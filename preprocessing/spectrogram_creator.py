@@ -84,9 +84,9 @@ def plot_spectrogram(
     """
 
     # Default arguments repeated explicitly for ease of future configuration.
-    kwargs.setdefault("NFFT", 4096)
+    kwargs.setdefault("NFFT", 1024)
     kwargs.setdefault("window", mlab.window_hanning)  # of size nfft
-    kwargs.setdefault("noverlap", 10)
+    kwargs.setdefault("noverlap", 512)
 
     # Plot spectrogram.
     spectrum: np.ndarray
@@ -133,7 +133,7 @@ if __name__ == '__main__':
             plt.rcParams['figure.dpi'] = 100
             plt.rcParams['savefig.dpi'] = 100        
             
-            plot_spectrogram(ax, x, sample_rate=7680000, center_freq=0)
+            plot_spectrogram(ax, x, sample_rate=20000000, center_freq=0)
                     
             save_path = os.path.abspath(spectrogram_folder) + '/' + filename + '.jpg'
             fig.savefig(save_path)
