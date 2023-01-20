@@ -84,9 +84,9 @@ def plot_spectrogram(
     """
 
     # Default arguments repeated explicitly for ease of future configuration.
-    kwargs.setdefault("NFFT", 1024)
+    kwargs.setdefault("NFFT", 4096)
     kwargs.setdefault("window", mlab.window_hanning)  # of size nfft
-    kwargs.setdefault("noverlap", 512)
+    kwargs.setdefault("noverlap", 10)
 
     # Plot spectrogram.
     spectrum: np.ndarray
@@ -103,7 +103,7 @@ def plot_spectrogram(
 if __name__ == '__main__':
     
     parser = argparse.ArgumentParser(description = '',formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--IQ_folder_path', default='', type=str, help='')
+    parser.add_argument('-I', '--IQ_folder_path', default='', type=str, help='')
 
     args = parser.parse_args()
     
@@ -115,21 +115,27 @@ if __name__ == '__main__':
 
     # sort the files
     IQ_file_list = sorted(IQ_file_list, key = os.path.getmtime)
-    IQ_file_list = IQ_file_list[-10:]
+    IQ_file_list = IQ_file_list[-20:]
 
     print('********** Creating Spectrograms ***********') 
     for this_IQ_path in tqdm(IQ_file_list):
+        print(this_IQ_path)
 
-       if this_IQ_path.endswith('-data'):
-            filename = this_IQ_path.split('/')[-1].split('-data')[0]
+        if this_IQ_path.endswith('.mat'):
+            filename = this_IQ_path.split('/')[-1].split('.mat')[0]
+            print(filename)
             
-            with open (this_IQ_path,'rb') as handle:
-                content = np.fromfile(handle, dtype=np.complex64)
+            with open(this_IQ_path,'rb') as handle:
+                #content = np.fromfile(handle, dtype=np.complex64)
+                mat_content = loadmat(handle, squeeze_me=True)
+                #print(mat_content['waveform'].shape)
+                #print(mat_content['waveform'].dtype)
+                #print(mat_content['waveform'])
             # discard the fist element
             # x = content[1:]
-            x = content
+            x = mat_content['waveform']
 
-            fig, ax = plt.subplots(figsize=(8,12))
+            fig, ax = plt.subplots(figsize=(10, 10))
             plt.rcParams['figure.dpi'] = 100
             plt.rcParams['savefig.dpi'] = 100        
             
@@ -139,3 +145,4 @@ if __name__ == '__main__':
             fig.savefig(save_path)
 
             plt.close(fig)
+
