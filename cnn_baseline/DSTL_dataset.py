@@ -44,7 +44,7 @@ class DSTLDataset(Dataset):
                  slice_overlap_ratio=0.5,   # this is the overlap ratio for each slice generated from a signal
                                             # this value will affect the number of slices that is possible to create from each signal
                  ds_path='/home/mauro/Research/DSTL/DSTL_DATASET_1_0',
-                 noise_model='AWGN', noise_dbm=0,
+                 noise_model='AWGN', snr_dbs=[30],
                  override_gen_map=False,
                  normalize=False,
                  transform=None, target_transform=None):
@@ -52,6 +52,8 @@ class DSTLDataset(Dataset):
         self.protocols = protocols
         self.slice_len = slice_len
         self.slice_overlap_ratio = slice_overlap_ratio
+        self.noise_model = noise_model
+        self.snr_dbs = snr_dbs
 
         assert(ds_type in ['train', 'test'])
         self.ds_type = ds_type
@@ -173,8 +175,31 @@ class DSTLDataset(Dataset):
             mat_dict = sio.loadmat(obs_info['path'])
             self.signal_cache.put(obs_info['path'], mat_dict['waveform'])
             sig = self.signal_cache.get(obs_info['path'])
-        # then we obtain the relative slice
-        obs = sig[obs_info['slice_ix']:obs_info['slice_ix']+self.slice_len, 0]
+
+        # apply AWGN noise based on the levels specified when instantiating the dataset object
+        # if more than one is specified, a random level is picked among the one specified
+        # first, let's compute signal power (in Watts) as rms(sig)**2
+        rms = np.sqrt(np.mean(np.abs(sig)**2))
+        sig_W = rms ** 2    # power of signal in Watts
+        # convert signal power in dBW
+        SNR = np.random.choice(self.snr_dbs)
+        sig_dbW = 10 * np.log10(sig_W/1)
+        # now compute the relative noise power based on the specified SNR level
+        noise_dbW = sig_dbW - float(SNR)
+        # noise variance = noise power
+        noise_var = 10**(noise_dbW/10)
+        # obtain noise standard deviation
+        noise_std = np.sqrt(noise_var)
+        # now generate the noise samples.
+        # NOTE: since we are generating ** complex ** noise samples, the nominal variance for a
+        # normal complex distribution is equal to 1/2 instead of 1.
+        # var = std**2 = 1/2 ---> std = sqrt(1/2) = 1/sqrt(2)
+        complex_std = noise_std * 1/np.sqrt(2)
+        noise_samples = np.random.normal(0, complex_std, size=sig.shape) + 1j * np.random.normal(0, complex_std, size=sig.shape)
+        # now apply noise to the signal
+        noisy_sig = sig + noise_samples
+        # then, retireve the relative slice of the requested dataset sample
+        obs = noisy_sig[obs_info['slice_ix']:obs_info['slice_ix']+self.slice_len, 0]
         obs = np.stack((obs.real, obs.imag))
         label = dataset['labels'][s_idx]
 

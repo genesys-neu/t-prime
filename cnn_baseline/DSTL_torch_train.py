@@ -107,7 +107,7 @@ def validate_epoch(dataloader, model, loss_fn, Nclasses, isDebug=False):
             correct += (pred.argmax(1) == y).type(torch.float).sum().item()
             y_cpu = y.to('cpu')
             pred_cpu = pred.to('cpu')
-            conf_matrix += conf_mat(y_cpu, pred_cpuq.argmax(1), labels=list(range(Nclasses)))
+            conf_matrix += conf_mat(y_cpu, pred_cpu.argmax(1), labels=list(range(Nclasses)))
     test_loss /= num_batches
     correct /= size
     print(
@@ -159,14 +159,6 @@ def train_func(config: Dict):
     for e in range(epochs):
         train_epoch(train_dataloader, model, loss_fn, optimizer, isDebug)
         loss, conf_matrix = validate_epoch(test_dataloader, model, loss_fn, Nclasses=Nclass, isDebug=isDebug)
-        if best_loss > loss:
-            best_loss = loss
-            pickle.dump(conf_matrix, open('conf_matrix.best.pkl', 'wb'))
-            torch.save({
-                'model_state_dict': model.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-                'loss': loss,
-            }, 'model.best.pt')
         scheduler.step(loss)
         loss_results.append(loss)
         if not isDebug:
@@ -178,6 +170,15 @@ def train_func(config: Dict):
             )
 
             session.report(dict(loss=loss), checkpoint=checkpoint)
+        else:
+            if best_loss > loss:
+                best_loss = loss
+                pickle.dump(conf_matrix, open('conf_matrix.best.pkl', 'wb'))
+                torch.save({
+                    'model_state_dict': model.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict(),
+                    'loss': loss,
+                }, 'model.best.pt')
 
     # return required for backwards compatibility with the old API
     # TODO(team-ml) clean up and remove return
@@ -187,6 +188,9 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
+    parser.add_argument("--snr_db", nargs='+', default=[30], help="SNR levels to be considered during training. "
+                                                                  "It's possible to define multiple noise levels to be "
+                                                                  "chosen at random during input slices generation.")
     parser.add_argument("--isDebug", action='store_true', default=False, help="Run in debug mode")
     parser.add_argument("--num-workers", "-n", type=int, default=2, help="Sets number of workers for training.")
     parser.add_argument("--use-gpu", action="store_true", default=False, help="Enables GPU training")
@@ -196,8 +200,8 @@ if __name__ == "__main__":
     args, _ = parser.parse_known_args()
 
     protocols = ['802_11ax', '802_11b', '802_11n', '802_11g']
-    ds_train = DSTLDataset(protocols, ds_type='train', slice_len=128, slice_overlap_ratio=0.5, override_gen_map=True)
-    ds_test = DSTLDataset(protocols, ds_type='test', slice_len=128, slice_overlap_ratio=0.5, override_gen_map=True)
+    ds_train = DSTLDataset(protocols, ds_type='train', snr_dbs=args.snr_db, slice_len=128, slice_overlap_ratio=0.5, override_gen_map=True)
+    ds_test = DSTLDataset(protocols, ds_type='test', snr_dbs=args.snr_db, slice_len=128, slice_overlap_ratio=0.5, override_gen_map=True)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     train_config = {"lr": 1e-3, "batch_size": 512, "epochs": 5}
