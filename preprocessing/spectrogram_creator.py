@@ -146,7 +146,7 @@ if __name__ == '__main__':
             plt.rcParams['figure.dpi'] = 100
             plt.rcParams['savefig.dpi'] = 100
             
-            plot_spectrogram(ax, x, sample_rate=2000000, center_freq=0)
+            plot_spectrogram(ax, x, sample_rate=20000000, center_freq=0)
 
             final_save_path = save_path + '/' + filename + '.jpg'
             #print(save_path)
