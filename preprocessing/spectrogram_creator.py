@@ -84,9 +84,9 @@ def plot_spectrogram(
     """
 
     # Default arguments repeated explicitly for ease of future configuration.
-    kwargs.setdefault("NFFT", 4096)
+    kwargs.setdefault("NFFT", 64)
     kwargs.setdefault("window", mlab.window_hanning)  # of size nfft
-    kwargs.setdefault("noverlap", 10)
+    kwargs.setdefault("noverlap", 32)
 
     # Plot spectrogram.
     spectrum: np.ndarray
@@ -108,22 +108,25 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     spectrogram_folder = 'images'
-    if not os.path.isdir(os.path.abspath(spectrogram_folder)):
-        os.mkdir(os.path.abspath(spectrogram_folder))
+    save_path = os.path.join(os.path.abspath(args.IQ_folder_path),spectrogram_folder)
+
+    if not os.path.isdir(save_path):
+        os.mkdir(save_path)
+    #print(save_path)
     
     IQ_file_list = glob.glob(os.path.abspath(args.IQ_folder_path)+'/*')
 
     # sort the files
     IQ_file_list = sorted(IQ_file_list, key = os.path.getmtime)
-    IQ_file_list = IQ_file_list[-20:]
+    #IQ_file_list = IQ_file_list[-20:]
 
     print('********** Creating Spectrograms ***********') 
     for this_IQ_path in tqdm(IQ_file_list):
-        print(this_IQ_path)
+        #print(this_IQ_path)
 
         if this_IQ_path.endswith('.mat'):
             filename = this_IQ_path.split('/')[-1].split('.mat')[0]
-            print(filename)
+            #print(filename)
             
             with open(this_IQ_path,'rb') as handle:
                 #content = np.fromfile(handle, dtype=np.complex64)
@@ -133,16 +136,21 @@ if __name__ == '__main__':
                 #print(mat_content['waveform'])
             # discard the fist element
             # x = content[1:]
+
             x = mat_content['waveform']
+            #x = np.fft.fft(x, 64)
+            #x = np.fft.fftshift(x)
+            #x = np.fft.ifft(x, 64)
 
             fig, ax = plt.subplots(figsize=(10, 10))
             plt.rcParams['figure.dpi'] = 100
-            plt.rcParams['savefig.dpi'] = 100        
+            plt.rcParams['savefig.dpi'] = 100
             
-            plot_spectrogram(ax, x, sample_rate=20000000, center_freq=0)
-                    
-            save_path = os.path.abspath(spectrogram_folder) + '/' + filename + '.jpg'
-            fig.savefig(save_path)
+            plot_spectrogram(ax, x, sample_rate=2000000, center_freq=0)
+
+            final_save_path = save_path + '/' + filename + '.jpg'
+            #print(save_path)
+            fig.savefig(final_save_path)
 
             plt.close(fig)
 
