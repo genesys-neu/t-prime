@@ -193,6 +193,7 @@ class DSTLDataset(Dataset):
         # now generate the noise samples.
         # NOTE: since we are generating ** complex ** noise samples, the nominal variance for a
         # normal complex distribution is equal to 1/2 instead of 1.
+        # https://en.wikipedia.org/wiki/Complex_normal_distribution
         # var = std**2 = 1/2 ---> std = sqrt(1/2) = 1/sqrt(2)
         complex_std = noise_std * 1/np.sqrt(2)
         noise_samples = np.random.normal(0, complex_std, size=sig.shape) + 1j * np.random.normal(0, complex_std, size=sig.shape)

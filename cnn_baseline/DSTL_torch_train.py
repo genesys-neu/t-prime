@@ -1,3 +1,4 @@
+import os
 import numpy as np
 from DSTL_dataset import DSTLDataset
 from ray.air import session, Checkpoint
@@ -66,8 +67,8 @@ class ConvNN(nn.Module):
 
 global_model = ConvNN
 
-def train_epoch(dataloader, model, loss_fn, optimizer, isDebug=False):
-    if not isDebug:
+def train_epoch(dataloader, model, loss_fn, optimizer, use_ray=False):
+    if use_ray:
         size = len(dataloader.dataset) // session.get_world_size()
     else:
         size = len(dataloader.dataset)
@@ -89,8 +90,8 @@ def train_epoch(dataloader, model, loss_fn, optimizer, isDebug=False):
             print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
 
 from sklearn.metrics import confusion_matrix as conf_mat
-def validate_epoch(dataloader, model, loss_fn, Nclasses, isDebug=False):
-    if not isDebug:
+def validate_epoch(dataloader, model, loss_fn, Nclasses, use_ray=False):
+    if use_ray:
         size = len(dataloader.dataset) // session.get_world_size()
     else:
         size = len(dataloader.dataset)
@@ -123,13 +124,14 @@ def train_func(config: Dict):
     lr = config["lr"]
     epochs = config["epochs"]
     Nclass = config["Nclass"]
-    isDebug = config['isDebug']
+    use_ray = config['useRay']
     slice_len = config['slice_len']
     num_feats = config['num_feats']
     num_channels = config['num_chans']
     device = config['device']
+    logdir = config['cp_path']
 
-    if isDebug:
+    if not use_ray:
         worker_batch_size = batch_size
     else:
         worker_batch_size = batch_size // session.get_world_size()
@@ -138,13 +140,13 @@ def train_func(config: Dict):
     train_dataloader = DataLoader(ds_train, batch_size=worker_batch_size, shuffle=True)
     test_dataloader = DataLoader(ds_test, batch_size=worker_batch_size, shuffle=True)
 
-    if not isDebug:
+    if use_ray:
         train_dataloader = train.torch.prepare_data_loader(train_dataloader)
         test_dataloader = train.torch.prepare_data_loader(test_dataloader)
 
     # Create model.
     model = global_model(classes=Nclass, numChannels=num_channels, slice_len=slice_len, num_feats=num_feats)
-    if not isDebug:
+    if use_ray:
         model = train.torch.prepare_model(model)
     else:
         model.to(device)
@@ -157,11 +159,14 @@ def train_func(config: Dict):
     loss_results = []
     best_loss = np.inf
     for e in range(epochs):
-        train_epoch(train_dataloader, model, loss_fn, optimizer, isDebug)
-        loss, conf_matrix = validate_epoch(test_dataloader, model, loss_fn, Nclasses=Nclass, isDebug=isDebug)
+        train_epoch(train_dataloader, model, loss_fn, optimizer, use_ray)
+        loss, conf_matrix = validate_epoch(test_dataloader, model, loss_fn, Nclasses=Nclass, use_ray=use_ray)
         scheduler.step(loss)
         loss_results.append(loss)
-        if not isDebug:
+        if use_ray:
+            if best_loss > loss:
+                best_loss = loss
+
             # store checkpoint only if the loss has improved
             state_dict = model.state_dict()
             consume_prefix_in_state_dict_if_present(state_dict, "module.")
@@ -173,12 +178,12 @@ def train_func(config: Dict):
         else:
             if best_loss > loss:
                 best_loss = loss
-                pickle.dump(conf_matrix, open('conf_matrix.best.pkl', 'wb'))
+                pickle.dump(conf_matrix, open(os.path.join(logdir, 'conf_matrix.best.pkl'), 'wb'))
                 torch.save({
                     'model_state_dict': model.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
                     'loss': loss,
-                }, 'model.best.pt')
+                }, os.path.join(logdir,'model.best.pt'))
 
     # return required for backwards compatibility with the old API
     # TODO(team-ml) clean up and remove return
@@ -191,28 +196,32 @@ if __name__ == "__main__":
     parser.add_argument("--snr_db", nargs='+', default=[30], help="SNR levels to be considered during training. "
                                                                   "It's possible to define multiple noise levels to be "
                                                                   "chosen at random during input slices generation.")
-    parser.add_argument("--isDebug", action='store_true', default=False, help="Run in debug mode")
+    parser.add_argument("--useRay", action='store_true', default=False, help="Run with Ray's Trainer function")
     parser.add_argument("--num-workers", "-n", type=int, default=2, help="Sets number of workers for training.")
     parser.add_argument("--use-gpu", action="store_true", default=False, help="Enables GPU training")
     parser.add_argument("--address", required=False, type=str, help="the address to use for Ray")
     parser.add_argument("--test", action="store_true", default=False, help="Testing the model")
-    parser.add_argument("--cp_path", help='Path to the checkpoint to load at test time.')
+    parser.add_argument("--cp_path", default='./', help='Path to the checkpoint to save/load the model.')
     args, _ = parser.parse_known_args()
 
     protocols = ['802_11ax', '802_11b', '802_11n', '802_11g']
     ds_train = DSTLDataset(protocols, ds_type='train', snr_dbs=args.snr_db, slice_len=128, slice_overlap_ratio=0.5, override_gen_map=True)
     ds_test = DSTLDataset(protocols, ds_type='test', snr_dbs=args.snr_db, slice_len=128, slice_overlap_ratio=0.5, override_gen_map=True)
 
+    if not os.path.isdir(args.cp_path):
+        os.makedirs(args.cp_path)
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     train_config = {"lr": 1e-3, "batch_size": 512, "epochs": 5}
     ds_info = ds_train.info()
     Nclass = ds_info['nclasses']
     train_config['Nclass'] = Nclass
-    train_config['isDebug'] = args.isDebug
+    train_config['useRay'] = args.useRay    # TODO: fix this, currently it's not working with Ray because the dataset gets replicated among workers
     train_config['slice_len'] = ds_info['slice_len']
     train_config['num_feats'] = 1
     train_config['num_chans'] = ds_info['nchans']
     train_config['device'] = device
+    train_config['cp_path'] = args.cp_path
 
     """
     if not train_config['isDebug']:
