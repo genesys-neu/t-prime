@@ -141,7 +141,6 @@ if __name__ == '__main__':
             #x = np.fft.fft(x, 64)
             #x = np.fft.fftshift(x)
             #x = np.fft.ifft(x, 64)
-
             fig, ax = plt.subplots(figsize=(10, 10))
             plt.rcParams['figure.dpi'] = 100
             plt.rcParams['savefig.dpi'] = 100
