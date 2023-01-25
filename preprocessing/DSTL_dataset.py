@@ -54,6 +54,7 @@ class DSTLDataset(Dataset):
         self.slice_overlap_ratio = slice_overlap_ratio
         self.noise_model = noise_model
         self.snr_dbs = snr_dbs
+        self.overlap = int(self.slice_len * self.slice_overlap_ratio)
 
         assert(ds_type in ['train', 'test'])
         self.ds_type = ds_type
@@ -110,8 +111,7 @@ class DSTLDataset(Dataset):
             for ix, path in examples_map[c].items():
                 sig = sio.loadmat(path)
                 len_sig = sig['waveform'].shape[0]
-                overlap = int(self.slice_len * self.slice_overlap_ratio)
-                window_ixs = list(range(0, len_sig-self.slice_len, overlap)) 
+                window_ixs = list(range(0, len_sig-self.slice_len, self.overlap))
                 n_windows = len(window_ixs)
                 examples_map[c][ix] = {'slices': window_ixs,
                                        'path': examples_map[c][ix]}  # here we modify the original content
@@ -176,28 +176,7 @@ class DSTLDataset(Dataset):
             self.signal_cache.put(obs_info['path'], mat_dict['waveform'])
             sig = self.signal_cache.get(obs_info['path'])
 
-        # apply AWGN noise based on the levels specified when instantiating the dataset object
-        # if more than one is specified, a random level is picked among the one specified
-        # first, let's compute signal power (in Watts) as rms(sig)**2
-        rms = np.sqrt(np.mean(np.abs(sig)**2))
-        sig_W = rms ** 2    # power of signal in Watts
-        # convert signal power in dBW
-        SNR = np.random.choice(self.snr_dbs)
-        sig_dbW = 10 * np.log10(sig_W/1)
-        # now compute the relative noise power based on the specified SNR level
-        noise_dbW = sig_dbW - float(SNR)
-        # noise variance = noise power
-        noise_var = 10**(noise_dbW/10)
-        # obtain noise standard deviation
-        noise_std = np.sqrt(noise_var)
-        # now generate the noise samples.
-        # NOTE: since we are generating ** complex ** noise samples, the nominal variance for a
-        # normal complex distribution is equal to 1/2 instead of 1.
-        # var = std**2 = 1/2 ---> std = sqrt(1/2) = 1/sqrt(2)
-        complex_std = noise_std * 1/np.sqrt(2)
-        noise_samples = np.random.normal(0, complex_std, size=sig.shape) + 1j * np.random.normal(0, complex_std, size=sig.shape)
-        # now apply noise to the signal
-        noisy_sig = sig + noise_samples
+        noisy_sig = self.apply_AWGN(sig)
         # then, retireve the relative slice of the requested dataset sample
         obs = noisy_sig[obs_info['slice_ix']:obs_info['slice_ix']+self.slice_len, 0]
         obs = np.stack((obs.real, obs.imag))
@@ -208,6 +187,33 @@ class DSTLDataset(Dataset):
         if self.target_transform:
             label = self.target_transform(label)
         return obs, label
+
+    def apply_AWGN(self, sig):
+        # apply AWGN noise based on the levels specified when instantiating the dataset object
+        # if more than one is specified, a random level is picked among the one specified
+        # first, let's compute signal power (in Watts) as rms(sig)**2
+        rms = np.sqrt(np.mean(np.abs(sig) ** 2))
+        sig_W = rms ** 2  # power of signal in Watts
+        # convert signal power in dBW
+        SNR = np.random.choice(self.snr_dbs)
+        sig_dbW = 10 * np.log10(sig_W / 1)
+        # now compute the relative noise power based on the specified SNR level
+        noise_dbW = sig_dbW - float(SNR)
+        # noise variance = noise power
+        noise_var = 10 ** (noise_dbW / 10)
+        # obtain noise standard deviation
+        noise_std = np.sqrt(noise_var)
+        # now generate the noise samples.
+        # NOTE: since we are generating ** complex ** noise samples, the nominal variance for a
+        # normal complex distribution is equal to 1/2 instead of 1.
+        # https://en.wikipedia.org/wiki/Complex_normal_distribution
+        # var = std**2 = 1/2 ---> std = sqrt(1/2) = 1/sqrt(2)
+        complex_std = noise_std * 1 / np.sqrt(2)
+        noise_samples = np.random.normal(0, complex_std, size=sig.shape) + 1j * np.random.normal(0, complex_std,
+                                                                                                 size=sig.shape)
+        # now apply noise to the signal
+        noisy_sig = sig + noise_samples
+        return noisy_sig
 
 
 if __name__ == "__main__":
