@@ -171,6 +171,7 @@ class DSTLDataset(Dataset):
         obs_info = dataset['data'][s_idx]
         # let's first retrieve the signal from the cache (or load it in if not present)
         sig = self.signal_cache.get(obs_info['path'])
+        self.last_file_loaded = obs_info['path']
         if sig is None:
             mat_dict = sio.loadmat(obs_info['path'])
             self.signal_cache.put(obs_info['path'], mat_dict['waveform'])
