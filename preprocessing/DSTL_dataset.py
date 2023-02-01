@@ -8,6 +8,7 @@ import argparse
 from glob import glob
 import os
 from tqdm import tqdm
+from dstl.preprocessing.matutils import matutils
 
 class FileCache:
     def __init__(self, max_size):
@@ -44,7 +45,8 @@ class DSTLDataset(Dataset):
                  slice_overlap_ratio=0.5,   # this is the overlap ratio for each slice generated from a signal
                                             # this value will affect the number of slices that is possible to create from each signal
                  ds_path='/home/mauro/Research/DSTL/DSTL_DATASET_1_0',
-                 noise_model='AWGN', snr_dbs=[30],
+                 noise_model='AWGN', snr_dbs=[30], seed=None,
+                 apply_noise=True, apply_wchannel=False,
                  override_gen_map=False,
                  normalize=False,
                  transform=None, target_transform=None):
@@ -52,9 +54,13 @@ class DSTLDataset(Dataset):
         self.protocols = protocols
         self.slice_len = slice_len
         self.slice_overlap_ratio = slice_overlap_ratio
+        self.overlap = int(self.slice_len * self.slice_overlap_ratio)
         self.noise_model = noise_model
         self.snr_dbs = snr_dbs
-        self.overlap = int(self.slice_len * self.slice_overlap_ratio)
+        self.seed = seed
+        if not (self.seed is None):
+            np.random.seed(self.seed)
+
 
         assert(ds_type in ['train', 'test'])
         self.ds_type = ds_type
@@ -79,8 +85,28 @@ class DSTLDataset(Dataset):
         # let's assign inputs and labels
         self.transform = transform
         self.target_transform = target_transform
+        self.apply_wchannel = apply_wchannel
+        self.apply_noise = apply_noise
 
         self.signal_cache = FileCache(max_size=20e4)
+
+        # let's initialize Matlab engine
+        self.mateng = matutils.MatlabEngine()  # todo check if we need any custom paths
+        # initialize each channel object for each protocol used
+        self.chan_models = {}
+        for ix, p in enumerate(protocols):
+            if p == '802_11n':
+                tgn = self.mateng.eng.wlanTGnChannel('SampleRate', float(20e6), 'DelayProfile', 'Model-B', 'LargeScaleFadingEffect', 'Pathloss')
+                self.chan_models[ix] = tgn
+            elif p == '802_11ax':
+                tgax = self.mateng.eng.wlanTGaxChannel('SampleRate', float(20e6), 'ChannelBandwidth', 'CBW20', 'DelayProfile', 'Model-B', 'LargeScaleFadingEffect', 'Pathloss')
+                self.chan_models[ix] = tgax
+            elif p == '802_11b':
+                rayleighB = self.mateng.eng.comm.RayleighChannel('SampleRate', float(11e6), 'PathDelays', float(1.5e-9), 'AveragePathGains', float(-3))
+                self.chan_models[ix] = rayleighB
+            elif (p == '802_11b_upsampled') or (p == '802_11g'):
+                rayleigh = self.mateng.eng.comm.RayleighChannel('SampleRate', float(20e6), 'PathDelays', float(1.5e-9), 'AveragePathGains', float(-3))
+                self.chan_models[ix] = rayleigh
 
     def generate_ds_map(self, ds_path, filename, test_ratio=0.2):
         examples_map = {}
@@ -177,11 +203,14 @@ class DSTLDataset(Dataset):
             self.signal_cache.put(obs_info['path'], mat_dict['waveform'])
             sig = self.signal_cache.get(obs_info['path'])
 
-        noisy_sig = self.apply_AWGN(sig)
+        label = dataset['labels'][s_idx]
+        # apply wireless channel and noise if required
+        chan_sig = self.apply_wchan(sig, label) if self.apply_wchannel else sig
+        noisy_sig = self.apply_AWGN(chan_sig) if self.apply_noise else chan_sig
+
         # then, retireve the relative slice of the requested dataset sample
         obs = noisy_sig[obs_info['slice_ix']:obs_info['slice_ix']+self.slice_len, 0]
         obs = np.stack((obs.real, obs.imag))
-        label = dataset['labels'][s_idx]
 
         if self.transform:
             obs = self.transform(obs)
@@ -216,9 +245,16 @@ class DSTLDataset(Dataset):
         noisy_sig = sig + noise_samples
         return noisy_sig
 
+    def apply_wchan(self, sig, label):
+        mat_sig = self.mateng.py2mat_array(sig)
+        channel = self.chan_models[label]
+        proc_sig = self.mateng.eng.step(channel, mat_sig, nargout=1)
+        return np.array(proc_sig)
+
+
 
 if __name__ == "__main__":
-    myds = DSTLDataset(['802_11ax', '802_11b', '802_11n', '802_11g'],slice_len=128, slice_overlap_ratio=0.5)
+    myds = DSTLDataset(['802_11ax', '802_11b', '802_11n', '802_11g'], slice_len=128, slice_overlap_ratio=0.5, apply_wchannel=True)
     for _ in range(10):
         index = np.random.choice(list(myds.ds_info['ds_indexes']['train']['data'].keys()))
         obs, lbl = myds[index]
