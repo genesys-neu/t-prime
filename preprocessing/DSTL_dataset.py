@@ -8,7 +8,7 @@ import argparse
 from glob import glob
 import os
 from tqdm import tqdm
-from dstl.preprocessing.matutils import matutils
+
 
 class FileCache:
     def __init__(self, max_size):
@@ -91,22 +91,24 @@ class DSTLDataset(Dataset):
         self.signal_cache = FileCache(max_size=20e4)
 
         # let's initialize Matlab engine
-        self.mateng = matutils.MatlabEngine()  # todo check if we need any custom paths
-        # initialize each channel object for each protocol used
-        self.chan_models = {}
-        for ix, p in enumerate(protocols):
-            if p == '802_11n':
-                tgn = self.mateng.eng.wlanTGnChannel('SampleRate', float(20e6), 'DelayProfile', 'Model-B', 'LargeScaleFadingEffect', 'Pathloss')
-                self.chan_models[ix] = tgn
-            elif p == '802_11ax':
-                tgax = self.mateng.eng.wlanTGaxChannel('SampleRate', float(20e6), 'ChannelBandwidth', 'CBW20', 'DelayProfile', 'Model-B', 'LargeScaleFadingEffect', 'Pathloss')
-                self.chan_models[ix] = tgax
-            elif p == '802_11b':
-                rayleighB = self.mateng.eng.comm.RayleighChannel('SampleRate', float(11e6), 'PathDelays', float(1.5e-9), 'AveragePathGains', float(-3))
-                self.chan_models[ix] = rayleighB
-            elif (p == '802_11b_upsampled') or (p == '802_11g'):
-                rayleigh = self.mateng.eng.comm.RayleighChannel('SampleRate', float(20e6), 'PathDelays', float(1.5e-9), 'AveragePathGains', float(-3))
-                self.chan_models[ix] = rayleigh
+        if self.apply_wchannel:
+            from dstl.preprocessing.matutils import matutils
+            self.mateng = matutils.MatlabEngine()  # todo check if we need any custom paths
+            # initialize each channel object for each protocol used
+            self.chan_models = {}
+            for ix, p in enumerate(protocols):
+                if p == '802_11n':
+                    tgn = self.mateng.eng.wlanTGnChannel('SampleRate', float(20e6), 'DelayProfile', 'Model-B', 'LargeScaleFadingEffect', 'Pathloss')
+                    self.chan_models[ix] = tgn
+                elif p == '802_11ax':
+                    tgax = self.mateng.eng.wlanTGaxChannel('SampleRate', float(20e6), 'ChannelBandwidth', 'CBW20', 'DelayProfile', 'Model-B', 'LargeScaleFadingEffect', 'Pathloss')
+                    self.chan_models[ix] = tgax
+                elif p == '802_11b':
+                    rayleighB = self.mateng.eng.comm.RayleighChannel('SampleRate', float(11e6), 'PathDelays', float(1.5e-9), 'AveragePathGains', float(-3))
+                    self.chan_models[ix] = rayleighB
+                elif (p == '802_11b_upsampled') or (p == '802_11g'):
+                    rayleigh = self.mateng.eng.comm.RayleighChannel('SampleRate', float(20e6), 'PathDelays', float(1.5e-9), 'AveragePathGains', float(-3))
+                    self.chan_models[ix] = rayleigh
 
     def generate_ds_map(self, ds_path, filename, test_ratio=0.2):
         examples_map = {}
