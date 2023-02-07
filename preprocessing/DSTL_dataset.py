@@ -256,7 +256,7 @@ class DSTLDataset(Dataset):
 
 
 if __name__ == "__main__":
-    myds = DSTLDataset(['802_11ax', '802_11b', '802_11n', '802_11g'], slice_len=128, slice_overlap_ratio=0.5, apply_wchannel=True)
+    myds = DSTLDataset(['802_11ax', '802_11b', '802_11n', '802_11g'], slice_len=128, slice_overlap_ratio=0.5, apply_wchannel=False)
     for _ in range(10):
-        index = np.random.choice(list(myds.ds_info['ds_indexes']['train']['data'].keys()))
+        index = np.random.choice(list(myds.ds_info['ixs_maps']['train'].keys()))
         obs, lbl = myds[index]
