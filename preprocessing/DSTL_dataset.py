@@ -8,6 +8,7 @@ import argparse
 from glob import glob
 import os
 from tqdm import tqdm
+import matlab
 
 
 class FileCache:
@@ -45,8 +46,9 @@ class DSTLDataset(Dataset):
                  slice_overlap_ratio=0.5,   # this is the overlap ratio for each slice generated from a signal
                                             # this value will affect the number of slices that is possible to create from each signal
                  ds_path='/home/mauro/Research/DSTL/DSTL_DATASET_1_0',
+                 file_postfix='',
                  noise_model='AWGN', snr_dbs=[30], seed=None,
-                 apply_noise=True, apply_wchannel=False,
+                 apply_noise=True, apply_wchannel=None,
                  override_gen_map=False,
                  normalize=False,
                  transform=None, target_transform=None):
@@ -64,8 +66,9 @@ class DSTLDataset(Dataset):
 
         assert(ds_type in ['train', 'test'])
         self.ds_type = ds_type
-
-        info_filename = 'ds_info__'+str(len(protocols))+'class.pkl'
+        if file_postfix != '' and file_postfix[-1] != '_':
+            file_postfix += '_'
+        info_filename = 'ds_info__'+file_postfix+str(len(protocols))+'class.pkl'
         ds_info_path = os.path.join(ds_path, info_filename)
         do_gen_info = True
         if os.path.exists(ds_info_path) and (not override_gen_map):
@@ -88,27 +91,34 @@ class DSTLDataset(Dataset):
         self.apply_wchannel = apply_wchannel
         self.apply_noise = apply_noise
 
-        self.signal_cache = FileCache(max_size=20e4)
+        self.signal_cache = FileCache(max_size=20e3)
 
         # let's initialize Matlab engine
-        if self.apply_wchannel:
+        if not (self.apply_wchannel is None):
+            self.possible_channels = ['TGn', 'TGax', 'Rayleigh', 'relative']
+            assert(self.apply_wchannel in self.possible_channels)
+            self.channel_map = {}
             from dstl.preprocessing.matutils import matutils
             self.mateng = matutils.MatlabEngine()  # todo check if we need any custom paths
             # initialize each channel object for each protocol used
             self.chan_models = {}
             for ix, p in enumerate(protocols):
                 if p == '802_11n':
-                    tgn = self.mateng.eng.wlanTGnChannel('SampleRate', float(20e6), 'DelayProfile', 'Model-B', 'LargeScaleFadingEffect', 'Pathloss')
+                    tgn = self.mateng.eng.wlanTGnChannel('SampleRate', float(20e6), 'DelayProfile', 'Model-B', 'LargeScaleFadingEffect', 'Pathloss', 'PathGainsOutputPort', True)
                     self.chan_models[ix] = tgn
+                    self.channel_map['TGn'] = ix
                 elif p == '802_11ax':
-                    tgax = self.mateng.eng.wlanTGaxChannel('SampleRate', float(20e6), 'ChannelBandwidth', 'CBW20', 'DelayProfile', 'Model-B', 'LargeScaleFadingEffect', 'Pathloss')
+                    tgax = self.mateng.eng.wlanTGaxChannel('SampleRate', float(20e6), 'ChannelBandwidth', 'CBW20', 'DelayProfile', 'Model-B', 'LargeScaleFadingEffect', 'Pathloss', 'PathGainsOutputPort', True)
                     self.chan_models[ix] = tgax
+                    self.channel_map['TGax'] = ix
                 elif p == '802_11b':
-                    rayleighB = self.mateng.eng.comm.RayleighChannel('SampleRate', float(11e6), 'PathDelays', float(1.5e-9), 'AveragePathGains', float(-3))
+                    rayleighB = self.mateng.eng.comm.RayleighChannel('SampleRate', float(11e6), 'PathDelays', float(1.5e-9), 'AveragePathGains', float(-3), 'PathGainsOutputPort', True)
                     self.chan_models[ix] = rayleighB
+                    self.channel_map['RayleighB'] = ix
                 elif (p == '802_11b_upsampled') or (p == '802_11g'):
-                    rayleigh = self.mateng.eng.comm.RayleighChannel('SampleRate', float(20e6), 'PathDelays', float(1.5e-9), 'AveragePathGains', float(-3))
+                    rayleigh = self.mateng.eng.comm.RayleighChannel('SampleRate', float(20e6), 'PathDelays', float(1.5e-9), 'AveragePathGains', float(-3), 'PathGainsOutputPort', True)
                     self.chan_models[ix] = rayleigh
+                    self.channel_map['Rayleigh'] = ix
 
     def generate_ds_map(self, ds_path, filename, test_ratio=0.2):
         examples_map = {}
@@ -198,16 +208,16 @@ class DSTLDataset(Dataset):
         # retrieve the info relative to this input sample
         obs_info = dataset['data'][s_idx]
         # let's first retrieve the signal from the cache (or load it in if not present)
-        sig = self.signal_cache.get(obs_info['path'])
+        sig_dict = self.signal_cache.get(obs_info['path'])
         self.last_file_loaded = obs_info['path']
-        if sig is None:
+        if sig_dict is None:
             mat_dict = sio.loadmat(obs_info['path'])
-            self.signal_cache.put(obs_info['path'], mat_dict['waveform'])
-            sig = self.signal_cache.get(obs_info['path'])
+            self.signal_cache.put(obs_info['path'], {'np': mat_dict['waveform'], 'mat': self.mateng.py2mat_array(mat_dict['waveform'])})
+            sig_dict = self.signal_cache.get(obs_info['path'])
 
         label = dataset['labels'][s_idx]
         # apply wireless channel and noise if required
-        chan_sig = self.apply_wchan(sig, label) if self.apply_wchannel else sig
+        chan_sig = self.apply_wchan(sig_dict['mat'], label) if not (self.apply_wchannel is None) else sig_dict['np']
         noisy_sig = self.apply_AWGN(chan_sig) if self.apply_noise else chan_sig
 
         # then, retireve the relative slice of the requested dataset sample
@@ -247,16 +257,27 @@ class DSTLDataset(Dataset):
         noisy_sig = sig + noise_samples
         return noisy_sig
 
-    def apply_wchan(self, sig, label):
-        mat_sig = self.mateng.py2mat_array(sig)
-        channel = self.chan_models[label]
+    def apply_wchan(self, mat_sig, label):
+        if self.apply_wchannel == 'relative':
+            # in this case we apply the channel relative to the protocol used
+            channel = self.chan_models[label]
+        else:
+            # in other cases, we have a fixed channel we want to apply to all the signals
+            # in this case, 802.11b is not supported in its native sampling rate (11 MHz) due to consistency with
+            # sampling rate of other standards (20 MHz)
+            assert(not ('802_11b' in self.protocols))
+            chan_ix = self.channel_map[self.apply_wchannel]
+            channel = self.chan_models[chan_ix]
+
         proc_sig = self.mateng.eng.step(channel, mat_sig, nargout=1)
         return np.array(proc_sig)
 
 
 
 if __name__ == "__main__":
-    myds = DSTLDataset(['802_11ax', '802_11b', '802_11n', '802_11g'], slice_len=128, slice_overlap_ratio=0.5, apply_wchannel=False)
+    # myds = DSTLDataset(['802_11ax', '802_11b', '802_11n', '802_11g'], slice_len=128, slice_overlap_ratio=0.5) # case with mixed sampling rates and only AWGN
+    myds = DSTLDataset(['802_11ax', '802_11b_upsampled', '802_11n', '802_11g'], slice_len=128, slice_overlap_ratio=0.5,
+                       apply_wchannel='TGn', file_postfix='all20MHz')    # this case has consistent sampling rates (20 MHz) and applies a specific channel to all signals
     for _ in range(10):
         index = np.random.choice(list(myds.ds_info['ixs_maps']['train'].keys()))
         obs, lbl = myds[index]
