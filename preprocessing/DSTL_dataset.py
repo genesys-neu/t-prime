@@ -278,6 +278,20 @@ if __name__ == "__main__":
     # myds = DSTLDataset(['802_11ax', '802_11b', '802_11n', '802_11g'], slice_len=128, slice_overlap_ratio=0.5) # case with mixed sampling rates and only AWGN
     myds = DSTLDataset(['802_11ax', '802_11b_upsampled', '802_11n', '802_11g'], slice_len=128, slice_overlap_ratio=0.5,
                        apply_wchannel='TGn', file_postfix='all20MHz')    # this case has consistent sampling rates (20 MHz) and applies a specific channel to all signals
+
+    import matplotlib.pyplot as plt
+    classes_slice_count = {}
+    # compute an histogram that shows the distribution of labels in the dataset
+    for k in ['802_11ax', '802_11b_upsampled', '802_11n', '802_11g']:
+        classes_slice_count[k] = 0
+        for key_idx, content in myds.ds_info['examples_map'][k].items():
+             classes_slice_count[k] += len(content['slices'])
+
+    plt.bar(list(classes_slice_count.keys()), list(classes_slice_count.values()))
+    plt.show()
+
     for _ in range(10):
         index = np.random.choice(list(myds.ds_info['ixs_maps']['train'].keys()))
         obs, lbl = myds[index]
+
+
