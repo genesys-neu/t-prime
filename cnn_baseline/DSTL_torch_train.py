@@ -1,5 +1,8 @@
 import os
 import numpy as np
+proj_root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.join(os.pardir, os.pardir)))
+import sys
+sys.path.append(proj_root_dir)
 from dstl.preprocessing.DSTL_dataset import DSTLDataset
 from ray.air import session, Checkpoint
 from typing import Dict
@@ -11,7 +14,7 @@ from ray.air.config import ScalingConfig
 import ray.train as train
 import pickle
 from torch.nn.modules.utils import consume_prefix_in_state_dict_if_present
-
+from tqdm import tqdm
 from model_cnn1d import Baseline_CNN1D
 
 def train_epoch(dataloader, model, loss_fn, optimizer, use_ray=False):
@@ -20,7 +23,7 @@ def train_epoch(dataloader, model, loss_fn, optimizer, use_ray=False):
     else:
         size = len(dataloader.dataset)
     model.train()
-    for batch, (X, y) in enumerate(dataloader):
+    for batch, (X, y) in tqdm(enumerate(dataloader), desc="Training epochs.."):
         X = X.to(device)
         y = y.to(device)
         # Compute prediction error
@@ -32,9 +35,10 @@ def train_epoch(dataloader, model, loss_fn, optimizer, use_ray=False):
         loss.backward()
         optimizer.step()
 
-        if batch % 100 == 0:
+        if batch % 50 == 0:
             loss, current = loss.item(), batch * len(X)
             print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
+            print(f"Cached files: ", len(dataloader.dataset.signal_cache.cache.keys()))
 
 from sklearn.metrics import confusion_matrix as conf_mat
 def validate_epoch(dataloader, model, loss_fn, Nclasses, use_ray=False):
@@ -140,7 +144,8 @@ def train_func(config: Dict):
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument("--noise", action='store_true', default=False, help="Specify if noise needs to be applied or not during training")
     parser.add_argument("--snr_db", nargs='+', default=[30], help="SNR levels to be considered during training. "
                                                                   "It's possible to define multiple noise levels to be "
                                                                   "chosen at random during input slices generation.")
@@ -150,11 +155,14 @@ if __name__ == "__main__":
     parser.add_argument("--address", required=False, type=str, help="the address to use for Ray")
     parser.add_argument("--test", action="store_true", default=False, help="Testing the model")
     parser.add_argument("--cp_path", default='./', help='Path to the checkpoint to save/load the model.')
+    parser.add_argument("--protocols", nargs='+', default=['802_11ax', '802_11b', '802_11n', '802_11g'],
+                        choices=['802_11ax', '802_11b', '802_11b_upsampled', '802_11n', '802_11g'], help="Specify the protocols/classes to be included in the training")
+    parser.add_argument("--channel", default=None, choices=['TGn', 'TGax', 'Rayleigh', 'relative', None], help="Specify the channel models to apply during data generation. ")
     args, _ = parser.parse_known_args()
 
-    protocols = ['802_11ax', '802_11b', '802_11n', '802_11g']
-    ds_train = DSTLDataset(protocols, ds_type='train', snr_dbs=args.snr_db, slice_len=128, slice_overlap_ratio=0.5, override_gen_map=True)
-    ds_test = DSTLDataset(protocols, ds_type='test', snr_dbs=args.snr_db, slice_len=128, slice_overlap_ratio=0.5, override_gen_map=True)
+    protocols = args.protocols
+    ds_train = DSTLDataset(protocols, ds_type='train', snr_dbs=args.snr_db, slice_len=128, slice_overlap_ratio=0.5, override_gen_map=True, apply_wchannel=args.channel, apply_noise=args.noise)
+    ds_test = DSTLDataset(protocols, ds_type='test', snr_dbs=args.snr_db, slice_len=128, slice_overlap_ratio=0.5, override_gen_map=True, apply_wchannel=args.channel, apply_noise=args.noise)
 
     if not os.path.isdir(args.cp_path):
         os.makedirs(args.cp_path)
