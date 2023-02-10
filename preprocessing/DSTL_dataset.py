@@ -230,6 +230,14 @@ class DSTLDataset(Dataset):
             label = self.target_transform(label)
         return obs, label
 
+    # Function to change the shape of obs
+    # the input is obs with shape (channel, slice)
+    def chan2sequence(self, chan):
+        seq = np.empty((chan.size))
+        seq[0::2] = chan[0]
+        seq[1::2] = chan[1]
+        return seq
+
     def apply_AWGN(self, sig):
         # apply AWGN noise based on the levels specified when instantiating the dataset object
         # if more than one is specified, a random level is picked among the one specified
