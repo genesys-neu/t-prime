@@ -1,6 +1,6 @@
 import os
 import numpy as np
-from dstl.preprocessing.DSTL_dataset import DSTLDataset
+from preprocessing.DSTL_dataset import DSTLDataset
 from ray.air import session, Checkpoint
 from typing import Dict
 import torch
@@ -12,7 +12,7 @@ import ray.train as train
 import pickle
 from torch.nn.modules.utils import consume_prefix_in_state_dict_if_present
 
-from model_cnn1d import Baseline_CNN1D
+from model_transformer import TransformerModel
 
 def train_epoch(dataloader, model, loss_fn, optimizer, use_ray=False):
     if use_ray:
@@ -74,6 +74,7 @@ def train_func(config: Dict):
     Nclass = config["Nclass"]
     use_ray = config['useRay']
     slice_len = config['slice_len']
+    d_model = 2 * slice_len
     num_feats = config['num_feats']
     num_channels = config['num_chans']
     device = config['device']
@@ -93,7 +94,7 @@ def train_func(config: Dict):
         test_dataloader = train.torch.prepare_data_loader(test_dataloader)
 
     # Create model.
-    model = global_model(classes=Nclass, numChannels=num_channels, slice_len=slice_len)
+    model = global_model(classes=Nclass, d_model=d_model)
     if use_ray:
         model = train.torch.prepare_model(model)
     else:
@@ -163,7 +164,7 @@ if __name__ == "__main__":
     train_config = {"lr": 1e-3, "batch_size": 512, "epochs": 5}
     ds_info = ds_train.info()
     Nclass = ds_info['nclasses']
-    train_config['pytorch_model'] = Baseline_CNN1D
+    train_config['pytorch_model'] = TransformerModel
     train_config['Nclass'] = Nclass
     train_config['useRay'] = args.useRay    # TODO: fix this, currently it's not working with Ray because the dataset gets replicated among workers
     train_config['slice_len'] = ds_info['slice_len']
