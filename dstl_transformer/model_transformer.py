@@ -42,11 +42,13 @@ class TransformerModel(nn.Module):
 
         # We should normalize the input weights by sqrt(d_model)
         src = src * math.sqrt(self.d_model)
-        src = self.pos_encoder(src)
+        # ToDo: The positional encoder is changing the dimensions in a way I don't understand
+        src = self.pos_encoder(src).squeeze()
         t_out = self.transformer_encoder(src)
-        hidden_state = t_out[0]
-        pooler = hidden_state[:, 0]
-        pooler = self.pre_classifier(pooler)
+        # ToDo: Perhaps with a working PE we need to use these to reshape
+        #hidden_state = t_out[0]
+        #pooler = hidden_state[:, 0]
+        pooler = self.pre_classifier(t_out)
         pooler = torch.nn.ReLU()(pooler)
         pooler = self.dropout(pooler)
         output = self.classifier(pooler)
@@ -62,9 +64,16 @@ class PositionalEncoding(nn.Module):
 
         position = torch.arange(max_len).unsqueeze(1)
         div_term = torch.exp(torch.arange(0, d_model, 2) * (-math.log(10000.0) / d_model))
-        pe = torch.zeros(max_len, 1, d_model)
-        pe[:, 0, 0::2] = torch.sin(position * div_term)
-        pe[:, 0, 1::2] = torch.cos(position * div_term)
+        # ToDo: try the following change
+        # pe = torch.zeros(max_len, 1, d_model)
+        # pe[:, 0, 0::2] = torch.sin(position * div_term)
+        # pe[:, 0, 1::2] = torch.cos(position * div_term)
+        # try the following instead
+        pe = torch.zeros(max_len, d_model)
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        pe = pe.unsqueeze(0)
+
         self.register_buffer('pe', pe)
 
     def forward(self, x: Tensor) -> Tensor:
@@ -72,5 +81,6 @@ class PositionalEncoding(nn.Module):
         Args:
             x: Tensor, shape [seq_len, batch_size, embedding_dim]
         """
-        x = x + self.pe[:x.size(0)]
+        # x = x + self.pe[:x.size(0)]
+        x = x + self.pe[:, :x.size(0)]
         return self.dropout(x)

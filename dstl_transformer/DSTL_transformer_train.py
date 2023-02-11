@@ -14,6 +14,16 @@ from torch.nn.modules.utils import consume_prefix_in_state_dict_if_present
 
 from model_transformer import TransformerModel
 
+
+# Function to change the shape of obs
+# the input is obs with shape (channel, slice)
+def chan2sequence(obs):
+    seq = np.empty((obs.size))
+    seq[0::2] = obs[0]
+    seq[1::2] = obs[1]
+    return seq
+
+
 def train_epoch(dataloader, model, loss_fn, optimizer, use_ray=False):
     if use_ray:
         size = len(dataloader.dataset) // session.get_world_size()
@@ -154,14 +164,16 @@ if __name__ == "__main__":
     args, _ = parser.parse_known_args()
 
     protocols = ['802_11ax', '802_11b', '802_11n', '802_11g']
-    ds_train = DSTLDataset(protocols, ds_type='train', snr_dbs=args.snr_db, slice_len=128, slice_overlap_ratio=0.5, override_gen_map=True)
-    ds_test = DSTLDataset(protocols, ds_type='test', snr_dbs=args.snr_db, slice_len=128, slice_overlap_ratio=0.5, override_gen_map=True)
+    ds_train = DSTLDataset(protocols, ds_type='train', snr_dbs=args.snr_db, slice_len=128, slice_overlap_ratio=0.5,
+                           override_gen_map=False, transform=chan2sequence)
+    ds_test = DSTLDataset(protocols, ds_type='test', snr_dbs=args.snr_db, slice_len=128, slice_overlap_ratio=0.5,
+                          override_gen_map=False, transform=chan2sequence)
 
     if not os.path.isdir(args.cp_path):
         os.makedirs(args.cp_path)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    train_config = {"lr": 1e-3, "batch_size": 512, "epochs": 5}
+    train_config = {"lr": 1e-3, "batch_size": 256, "epochs": 5}
     ds_info = ds_train.info()
     Nclass = ds_info['nclasses']
     train_config['pytorch_model'] = TransformerModel
