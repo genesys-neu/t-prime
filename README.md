@@ -5,4 +5,6 @@ All huggingface transformer based code is in the /transformer folder.
 
 All DSTL specific transformer code is in the /dstl_transformer folder.
 
+The CNN code is in the /cnn_baseline folder.
+
 All preprocessing specific code is in the /preprocessing folder.
