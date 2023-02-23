@@ -1,5 +1,7 @@
 import os
 import numpy as np
+import sys
+sys.path.insert(0, '../')
 from preprocessing.DSTL_dataset import DSTLDataset
 from ray.air import session, Checkpoint
 from typing import Dict

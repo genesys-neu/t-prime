@@ -45,7 +45,7 @@ class DSTLDataset(Dataset):
                  ds_type='train',  # either 'train' or 'test'
                  slice_overlap_ratio=0.5,   # this is the overlap ratio for each slice generated from a signal
                                             # this value will affect the number of slices that is possible to create from each signal
-                 ds_path='/home/mauro/Research/DSTL/DSTL_DATASET_1_0',
+                                            ds_path='/home/miquelsirera/Desktop/dstl/data/DSTL_DATASET_1_0',
                  file_postfix='',
                  noise_model='AWGN', snr_dbs=[30], seed=None,
                  apply_noise=True, apply_wchannel=None,
@@ -212,7 +212,8 @@ class DSTLDataset(Dataset):
         self.last_file_loaded = obs_info['path']
         if sig_dict is None:
             mat_dict = sio.loadmat(obs_info['path'])
-            self.signal_cache.put(obs_info['path'], {'np': mat_dict['waveform'], 'mat': self.mateng.py2mat_array(mat_dict['waveform'])})
+            self.signal_cache.put(obs_info['path'], {'np': mat_dict['waveform'], \
+                        'mat': self.mateng.py2mat_array(mat_dict['waveform']) if not (self.apply_wchannel is None) else ''})
             sig_dict = self.signal_cache.get(obs_info['path'])
 
         label = dataset['labels'][s_idx]
@@ -285,6 +286,7 @@ class DSTLDataset(Dataset):
 if __name__ == "__main__":
     # myds = DSTLDataset(['802_11ax', '802_11b', '802_11n', '802_11g'], slice_len=128, slice_overlap_ratio=0.5) # case with mixed sampling rates and only AWGN
     myds = DSTLDataset(['802_11ax', '802_11b_upsampled', '802_11n', '802_11g'], slice_len=128, slice_overlap_ratio=0.5,
+                      
                        apply_wchannel='TGn', file_postfix='all20MHz')    # this case has consistent sampling rates (20 MHz) and applies a specific channel to all signals
 
     import matplotlib.pyplot as plt
