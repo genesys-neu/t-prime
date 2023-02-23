@@ -45,6 +45,7 @@ class DSTLDataset(Dataset):
                  ds_type='train',  # either 'train' or 'test'
                  slice_overlap_ratio=0.5,   # this is the overlap ratio for each slice generated from a signal
                                             # this value will affect the number of slices that is possible to create from each signal
+                 raw_data_ratio=1.0,        # ratio of the whole raw signal dataset to consider for generation
                  ds_path='/home/mauro/Research/DSTL/DSTL_DATASET_1_0',
                  file_postfix='',
                  noise_model='AWGN', snr_dbs=[30], seed=None,
@@ -57,6 +58,8 @@ class DSTLDataset(Dataset):
         self.slice_len = slice_len
         self.slice_overlap_ratio = slice_overlap_ratio
         self.overlap = int(self.slice_len * self.slice_overlap_ratio)
+        self.raw_data_ratio = raw_data_ratio
+        self.n_sig_per_class = {} # this will be filled in the generate_ds_map() function
         self.noise_model = noise_model
         self.snr_dbs = snr_dbs
         self.seed = seed
@@ -128,12 +131,18 @@ class DSTLDataset(Dataset):
             path = os.path.join(ds_path, p)
             if os.path.isdir(path):
                 mat_list = sorted(glob(os.path.join(path, '*.mat')))
+                self.n_sig_per_class[p] = int(
+                    len(mat_list) * self.raw_data_ratio)  # for each protocol, we save the amount of raw signals to retain
+
+                mat_list = mat_list[:self.n_sig_per_class[p]] # then we just clip the list
+                num_mat = len(mat_list)                     # and store the new list value length
                 examples_map[p] = dict(
                     zip(
-                        list(range(len(mat_list))),
+                        list(range(num_mat)),
                         mat_list
                     )
                 )
+
             else:
                 sys.exit('[DSTLDataset] folder ' + path + ' not found. Aborting...')
 
@@ -295,9 +304,10 @@ if __name__ == "__main__":
     parser.add_argument('--postfix', default='', help='Postfix to append to dataset file.')
     parser.add_argument('--slicelen', default=128, type=int, help='Signal slice size')
     parser.add_argument('--overlap_ratio', default=0.5, help='Overlap ratio for slices generation')
+    parser.add_argument('--raw_data_ratio', default=1.0, type=float, help='Specify the ratio of examples per class to consider while training/testing')
     args, _ = parser.parse_known_args()
 
-    myds = DSTLDataset(protocols=args.protocols, ds_path=args.raw_path, slice_len=args.slicelen, slice_overlap_ratio=args.overlap_ratio,
+    myds = DSTLDataset(protocols=args.protocols, ds_path=args.raw_path, slice_len=args.slicelen, slice_overlap_ratio=args.overlap_ratio, raw_data_ratio=args.raw_data_ratio,
                        apply_wchannel='TGn', file_postfix=args.postfix)    # this case has consistent sampling rates (20 MHz) and applies a specific channel to all signals
 
     import matplotlib.pyplot as plt
