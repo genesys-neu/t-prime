@@ -1,4 +1,3 @@
-import sys
 import scipy.io as sio
 import numpy as np
 import torch
@@ -8,7 +7,9 @@ import argparse
 from glob import glob
 import os
 from tqdm import tqdm
-
+proj_root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.join(os.pardir, os.pardir)))
+import sys
+sys.path.append(proj_root_dir)
 
 class FileCache:
     def __init__(self, max_size):
