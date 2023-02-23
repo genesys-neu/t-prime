@@ -1,6 +1,6 @@
 import os
 import numpy as np
-from dstl.preprocessing.DSTL_dataset import DSTLDataset
+from preprocessing.DSTL_dataset import DSTLDataset
 from ray.air import session, Checkpoint
 from typing import Dict
 import torch
@@ -12,7 +12,17 @@ import ray.train as train
 import pickle
 from torch.nn.modules.utils import consume_prefix_in_state_dict_if_present
 
-from model_cnn1d import Baseline_CNN1D
+from model_transformer import TransformerModel
+
+
+# Function to change the shape of obs
+# the input is obs with shape (channel, slice)
+def chan2sequence(obs):
+    seq = np.empty((obs.size))
+    seq[0::2] = obs[0]
+    seq[1::2] = obs[1]
+    return seq
+
 
 def train_epoch(dataloader, model, loss_fn, optimizer, use_ray=False):
     if use_ray:
@@ -74,6 +84,7 @@ def train_func(config: Dict):
     Nclass = config["Nclass"]
     use_ray = config['useRay']
     slice_len = config['slice_len']
+    d_model = 2 * slice_len
     num_feats = config['num_feats']
     num_channels = config['num_chans']
     device = config['device']
@@ -93,7 +104,7 @@ def train_func(config: Dict):
         test_dataloader = train.torch.prepare_data_loader(test_dataloader)
 
     # Create model.
-    model = global_model(classes=Nclass, numChannels=num_channels, slice_len=slice_len)
+    model = global_model(classes=Nclass, d_model=d_model)
     if use_ray:
         model = train.torch.prepare_model(model)
     else:
@@ -153,17 +164,19 @@ if __name__ == "__main__":
     args, _ = parser.parse_known_args()
 
     protocols = ['802_11ax', '802_11b', '802_11n', '802_11g']
-    ds_train = DSTLDataset(protocols, ds_type='train', snr_dbs=args.snr_db, slice_len=128, slice_overlap_ratio=0.5, override_gen_map=True)
-    ds_test = DSTLDataset(protocols, ds_type='test', snr_dbs=args.snr_db, slice_len=128, slice_overlap_ratio=0.5, override_gen_map=True)
+    ds_train = DSTLDataset(protocols, ds_type='train', snr_dbs=args.snr_db, slice_len=128, slice_overlap_ratio=0.5,
+                           override_gen_map=False, transform=chan2sequence)
+    ds_test = DSTLDataset(protocols, ds_type='test', snr_dbs=args.snr_db, slice_len=128, slice_overlap_ratio=0.5,
+                          override_gen_map=False, transform=chan2sequence)
 
     if not os.path.isdir(args.cp_path):
         os.makedirs(args.cp_path)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    train_config = {"lr": 1e-3, "batch_size": 512, "epochs": 5}
+    train_config = {"lr": 1e-3, "batch_size": 256, "epochs": 5}
     ds_info = ds_train.info()
     Nclass = ds_info['nclasses']
-    train_config['pytorch_model'] = Baseline_CNN1D
+    train_config['pytorch_model'] = TransformerModel
     train_config['Nclass'] = Nclass
     train_config['useRay'] = args.useRay    # TODO: fix this, currently it's not working with Ray because the dataset gets replicated among workers
     train_config['slice_len'] = ds_info['slice_len']
