@@ -2,7 +2,7 @@ import os
 import numpy as np
 import sys
 sys.path.insert(0, '../')
-from preprocessing.DSTL_dataset import DSTLDataset
+from preprocessing.DSTL_dataset_transformer import DSTLDataset
 from ray.air import session, Checkpoint
 from typing import Dict
 import torch
@@ -85,6 +85,7 @@ def train_func(config: Dict):
     epochs = config["epochs"]
     Nclass = config["Nclass"]
     use_ray = config['useRay']
+    seq_len = config['seq_len']
     slice_len = config['slice_len']
     d_model = 2 * slice_len
     num_feats = config['num_feats']
@@ -106,13 +107,13 @@ def train_func(config: Dict):
         test_dataloader = train.torch.prepare_data_loader(test_dataloader)
 
     # Create model.
-    model = global_model(classes=Nclass, d_model=d_model)
+    model = global_model(classes=Nclass, d_model=d_model, seq_len=seq_len)
     if use_ray:
         model = train.torch.prepare_model(model)
     else:
         model.to(device)
 
-    loss_fn = nn.CrossEntropyLoss()
+    loss_fn = nn.NLLLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     from torch.optim.lr_scheduler import ReduceLROnPlateau
 
@@ -165,22 +166,23 @@ if __name__ == "__main__":
     parser.add_argument("--cp_path", default='./', help='Path to the checkpoint to save/load the model.')
     args, _ = parser.parse_known_args()
 
-    protocols = ['802_11ax', '802_11b', '802_11n', '802_11g']
-    ds_train = DSTLDataset(protocols, ds_type='train', snr_dbs=args.snr_db, slice_len=128, slice_overlap_ratio=0.5,
+    protocols = ['802_11ax', '802_11b_upsampled', '802_11n', '802_11g']
+    ds_train = DSTLDataset(protocols, ds_type='train', snr_dbs=args.snr_db, seq_len = 64, slice_len=128, slice_overlap_ratio=0.5,
                            override_gen_map=False, transform=chan2sequence)
-    ds_test = DSTLDataset(protocols, ds_type='test', snr_dbs=args.snr_db, slice_len=128, slice_overlap_ratio=0.5,
+    ds_test = DSTLDataset(protocols, ds_type='test', snr_dbs=args.snr_db, seq_len = 64, slice_len=128, slice_overlap_ratio=0.5,
                           override_gen_map=False, transform=chan2sequence)
 
     if not os.path.isdir(args.cp_path):
         os.makedirs(args.cp_path)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    train_config = {"lr": 1e-3, "batch_size": 256, "epochs": 5}
+    train_config = {"lr": 1e-3, "batch_size": 512, "epochs": 5}
     ds_info = ds_train.info()
     Nclass = ds_info['nclasses']
     train_config['pytorch_model'] = TransformerModel
     train_config['Nclass'] = Nclass
     train_config['useRay'] = args.useRay    # TODO: fix this, currently it's not working with Ray because the dataset gets replicated among workers
+    train_config['seq_len'] = ds_info['seq_len']
     train_config['slice_len'] = ds_info['slice_len']
     train_config['num_feats'] = 1
     train_config['num_chans'] = ds_info['nchans']

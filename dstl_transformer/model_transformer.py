@@ -6,8 +6,8 @@ from torch.nn import TransformerEncoder, TransformerEncoderLayer
 
 class TransformerModel(nn.Module):
 
-    def __init__(self, d_model: int = 512, nhead: int = 8, nlayers: int = 6,
-                 dropout: float = 0.1, classes: int = 3):
+    def __init__(self, d_model: int = 512, seq_len: int = 64, nhead: int = 8, nlayers: int = 6,
+                 dropout: float = 0.1, classes: int = 4):
         super(TransformerModel, self).__init__()
         self.model_type = 'Transformer'
 
@@ -16,22 +16,22 @@ class TransformerModel(nn.Module):
         # create the positional encoder
         self.pos_encoder = PositionalEncoding(d_model, dropout)
         # define the encoder layers
-        encoder_layers = TransformerEncoderLayer(d_model, nhead)
+        encoder_layers = TransformerEncoderLayer(d_model, nhead, batch_first=True)
         self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
         self.d_model = d_model
 
         # we will not use the decoder
         # instead we will add a linear layer, another scaled dropout layer, and finally a classifier layer
-        self.pre_classifier = torch.nn.Linear(d_model, d_model)
+        self.pre_classifier = torch.nn.Linear(d_model*seq_len, d_model)
         self.dropout = torch.nn.Dropout(dropout)
         self.classifier = torch.nn.Linear(d_model, classes)
-        self.logSoftmax = nn.LogSoftmax(dim=1)
+        self.logSoftmax = nn.LogSoftmax(dim=2)
 
 
     def forward(self, src: Tensor) -> Tensor:
         """
         Args:
-            src: Tensor, shape [seq_len, batch_size]
+            src: Tensor, shape [batch_size, seq_len, features]
         Returns:
             output classifier label
         """
@@ -48,6 +48,7 @@ class TransformerModel(nn.Module):
         # ToDo: Perhaps with a working PE we need to use these to reshape
         #hidden_state = t_out[0]
         #pooler = hidden_state[:, 0]
+        t_out = torch.flatten(t_out, start_dim=1)
         pooler = self.pre_classifier(t_out)
         pooler = torch.nn.ReLU()(pooler)
         pooler = self.dropout(pooler)
@@ -79,8 +80,8 @@ class PositionalEncoding(nn.Module):
     def forward(self, x: Tensor) -> Tensor:
         """
         Args:
-            x: Tensor, shape [seq_len, batch_size, embedding_dim]
+            x: Tensor, shape [batch_size, seq_len, embedding_dim]
         """
         # x = x + self.pe[:x.size(0)]
-        x = x + self.pe[:, :x.size(0)]
+        x = x + self.pe[:, :x.size(1)]
         return self.dropout(x)
