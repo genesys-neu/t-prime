@@ -8,7 +8,6 @@ import argparse
 from glob import glob
 import os
 from tqdm import tqdm
-import matlab
 
 
 class FileCache:
@@ -275,9 +274,22 @@ class DSTLDataset(Dataset):
 
 
 if __name__ == "__main__":
-    # myds = DSTLDataset(['802_11ax', '802_11b', '802_11n', '802_11g'], slice_len=128, slice_overlap_ratio=0.5) # case with mixed sampling rates and only AWGN
-    myds = DSTLDataset(['802_11ax', '802_11b_upsampled', '802_11n', '802_11g'], slice_len=128, slice_overlap_ratio=0.5,
-                       apply_wchannel='TGn', file_postfix='all20MHz')    # this case has consistent sampling rates (20 MHz) and applies a specific channel to all signals
+
+
+    import argparse
+
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument("--protocols", nargs='+', default=['802_11ax', '802_11b_upsampled', '802_11n', '802_11g'],
+                        choices=['802_11ax', '802_11b', '802_11b_upsampled', '802_11n', '802_11g'],
+                        help="Specify the protocols/classes to be included in the dataset")
+    parser.add_argument('--raw_path', default='/home/mauro/Research/DSTL/DSTL_DATASET_1_0', help='Path where raw signals are stored.')
+    parser.add_argument('--postfix', default='', help='Postfix to append to dataset file.')
+    parser.add_argument('--slicelen', default=128, type=int, help='Signal slice size')
+    parser.add_argument('--overlap_ratio', default=0.5, help='Overlap ratio for slices generation')
+    args, _ = parser.parse_known_args()
+
+    myds = DSTLDataset(protocols=args.protocols, ds_path=args.raw_path, slice_len=args.slicelen, slice_overlap_ratio=args.overlap_ratio,
+                       apply_wchannel='TGn', file_postfix=args.postfix)    # this case has consistent sampling rates (20 MHz) and applies a specific channel to all signals
 
     import matplotlib.pyplot as plt
     classes_slice_count = {}

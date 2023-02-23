@@ -16,37 +16,38 @@ args, _ = parser.parse_known_args()
 
 
 logdir = args.logdir
+pkl_file = args.pkl
+figname = args.figname
+labels = args.labels
 
-tot_samples = []
-correct_samples = []
-conf_mat = None
 
-cm = pickle.load(open(os.path.join(logdir, args.pkl), 'rb'))
-#print(cm)
+def plot_confmatrix(logdir, pkl_file, labels, figname):
+    tot_samples = []
+    correct_samples = []
+    conf_mat = None
+    cm = pickle.load(open(os.path.join(logdir, pkl_file), 'rb'))
+    # print(cm)
+    tot_s = np.sum(cm)
+    correct_s = 0
+    for r in range(cm.shape[0]):
+        correct_s += cm[r, r]
+    tot_samples.append(tot_s)
+    correct_samples.append(correct_s)
+    for r in range(cm.shape[0]):  # for each row in the confusion matrix
+        sum_row = np.sum(cm[r, :])
+        cm[r, :] = cm[r, :] / sum_row  # compute in percentage
+        # also compute accuracy for each row
+    if conf_mat is None:
+        conf_mat = cm
+    else:
+        conf_mat += cm
+    plt.clf()
+    df_cm = pd.DataFrame(conf_mat, labels, labels)
+    # plt.figure(figsize=(10,7))
+    sn.set(font_scale=1.4)  # for label size
+    sn.heatmap(df_cm, annot=True, annot_kws={"size": 16})  # font size
+    # plt.show()
+    plt.savefig(os.path.join(logdir, figname))
 
-tot_s = np.sum(cm)
-correct_s = 0
-for r in range(cm.shape[0]):
-    correct_s += cm[r, r]
-tot_samples.append(tot_s)
-correct_samples.append(correct_s)
 
-for r in range(cm.shape[0]):    # for each row in the confusion matrix
-    sum_row = np.sum(cm[r,:])
-    cm[r, :] = cm[r, :] / sum_row   # compute in percentage
-    # also compute accuracy for each row
-
-if conf_mat is None:
-    conf_mat = cm
-else:
-    conf_mat += cm
-
-plt.clf()
-axis_lbl = args.labels
-df_cm = pd.DataFrame(conf_mat, axis_lbl, axis_lbl)
-# plt.figure(figsize=(10,7))
-sn.set(font_scale=1.4) # for label size
-sn.heatmap(df_cm, annot=True, annot_kws={"size": 16}) # font size
-
-#plt.show()
-plt.savefig(os.path.join(logdir, args.figname))
+plot_confmatrix(logdir, pkl_file, labels, figname)
