@@ -138,7 +138,7 @@ def train_func(config: Dict):
                     'optimizer_state_dict': optimizer.state_dict(),
                     'loss': loss,
                 }, os.path.join(logdir,'model.best.pt'))
-                plot_confmatrix(logdir, pkl_file, train_config['class_labels'], 'conf_mat.png')
+                plot_confmatrix(logdir, pkl_file, train_config['class_labels'], 'conf_mat_epoch'+str(e)+'.png')
 
 
     # return required for backwards compatibility with the old API
@@ -206,5 +206,8 @@ if __name__ == "__main__":
         train_func(train_config)
     """
 
-    train_func(train_config)
+    epochs_loss = train_func(train_config)
+    pickle.dump(epochs_loss, open(os.path.join(args.cp_path, 'epochs_loss.pkl'), 'wb'))
+    print(epochs_loss)
+
 
