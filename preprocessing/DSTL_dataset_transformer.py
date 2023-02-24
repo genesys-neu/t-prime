@@ -46,7 +46,7 @@ class DSTLDataset(Dataset):
                  ds_type='train',  # either 'train' or 'test'
                  slice_overlap_ratio=0,   # this is the overlap ratio for each slice generated from a signal
                                             # this value will affect the number of slices that is possible to create from each signal
-                                            ds_path='/home/miquelsirera/Desktop/dstl/data/DSTL_DATASET_1_0',
+                                            ds_path='/home/miquelsirera/Desktop/dstl/data/DSTL_DATASET_1_1',
                  file_postfix='',
                  noise_model='AWGN', snr_dbs=[30], seed=None,
                  apply_noise=True, apply_wchannel=None,
