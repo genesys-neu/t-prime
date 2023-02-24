@@ -32,21 +32,26 @@ def train_epoch(dataloader, model, loss_fn, optimizer, use_ray=False):
     else:
         size = len(dataloader.dataset)
     model.train()
+    correct = 0
     for batch, (X, y) in enumerate(dataloader):
         X = X.to(device)
         y = y.to(device)
         # Compute prediction error
         pred = model(X.float())
         loss = loss_fn(pred, y)
-
+        correct += (pred.argmax(1) == y).type(torch.float).sum().item()
         # Backpropagation
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-
+        
         if batch % 100 == 0:
             loss, current = loss.item(), batch * len(X)
             print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
+    correct /= size
+    print(f"Train Error: \n "
+          f"Accuracy: {(100 * correct):>0.1f}%, "
+    )
 
 from sklearn.metrics import confusion_matrix as conf_mat
 def validate_epoch(dataloader, model, loss_fn, Nclasses, use_ray=False):
@@ -112,7 +117,11 @@ def train_func(config: Dict):
         model = train.torch.prepare_model(model)
     else:
         model.to(device)
-
+    
+    print(model)
+    for name, param in model.named_parameters():
+        print(f'{name:20} {param.numel()} {list(param.shape)}')
+    print(f'TOTAL                {sum(p.numel() for p in model.parameters())}')
     loss_fn = nn.NLLLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     from torch.optim.lr_scheduler import ReduceLROnPlateau
@@ -167,16 +176,16 @@ if __name__ == "__main__":
     args, _ = parser.parse_known_args()
 
     protocols = ['802_11ax', '802_11b_upsampled', '802_11n', '802_11g']
-    ds_train = DSTLDataset(protocols, ds_type='train', snr_dbs=args.snr_db, seq_len = 64, slice_len=128, slice_overlap_ratio=0.5,
+    ds_train = DSTLDataset(protocols, ds_type='train', snr_dbs=args.snr_db, seq_len = 64, slice_len=128, slice_overlap_ratio=0,
                            override_gen_map=False, transform=chan2sequence)
-    ds_test = DSTLDataset(protocols, ds_type='test', snr_dbs=args.snr_db, seq_len = 64, slice_len=128, slice_overlap_ratio=0.5,
+    ds_test = DSTLDataset(protocols, ds_type='test', snr_dbs=args.snr_db, seq_len = 64, slice_len=128, slice_overlap_ratio=0,
                           override_gen_map=False, transform=chan2sequence)
 
     if not os.path.isdir(args.cp_path):
         os.makedirs(args.cp_path)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    train_config = {"lr": 1e-3, "batch_size": 512, "epochs": 5}
+    train_config = {"lr": 1e-4, "batch_size": 128, "epochs": 5}
     ds_info = ds_train.info()
     Nclass = ds_info['nclasses']
     train_config['pytorch_model'] = TransformerModel
