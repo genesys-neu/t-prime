@@ -13,6 +13,7 @@ class TransformerModel(nn.Module):
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+        self.norm = nn.LayerNorm(d_model)
         # create the positional encoder
         self.pos_encoder = PositionalEncoding(d_model, dropout)
         # define the encoder layers
@@ -23,9 +24,9 @@ class TransformerModel(nn.Module):
         # we will not use the decoder
         # instead we will add a linear layer, another scaled dropout layer, and finally a classifier layer
         self.pre_classifier = torch.nn.Linear(d_model*seq_len, d_model)
-        self.dropout = torch.nn.Dropout(dropout)
+        self.dropout = torch.nn.Dropout(0.5)
         self.classifier = torch.nn.Linear(d_model, classes)
-        self.logSoftmax = nn.LogSoftmax(dim=2)
+        self.logSoftmax = nn.LogSoftmax(dim=1)
 
 
     def forward(self, src: Tensor) -> Tensor:
@@ -41,9 +42,10 @@ class TransformerModel(nn.Module):
         # needs to be shaped like (batch, len_slice)
 
         # We should normalize the input weights by sqrt(d_model)
-        src = src * math.sqrt(self.d_model)
+        #src = src * math.sqrt(self.d_model)
+        src = self.norm(src)
         # ToDo: The positional encoder is changing the dimensions in a way I don't understand
-        src = self.pos_encoder(src).squeeze()
+        #src = self.pos_encoder(src).squeeze()
         t_out = self.transformer_encoder(src)
         # ToDo: Perhaps with a working PE we need to use these to reshape
         #hidden_state = t_out[0]
