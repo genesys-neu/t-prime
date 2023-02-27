@@ -6,7 +6,7 @@ from torch.nn import TransformerEncoder, TransformerEncoderLayer
 
 class TransformerModel(nn.Module):
 
-    def __init__(self, d_model: int = 512, seq_len: int = 64, nhead: int = 8, nlayers: int = 6,
+    def __init__(self, d_model: int = 512, seq_len: int = 64, nhead: int = 8, nlayers: int = 2,
                  dropout: float = 0.1, classes: int = 4):
         super(TransformerModel, self).__init__()
         self.model_type = 'Transformer'

@@ -48,7 +48,7 @@ def train_epoch(dataloader, model, loss_fn, optimizer, use_ray=False):
         loss.backward()
         optimizer.step()
         
-        if batch % 100 == 0:
+        if batch % 50 == 0:
             loss, current = loss.item(), batch * len(X)
             print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
     correct /= size
@@ -248,7 +248,7 @@ if __name__ == "__main__":
         "Architecture": "Transformer_v1",
         "Layers": train_config["transformer_layers"],
         "Wireless channel": args.wchannel,
-        "Snr (dbs)": args.snr_dbs,
+        "Snr (dbs)": args.snr_db,
         "Epochs": train_config["epochs"],
         "Learning rate": train_config["lr"],
         "Batch size": train_config["batch_size"],
@@ -256,7 +256,8 @@ if __name__ == "__main__":
         "Slice length": train_config["slice_len"]
     }
     wandb.init(project="RF_Transformer", config=exp_config)
-    wandb.run.name = f'run_{args.snr_dbs}dbs_{args.wchannel}'
+    wandb.run.name = f'run_{args.snr_db}dbs_{args.wchannel}'
 
     _, conf_matrix = train_func(train_config)
     wandb.log({"Confusion Matrix": conf_matrix})
+    wandb.finish()
