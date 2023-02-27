@@ -13,6 +13,8 @@ from ray.air.config import ScalingConfig
 import ray.train as train
 import pickle
 from torch.nn.modules.utils import consume_prefix_in_state_dict_if_present
+import wandb
+import matplotlib.pyplot as plt
 
 from model_transformer import TransformerModel
 
@@ -33,6 +35,7 @@ def train_epoch(dataloader, model, loss_fn, optimizer, use_ray=False):
         size = len(dataloader.dataset)
     model.train()
     correct = 0
+    loss = 0
     for batch, (X, y) in enumerate(dataloader):
         X = X.to(device)
         y = y.to(device)
@@ -52,6 +55,7 @@ def train_epoch(dataloader, model, loss_fn, optimizer, use_ray=False):
     print(f"Train Error: \n "
           f"Accuracy: {(100 * correct):>0.1f}%, "
     )
+    return loss, correct
 
 from sklearn.metrics import confusion_matrix as conf_mat
 def validate_epoch(dataloader, model, loss_fn, Nclasses, use_ray=False):
@@ -81,7 +85,7 @@ def validate_epoch(dataloader, model, loss_fn, Nclasses, use_ray=False):
         f"Avg loss: {test_loss:>8f} \n"
     )
 
-    return test_loss, conf_matrix
+    return test_loss, correct, conf_matrix
 
 def train_func(config: Dict):
     global_model = config['pytorch_model']
@@ -93,7 +97,7 @@ def train_func(config: Dict):
     seq_len = config['seq_len']
     slice_len = config['slice_len']
     d_model = 2 * slice_len
-    num_feats = config['num_feats']
+    transformer_layers = config["transformer_layers"] 
     num_channels = config['num_chans']
     device = config['device']
     logdir = config['cp_path']
@@ -112,7 +116,7 @@ def train_func(config: Dict):
         test_dataloader = train.torch.prepare_data_loader(test_dataloader)
 
     # Create model.
-    model = global_model(classes=Nclass, d_model=d_model, seq_len=seq_len)
+    model = global_model(classes=Nclass, d_model=d_model, seq_len=seq_len, nlayers=transformer_layers)
     if use_ray:
         model = train.torch.prepare_model(model)
     else:
@@ -124,14 +128,20 @@ def train_func(config: Dict):
     print(f'TOTAL                {sum(p.numel() for p in model.parameters())}')
     loss_fn = nn.NLLLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-    from torch.optim.lr_scheduler import ReduceLROnPlateau
 
+    from torch.optim.lr_scheduler import ReduceLROnPlateau
     scheduler = ReduceLROnPlateau(optimizer, 'min', min_lr=0.00001, verbose=True)
     loss_results = []
     best_loss = np.inf
+    wandb.watch(model, log_freq=10)
+    best_conf_matrix = 0
     for e in range(epochs):
-        train_epoch(train_dataloader, model, loss_fn, optimizer, use_ray)
-        loss, conf_matrix = validate_epoch(test_dataloader, model, loss_fn, Nclasses=Nclass, use_ray=use_ray)
+        tr_loss, tr_acc = train_epoch(train_dataloader, model, loss_fn, optimizer, use_ray)
+        wandb.log({'Tr_loss': tr_loss}, step=e)
+        wandb.log({'Tr_acc': tr_acc}, step=e)
+        loss, acc, conf_matrix = validate_epoch(test_dataloader, model, loss_fn, Nclasses=Nclass, use_ray=use_ray)
+        wandb.log({'Val_loss': loss}, step=e)
+        wandb.log({'Val_acc': acc}, step=e)
         scheduler.step(loss)
         loss_results.append(loss)
         if use_ray:
@@ -149,6 +159,7 @@ def train_func(config: Dict):
         else:
             if best_loss > loss:
                 best_loss = loss
+                best_conf_matrix = conf_matrix
                 pickle.dump(conf_matrix, open(os.path.join(logdir, 'conf_matrix.best.pkl'), 'wb'))
                 torch.save({
                     'model_state_dict': model.state_dict(),
@@ -156,9 +167,22 @@ def train_func(config: Dict):
                     'loss': loss,
                 }, os.path.join(logdir,'model.best.pt'))
 
+    fig = plt.figure(figsize=(8,8))
+    plt.imshow(best_conf_matrix, interpolation='none', cmap=plt.cm.Blues)
+    
+    plt.colorbar()
+    tick_marks = np.arange(Nclass)
+
+    plt.xticks(tick_marks, np.arange(0, Nclass))
+    plt.yticks(tick_marks, np.arange(0, Nclass))
+    plt.tight_layout()
+    
+    plt.ylabel('True label')
+    plt.xlabel('Predicted label')
+    plt.title("Confusion matrix")
     # return required for backwards compatibility with the old API
     # TODO(team-ml) clean up and remove return
-    return loss_results
+    return loss_results, fig
 
 if __name__ == "__main__":
     import argparse
@@ -172,31 +196,37 @@ if __name__ == "__main__":
     parser.add_argument("--use-gpu", action="store_true", default=False, help="Enables GPU training")
     parser.add_argument("--address", required=False, type=str, help="the address to use for Ray")
     parser.add_argument("--test", action="store_true", default=False, help="Testing the model")
+    parser.add_argument("--wchannel", default=None, help="Wireless channel to be applied, it can be"
+                                                         "TGn, TGax, Rayleigh or relative.")
     parser.add_argument("--cp_path", default='./', help='Path to the checkpoint to save/load the model.')
     args, _ = parser.parse_known_args()
 
     protocols = ['802_11ax', '802_11b_upsampled', '802_11n', '802_11g']
     ds_train = DSTLDataset(protocols, ds_type='train', snr_dbs=args.snr_db, seq_len = 64, slice_len=128, slice_overlap_ratio=0,
-                           override_gen_map=False, transform=chan2sequence)
+                           override_gen_map=False, apply_wchannel=args.wchannel, transform=chan2sequence)
     ds_test = DSTLDataset(protocols, ds_type='test', snr_dbs=args.snr_db, seq_len = 64, slice_len=128, slice_overlap_ratio=0,
-                          override_gen_map=False, transform=chan2sequence)
+                          override_gen_map=False, apply_wchannel=args.wchannel, transform=chan2sequence)
 
     if not os.path.isdir(args.cp_path):
         os.makedirs(args.cp_path)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    train_config = {"lr": 1e-4, "batch_size": 128, "epochs": 5}
     ds_info = ds_train.info()
     Nclass = ds_info['nclasses']
-    train_config['pytorch_model'] = TransformerModel
-    train_config['Nclass'] = Nclass
-    train_config['useRay'] = args.useRay    # TODO: fix this, currently it's not working with Ray because the dataset gets replicated among workers
-    train_config['seq_len'] = ds_info['seq_len']
-    train_config['slice_len'] = ds_info['slice_len']
-    train_config['num_feats'] = 1
-    train_config['num_chans'] = ds_info['nchans']
-    train_config['device'] = device
-    train_config['cp_path'] = args.cp_path
+    train_config = {
+        "lr": 1e-4, 
+        "batch_size": 128, 
+        "epochs": 5,
+        "pytorch_model": TransformerModel,
+        "transformer_layers": 2,
+        "Nclass": Nclass,
+        "useRay": args.useRay, # TODO: fix this, currently it's not working with Ray because the dataset gets replicated among workers 
+        "seq_len": ds_info['seq_len'],
+        "slice_len": ds_info['slice_len'],
+        "num_chans": ds_info['nchans'],
+        "device": device,
+        "cp_path": args.cp_path,
+    }
 
     """
     if not train_config['isDebug']:
@@ -213,6 +243,20 @@ if __name__ == "__main__":
     else:
         train_func(train_config)
     """
+    exp_config = { #Experiment configuration for tracking
+        "Dataset": "1_1",
+        "Architecture": "Transformer_v1",
+        "Layers": train_config["transformer_layers"],
+        "Wireless channel": args.wchannel,
+        "Snr (dbs)": args.snr_dbs,
+        "Epochs": train_config["epochs"],
+        "Learning rate": train_config["lr"],
+        "Batch size": train_config["batch_size"],
+        "Sequence lenght": train_config["seq_len"],
+        "Slice length": train_config["slice_len"]
+    }
+    wandb.init(project="RF_Transformer", config=exp_config)
+    wandb.run.name = f'run_{args.snr_dbs}dbs_{args.wchannel}'
 
-    train_func(train_config)
-
+    _, conf_matrix = train_func(train_config)
+    wandb.log({"Confusion Matrix": conf_matrix})
