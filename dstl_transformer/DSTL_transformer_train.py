@@ -8,11 +8,13 @@ from typing import Dict
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 from ray.train.torch import TorchTrainer, TorchPredictor
 from ray.air.config import ScalingConfig
 import ray.train as train
 import pickle
 from torch.nn.modules.utils import consume_prefix_in_state_dict_if_present
+from sklearn.metrics import confusion_matrix as conf_mat
 import wandb
 import matplotlib.pyplot as plt
 
@@ -57,7 +59,6 @@ def train_epoch(dataloader, model, loss_fn, optimizer, use_ray=False):
     )
     return loss, correct
 
-from sklearn.metrics import confusion_matrix as conf_mat
 def validate_epoch(dataloader, model, loss_fn, Nclasses, use_ray=False):
     if use_ray:
         size = len(dataloader.dataset) // session.get_world_size()
@@ -101,6 +102,7 @@ def train_func(config: Dict):
     num_channels = config['num_chans']
     device = config['device']
     logdir = config['cp_path']
+    pos_encoder = config["use_positional_enc"]
 
     if not use_ray:
         worker_batch_size = batch_size
@@ -116,7 +118,7 @@ def train_func(config: Dict):
         test_dataloader = train.torch.prepare_data_loader(test_dataloader)
 
     # Create model.
-    model = global_model(classes=Nclass, d_model=d_model, seq_len=seq_len, nlayers=transformer_layers)
+    model = global_model(classes=Nclass, d_model=d_model, seq_len=seq_len, nlayers=transformer_layers, use_pos=pos_encoder)
     if use_ray:
         model = train.torch.prepare_model(model)
     else:
@@ -125,11 +127,11 @@ def train_func(config: Dict):
     print(model)
     for name, param in model.named_parameters():
         print(f'{name:20} {param.numel()} {list(param.shape)}')
-    print(f'TOTAL                {sum(p.numel() for p in model.parameters())}')
+    total_params = sum(p.numel() for p in model.parameters())
+    print(f'TOTAL                {total_params}')
+    wandb.log({"Num. params": total_params})
     loss_fn = nn.NLLLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-
-    from torch.optim.lr_scheduler import ReduceLROnPlateau
     scheduler = ReduceLROnPlateau(optimizer, 'min', min_lr=0.00001, verbose=True)
     loss_results = []
     best_loss = np.inf
@@ -202,15 +204,28 @@ if __name__ == "__main__":
     parser.add_argument("--test", action="store_true", default=False, help="Testing the model")
     parser.add_argument("--wchannel", default=None, help="Wireless channel to be applied, it can be"
                                                          "TGn, TGax, Rayleigh or relative.")
-    parser.add_argument("--cp_path", default='./', help='Path to the checkpoint to save/load the model.')
+    parser.add_argument("--cp_path", default='./model_cp', help='Path to the checkpoint to save/load the model.')
     parser.add_argument("--slice_len", default=128, help="Slice length in which a sequence is divided.")
     parser.add_argument("--seq_len", default=64, help="Sequence length to input to the transformer.")
     args, _ = parser.parse_known_args()
 
+    exp_config = { #Experiment configuration for tracking
+        "Dataset": "1_1",
+        "Architecture": "Transformer_v1",
+        "Layers": 2,
+        "Wireless channel": args.wchannel,
+        "Snr (dbs)": args.snr_db,
+        "Epochs": 5,
+        "Learning rate": 1e-4,
+        "Batch size": 128,
+        "Sequence lenght": 64,
+        "Slice length": 128,
+        "Positional encoder": False
+    }
     protocols = ['802_11ax', '802_11b_upsampled', '802_11n', '802_11g']
-    ds_train = DSTLDataset(protocols, ds_type='train', snr_dbs=args.snr_db, seq_len = int(args.seq_len), slice_len=int(args.slice_len), slice_overlap_ratio=0,
+    ds_train = DSTLDataset(protocols, ds_type='train', snr_dbs=args.snr_db, seq_len=exp_config["Sequence length"], slice_len=exp_config["Slice length"], slice_overlap_ratio=0,
                            override_gen_map=True, apply_wchannel=args.wchannel, transform=chan2sequence)
-    ds_test = DSTLDataset(protocols, ds_type='test', snr_dbs=args.snr_db, seq_len = int(args.seq_len), slice_len=int(args.slice_len), slice_overlap_ratio=0,
+    ds_test = DSTLDataset(protocols, ds_type='test', snr_dbs=args.snr_db, seq_len=exp_config["Sequence length"], slice_len=exp_config["Slice length"], slice_overlap_ratio=0,
                           override_gen_map=False, apply_wchannel=args.wchannel, transform=chan2sequence)
 
     if not os.path.isdir(args.cp_path):
@@ -219,19 +234,21 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     ds_info = ds_train.info()
     Nclass = ds_info['nclasses']
+    
     train_config = {
-        "lr": 1e-4, 
-        "batch_size": 128, 
-        "epochs": 1,
+        "lr": exp_config["lr"], 
+        "batch_size": exp_config["batch_size"], 
+        "epochs": exp_config["epochs"],
         "pytorch_model": TransformerModel,
-        "transformer_layers": 2,
+        "transformer_layers": exp_config["transformer_layers"],
         "Nclass": Nclass,
         "useRay": args.useRay, # TODO: fix this, currently it's not working with Ray because the dataset gets replicated among workers 
-        "seq_len": ds_info['seq_len'],
-        "slice_len": ds_info['slice_len'],
+        "seq_len": ds_info["seq_len"],
+        "slice_len": ds_info["slice_len"],
         "num_chans": ds_info['nchans'],
         "device": device,
         "cp_path": args.cp_path,
+        "use_positional_enc": exp_config["Positional encoder"],
         "protocols": protocols
         }
 
@@ -250,18 +267,6 @@ if __name__ == "__main__":
     else:
         train_func(train_config)
     """
-    exp_config = { #Experiment configuration for tracking
-        "Dataset": "1_1",
-        "Architecture": "Transformer_v1",
-        "Layers": train_config["transformer_layers"],
-        "Wireless channel": args.wchannel,
-        "Snr (dbs)": args.snr_db,
-        "Epochs": train_config["epochs"],
-        "Learning rate": train_config["lr"],
-        "Batch size": train_config["batch_size"],
-        "Sequence lenght": train_config["seq_len"],
-        "Slice length": train_config["slice_len"]
-    }
     wandb.init(project="RF_Transformer", config=exp_config)
     wandb.run.name = f'{float(args.snr_db[0])} dBs {args.wchannel} sl:{ds_info["slice_len"]} sq:{ds_info["seq_len"]}'
 

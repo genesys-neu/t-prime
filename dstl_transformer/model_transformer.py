@@ -7,7 +7,7 @@ from torch.nn import TransformerEncoder, TransformerEncoderLayer
 class TransformerModel(nn.Module):
 
     def __init__(self, d_model: int = 512, seq_len: int = 64, nhead: int = 8, nlayers: int = 2,
-                 dropout: float = 0.1, classes: int = 4):
+                 dropout: float = 0.1, classes: int = 4, use_pos: bool = False):
         super(TransformerModel, self).__init__()
         self.model_type = 'Transformer'
 
@@ -15,6 +15,7 @@ class TransformerModel(nn.Module):
 
         self.norm = nn.LayerNorm(d_model)
         # create the positional encoder
+        self.use_positional_enc = use_pos
         self.pos_encoder = PositionalEncoding(d_model, dropout)
         # define the encoder layers
         encoder_layers = TransformerEncoderLayer(d_model, nhead, batch_first=True)
@@ -45,7 +46,8 @@ class TransformerModel(nn.Module):
         #src = src * math.sqrt(self.d_model)
         src = self.norm(src)
         # ToDo: The positional encoder is changing the dimensions in a way I don't understand
-        #src = self.pos_encoder(src).squeeze()
+        if self.use_positional_enc:
+            src = self.pos_encoder(src).squeeze()
         t_out = self.transformer_encoder(src)
         # ToDo: Perhaps with a working PE we need to use these to reshape
         #hidden_state = t_out[0]
