@@ -16,6 +16,7 @@ import pickle
 from torch.nn.modules.utils import consume_prefix_in_state_dict_if_present
 from tqdm import tqdm
 from model_cnn1d import Baseline_CNN1D
+from confusion_matrix import plot_confmatrix
 
 def train_epoch(dataloader, model, loss_fn, optimizer, use_ray=False):
     if use_ray:
@@ -128,14 +129,17 @@ def train_func(config: Dict):
 
             session.report(dict(loss=loss), checkpoint=checkpoint)
         else:
+            pkl_file = 'conf_matrix.best.pkl'
             if best_loss > loss:
                 best_loss = loss
-                pickle.dump(conf_matrix, open(os.path.join(logdir, 'conf_matrix.best.pkl'), 'wb'))
+                pickle.dump(conf_matrix, open(os.path.join(logdir, pkl_file), 'wb'))
                 torch.save({
                     'model_state_dict': model.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
                     'loss': loss,
                 }, os.path.join(logdir,'model.best.pt'))
+                plot_confmatrix(logdir, pkl_file, train_config['class_labels'], 'conf_mat_epoch'+str(e)+'.png')
+
 
     # return required for backwards compatibility with the old API
     # TODO(team-ml) clean up and remove return
@@ -155,14 +159,19 @@ if __name__ == "__main__":
     parser.add_argument("--address", required=False, type=str, help="the address to use for Ray")
     parser.add_argument("--test", action="store_true", default=False, help="Testing the model")
     parser.add_argument("--cp_path", default='./', help='Path to the checkpoint to save/load the model.')
-    parser.add_argument("--protocols", nargs='+', default=['802_11ax', '802_11b', '802_11n', '802_11g'],
+    parser.add_argument("--protocols", nargs='+', default=['802_11ax', '802_11b_upsampled', '802_11n', '802_11g'],
                         choices=['802_11ax', '802_11b', '802_11b_upsampled', '802_11n', '802_11g'], help="Specify the protocols/classes to be included in the training")
     parser.add_argument("--channel", default=None, choices=['TGn', 'TGax', 'Rayleigh', 'relative', None], help="Specify the channel models to apply during data generation. ")
+    parser.add_argument('--raw_path', default='/home/mauro/Research/DSTL/DSTL_DATASET_1_0', help='Path where raw signals are stored.')
+    parser.add_argument('--slicelen', default=128, type=int, help='Signal slice size')
+    parser.add_argument('--overlap_ratio', default=0.5, help='Overlap ratio for slices generation')
+    parser.add_argument('--postfix', default='', help='Postfix to append to dataset file.')
+
     args, _ = parser.parse_known_args()
 
     protocols = args.protocols
-    ds_train = DSTLDataset(protocols, ds_type='train', snr_dbs=args.snr_db, slice_len=128, slice_overlap_ratio=0.5, override_gen_map=True, apply_wchannel=args.channel, apply_noise=args.noise)
-    ds_test = DSTLDataset(protocols, ds_type='test', snr_dbs=args.snr_db, slice_len=128, slice_overlap_ratio=0.5, override_gen_map=True, apply_wchannel=args.channel, apply_noise=args.noise)
+    ds_train = DSTLDataset(protocols, ds_path=args.raw_path, ds_type='train', snr_dbs=args.snr_db, slice_len=args.slicelen, slice_overlap_ratio=args.overlap_ratio, file_postfix=args.postfix, override_gen_map=True, apply_wchannel=args.channel, apply_noise=args.noise)
+    ds_test = DSTLDataset(protocols,  ds_path=args.raw_path, ds_type='test', snr_dbs=args.snr_db, slice_len=args.slicelen, slice_overlap_ratio=args.overlap_ratio, file_postfix=args.postfix, override_gen_map=True, apply_wchannel=args.channel, apply_noise=args.noise)
 
     if not os.path.isdir(args.cp_path):
         os.makedirs(args.cp_path)
@@ -179,6 +188,7 @@ if __name__ == "__main__":
     train_config['num_chans'] = ds_info['nchans']
     train_config['device'] = device
     train_config['cp_path'] = args.cp_path
+    train_config['class_labels'] = protocols
 
     """
     if not train_config['isDebug']:
@@ -196,5 +206,8 @@ if __name__ == "__main__":
         train_func(train_config)
     """
 
-    train_func(train_config)
+    epochs_loss = train_func(train_config)
+    pickle.dump(epochs_loss, open(os.path.join(args.cp_path, 'epochs_loss.pkl'), 'wb'))
+    print(epochs_loss)
+
 
