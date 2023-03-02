@@ -166,20 +166,24 @@ def train_func(config: Dict):
                     'optimizer_state_dict': optimizer.state_dict(),
                     'loss': loss,
                 }, os.path.join(logdir,'model.best.pt'))
-
-    fig = plt.figure(figsize=(8,8))
-    plt.imshow(best_conf_matrix, interpolation='none', cmap=plt.cm.Blues)
     
-    plt.colorbar()
+    fig = plt.figure(figsize=(8,8))
+    best_conf_matrix = best_conf_matrix.astype('float') / best_conf_matrix.sum(axis=1)[np.newaxis]
+    plt.imshow(best_conf_matrix, interpolation='none', cmap=plt.cm.Blues)
+    #for i in range(best_conf_matrix.shape[0]):
+    #    for j in range(best_conf_matrix.shape[1]):
+    #        plt.text(x=j, y=i,s=best_conf_matrix[i, j], va='center', ha='center', size='xx-large')
+    plt.colorbar(fraction=0.046, pad=0.04)
+    plt.clim(0, 1)
     tick_marks = np.arange(Nclass)
-
-    plt.xticks(tick_marks, np.arange(0, Nclass))
-    plt.yticks(tick_marks, np.arange(0, Nclass))
+    config['protocols'][1] = '802_11b_up'
+    plt.xticks(tick_marks, config['protocols'])
+    plt.yticks(tick_marks, config['protocols'])
     plt.tight_layout()
     
     plt.ylabel('True label')
     plt.xlabel('Predicted label')
-    plt.title("Confusion matrix")
+    plt.title(f"Confusion matrix: {float(args.snr_db[0])} dBs, channel: {args.wchannel}, slice: {slice_len}, seq.: {seq_len}")
     # return required for backwards compatibility with the old API
     # TODO(team-ml) clean up and remove return
     return loss_results, fig
@@ -199,12 +203,14 @@ if __name__ == "__main__":
     parser.add_argument("--wchannel", default=None, help="Wireless channel to be applied, it can be"
                                                          "TGn, TGax, Rayleigh or relative.")
     parser.add_argument("--cp_path", default='./', help='Path to the checkpoint to save/load the model.')
+    parser.add_argument("--slice_len", default=128, help="Slice length in which a sequence is divided.")
+    parser.add_argument("--seq_len", default=64, help="Sequence length to input to the transformer.")
     args, _ = parser.parse_known_args()
 
     protocols = ['802_11ax', '802_11b_upsampled', '802_11n', '802_11g']
-    ds_train = DSTLDataset(protocols, ds_type='train', snr_dbs=args.snr_db, seq_len = 64, slice_len=128, slice_overlap_ratio=0,
-                           override_gen_map=False, apply_wchannel=args.wchannel, transform=chan2sequence)
-    ds_test = DSTLDataset(protocols, ds_type='test', snr_dbs=args.snr_db, seq_len = 64, slice_len=128, slice_overlap_ratio=0,
+    ds_train = DSTLDataset(protocols, ds_type='train', snr_dbs=args.snr_db, seq_len = int(args.seq_len), slice_len=int(args.slice_len), slice_overlap_ratio=0,
+                           override_gen_map=True, apply_wchannel=args.wchannel, transform=chan2sequence)
+    ds_test = DSTLDataset(protocols, ds_type='test', snr_dbs=args.snr_db, seq_len = int(args.seq_len), slice_len=int(args.slice_len), slice_overlap_ratio=0,
                           override_gen_map=False, apply_wchannel=args.wchannel, transform=chan2sequence)
 
     if not os.path.isdir(args.cp_path):
@@ -216,7 +222,7 @@ if __name__ == "__main__":
     train_config = {
         "lr": 1e-4, 
         "batch_size": 128, 
-        "epochs": 5,
+        "epochs": 1,
         "pytorch_model": TransformerModel,
         "transformer_layers": 2,
         "Nclass": Nclass,
@@ -226,7 +232,8 @@ if __name__ == "__main__":
         "num_chans": ds_info['nchans'],
         "device": device,
         "cp_path": args.cp_path,
-    }
+        "protocols": protocols
+        }
 
     """
     if not train_config['isDebug']:
@@ -256,7 +263,7 @@ if __name__ == "__main__":
         "Slice length": train_config["slice_len"]
     }
     wandb.init(project="RF_Transformer", config=exp_config)
-    wandb.run.name = f'run_{args.snr_db}dbs_{args.wchannel}'
+    wandb.run.name = f'{float(args.snr_db[0])} dBs {args.wchannel} sl:{ds_info["slice_len"]} sq:{ds_info["seq_len"]}'
 
     _, conf_matrix = train_func(train_config)
     wandb.log({"Confusion Matrix": conf_matrix})

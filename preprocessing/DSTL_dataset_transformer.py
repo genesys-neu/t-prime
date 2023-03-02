@@ -74,11 +74,8 @@ class DSTLDataset(Dataset):
         ds_info_path = os.path.join(ds_path, info_filename)
         do_gen_info = True
         if os.path.exists(ds_info_path) and (not override_gen_map):
-            ans = input('File '+info_filename+' already exists. Do you wanna create a new one? [y/n]')
-            if ans.lower() in ['n', 'no']:
-                do_gen_info = False
-
-        if do_gen_info and (not override_gen_map):
+            do_gen_info = False
+        if do_gen_info and override_gen_map:
             self.ds_info = self.generate_ds_map(ds_path, info_filename)
         else:
             self.ds_info = pickle.load(open(ds_info_path, 'rb'))
@@ -100,7 +97,7 @@ class DSTLDataset(Dataset):
             self.possible_channels = ['TGn', 'TGax', 'Rayleigh', 'relative']
             assert(self.apply_wchannel in self.possible_channels)
             self.channel_map = {}
-            from dstl.preprocessing.matutils import matutils
+            from preprocessing.matutils import matutils
             self.mateng = matutils.MatlabEngine()  # todo check if we need any custom paths
             # initialize each channel object for each protocol used
             self.chan_models = {}
