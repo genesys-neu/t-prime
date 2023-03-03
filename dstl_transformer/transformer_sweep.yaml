@@ -1,0 +1,37 @@
+program: DSTL_transformer_train.py
+method: bayes
+metric:
+  goal: minimize
+  name: Val_acc
+parameters:
+  Sequence_length:
+    max: 128
+    min: 8
+    distribution: int_uniform
+  Learning_rate:
+    max: 0.0005
+    min: 0.00001
+    distribution: uniform
+  Slice_length:
+    values: [16, 32, 64, 96, 128]
+  Batch_size:
+    max: 256
+    min: 64
+    distribution: int_uniform
+  Layers:
+    max: 3
+    min: 1
+    distribution: int_uniform
+  Epochs:
+    max: 15
+    min: 3
+    distribution: int_uniform
+  Positional_encoder:
+    values: [True, False]
+command:
+  - ${env}
+  - python3
+  - ${program}
+  - ${args}
+  - --use-gpu
+  - --snr_db=0

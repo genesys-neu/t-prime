@@ -41,11 +41,12 @@ class FileCache:
 class DSTLDataset(Dataset):
     def __init__(self,
                  protocols: list,  # this list will contain the folder/protocols names to include in the dataset
+                 seq_len: int,
                  slice_len: int,    # this will define the slice size of each signal that will be input to the model
                  ds_type='train',  # either 'train' or 'test'
-                 slice_overlap_ratio=0.5,   # this is the overlap ratio for each slice generated from a signal
+                 slice_overlap_ratio=0,   # this is the overlap ratio for each slice generated from a signal
                                             # this value will affect the number of slices that is possible to create from each signal
-                                            ds_path='/home/miquelsirera/Desktop/dstl/data/DSTL_DATASET_1_0',
+                                            ds_path='/home/miquelsirera/Desktop/dstl/data/DSTL_DATASET_1_1',
                  file_postfix='',
                  noise_model='AWGN', snr_dbs=[30], seed=None,
                  apply_noise=True, apply_wchannel=None,
@@ -54,9 +55,10 @@ class DSTLDataset(Dataset):
                  transform=None, target_transform=None):
 
         self.protocols = protocols
+        self.seq_len = seq_len
         self.slice_len = slice_len
         self.slice_overlap_ratio = slice_overlap_ratio
-        self.overlap = int(self.slice_len * self.slice_overlap_ratio)
+        self.overlap = self.slice_len - int(self.slice_len * self.slice_overlap_ratio)
         self.noise_model = noise_model
         self.snr_dbs = snr_dbs
         self.seed = seed
@@ -72,11 +74,8 @@ class DSTLDataset(Dataset):
         ds_info_path = os.path.join(ds_path, info_filename)
         do_gen_info = True
         if os.path.exists(ds_info_path) and (not override_gen_map):
-            ans = input('File '+info_filename+' already exists. Do you wanna create a new one? [y/n]')
-            if ans.lower() in ['n', 'no']:
-                do_gen_info = False
-
-        if do_gen_info and (not override_gen_map):
+            do_gen_info = False
+        if do_gen_info and override_gen_map:
             self.ds_info = self.generate_ds_map(ds_path, info_filename)
         else:
             self.ds_info = pickle.load(open(ds_info_path, 'rb'))
@@ -98,7 +97,7 @@ class DSTLDataset(Dataset):
             self.possible_channels = ['TGn', 'TGax', 'Rayleigh', 'relative']
             assert(self.apply_wchannel in self.possible_channels)
             self.channel_map = {}
-            from dstl.preprocessing.matutils import matutils
+            from preprocessing.matutils import matutils
             self.mateng = matutils.MatlabEngine()  # todo check if we need any custom paths
             # initialize each channel object for each protocol used
             self.chan_models = {}
@@ -138,9 +137,9 @@ class DSTLDataset(Dataset):
                 sys.exit('[DSTLDataset] folder ' + path + ' not found. Aborting...')
 
         # now let's go through each class examples and assign a global sample index
-        # based on the slice len and overlap configuration
+        # based on the seq len configuration
 
-        # also, we need to assign a unique slice index to each possible slice to be used with __getitem__ function
+        # also, we need to assign a unique seq index to each possible slice to be used with __getitem__ function
         # and assign the corresponding label
         data_ixs = {}
         labels_ixs = {}
@@ -149,17 +148,18 @@ class DSTLDataset(Dataset):
             for ix, path in examples_map[c].items():
                 sig = sio.loadmat(path)
                 len_sig = sig['waveform'].shape[0]
-                window_ixs = list(range(0, len_sig-self.slice_len, self.overlap))
+                window_ixs = list(range(0, len_sig-(self.slice_len*self.seq_len), \
+                    self.overlap*(self.seq_len-1) + self.slice_len)) # window is now seq_len*slice_len
                 n_windows = len(window_ixs)
-                examples_map[c][ix] = {'slices': window_ixs,
+                examples_map[c][ix] = {'seq': window_ixs,
                                        'path': examples_map[c][ix]}  # here we modify the original content
                 for w in window_ixs:
-                    data_ixs[ixs_count] = {'path': path, 'slice_ix': w}
+                    data_ixs[ixs_count] = {'path': path, 'seq_ix': w}
                     labels_ixs[ixs_count] = class_map[c]
                     ixs_count += 1
 
 
-        # lastly, we separate the training and testing dataset by randomly sampling a certain % of data samples indexes
+        # lastly, we separate the training and testing dataset by randomly sampling a certain % of data sequences indexes
         test_data_ixs = {}
         test_labels_ixs = {}
         test_ixs = np.random.choice(ixs_count, size=int(ixs_count*test_ratio), replace=False)
@@ -190,6 +190,7 @@ class DSTLDataset(Dataset):
 
     def info(self):
         ds_info = {
+            'seq_len': self.seq_len,
             'slice_len': self.slice_len,
             'numsamps': {'train' : len(self.ds_info['ds_indexes']['train']['data'].keys()),
                          'test': len(self.ds_info['ds_indexes']['test']['data'].keys())},
@@ -205,7 +206,7 @@ class DSTLDataset(Dataset):
         dataset = self.ds_info['ds_indexes'][self.ds_type]
         # first retrieve the internal sample index relative to the linear index idx
         s_idx = self.ds_info['ixs_maps'][self.ds_type][idx]
-        # retrieve the info relative to this input sample
+        # retrieve the info (path and index inside file) relative to this input sample
         obs_info = dataset['data'][s_idx]
         # let's first retrieve the signal from the cache (or load it in if not present)
         sig_dict = self.signal_cache.get(obs_info['path'])
@@ -221,15 +222,18 @@ class DSTLDataset(Dataset):
         chan_sig = self.apply_wchan(sig_dict['mat'], label) if not (self.apply_wchannel is None) else sig_dict['np']
         noisy_sig = self.apply_AWGN(chan_sig) if self.apply_noise else chan_sig
 
-        # then, retireve the relative slice of the requested dataset sample
-        obs = noisy_sig[obs_info['slice_ix']:obs_info['slice_ix']+self.slice_len, 0]
+        # then, retrieve the relative sequence of slices of the requested dataset sample
+        obs = noisy_sig[obs_info['seq_ix']:obs_info['seq_ix'] + self.overlap*(self.seq_len-1) + self.slice_len, 0]
         obs = np.stack((obs.real, obs.imag))
 
         if self.transform:
             obs = self.transform(obs)
         if self.target_transform:
             label = self.target_transform(label)
-        return obs, label
+
+        slice_ixs = list(range(0, obs.size-self.slice_len*2+1, self.overlap*2))
+        obs = [obs[i:i+self.slice_len*2] for i in slice_ixs]
+        return np.asarray(obs), label
 
     # Function to change the shape of obs
     # the input is obs with shape (channel, slice)
