@@ -33,6 +33,7 @@ def plot_confmatrix(logdir, pkl_file, labels, figname):
     sn.heatmap(df_cm, annot=True, annot_kws={"size": 16})  # font size
     # plt.show()
     plt.savefig(os.path.join(logdir, figname))
+    return df_cm
 
 if __name__ == "__main__":
     import argparse
