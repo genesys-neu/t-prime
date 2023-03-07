@@ -5,7 +5,7 @@ metric:
   name: Val_loss
 parameters:
   slicelen:
-    values: [32, 64, 128, 192, 256]
+    values: [128, 256, 512]
   postfix:
     value: 'all20MHz_half'
   channel:
@@ -16,6 +16,8 @@ parameters:
     value: 'results/'
   raw_data_ratio:
     value: 0.5
+  snr_db:
+    values: [-10, 0, 30]
 
 command:
   - python3

@@ -92,7 +92,7 @@ def train_func(config: Dict):
     num_channels = config['num_chans']
     device = config['device']
     logdir = os.path.join(config['cp_path'], 'sweep_'+config['wchannel']+'_'+config['postfix'])
-    os.makedirs(logdir)
+    os.makedirs(logdir, exist_ok=True)
 
     if not use_ray:
         worker_batch_size = batch_size
