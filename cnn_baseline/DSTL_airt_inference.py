@@ -56,6 +56,6 @@ slice_t = torch.Tensor(slice_in)
 slice_t = slice_t.to(model.device.type)
 out = model(slice_t.float())
 mean_ms, std_ms = timing_inference_GPU(slice_t, model)
-print(mean_ms, std_ms)
+print("Mean (ms):", mean_ms, "Std ", std_ms)
 
 
