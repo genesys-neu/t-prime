@@ -91,7 +91,7 @@ def train_func(config: Dict):
     num_feats = config['num_feats']
     num_channels = config['num_chans']
     device = config['device']
-    logdir = os.path.join(config['cp_path'], 'sweep_'+config['wchannel']+'_'+config['postfix'])
+    logdir = os.path.join(config['cp_path'], 'sweep_'+config['wchannel']+'_'+config['postfix'], 'slice'+str(slice_len)+'_snr'+config['snr_dB'])
     os.makedirs(logdir, exist_ok=True)
 
     if not use_ray:
@@ -225,6 +225,7 @@ if __name__ == "__main__":
     train_config['class_labels'] = protocols
     train_config['wchannel'] = args.channel
     train_config['postfix'] = args.postfix
+    train_config['snr_dB'] = args.snr_db[0]
 
     """
     if not train_config['isDebug']:
