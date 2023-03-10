@@ -207,12 +207,13 @@ if __name__ == "__main__":
     parser.add_argument("--cp_path", default='./', help='Path to the checkpoint to save/load the model.')
     parser.add_argument("--slice_len", default=128, help="Slice length in which a sequence is divided.")
     parser.add_argument("--seq_len", default=64, help="Sequence length to input to the transformer.")
+    parser.add_argument("--dataset_ratio", default=1.0, type=float, help="Portion of the dataset used for training and validation.")
     args, _ = parser.parse_known_args()
 
     protocols = ['802_11ax', '802_11b_upsampled', '802_11n', '802_11g']
-    ds_train = DSTLDataset(protocols, ds_type='train', snr_dbs=args.snr_db, seq_len = int(args.seq_len), slice_len=int(args.slice_len), slice_overlap_ratio=0,
+    ds_train = DSTLDataset(protocols, ds_type='train', snr_dbs=args.snr_db, seq_len = int(args.seq_len), slice_len=int(args.slice_len), raw_data_ratio=args.dataset_ratio, slice_overlap_ratio=0,
                            override_gen_map=True, apply_wchannel=args.wchannel, transform=chan2sequence)
-    ds_test = DSTLDataset(protocols, ds_type='test', snr_dbs=args.snr_db, seq_len = int(args.seq_len), slice_len=int(args.slice_len), slice_overlap_ratio=0,
+    ds_test = DSTLDataset(protocols, ds_type='test', snr_dbs=args.snr_db, seq_len = int(args.seq_len), slice_len=int(args.slice_len), raw_data_ratio=args.dataset_ratio, slice_overlap_ratio=0,
                           override_gen_map=False, apply_wchannel=args.wchannel, transform=chan2sequence)
 
     if not os.path.isdir(args.cp_path):
@@ -262,7 +263,9 @@ if __name__ == "__main__":
         "Learning rate": train_config["lr"],
         "Batch size": train_config["batch_size"],
         "Sequence lenght": train_config["seq_len"],
-        "Slice length": train_config["slice_len"]
+        "Slice length": train_config["slice_len"],
+        "Input field of view": train_config["seq_len"]*train_config["slice_len"],
+        "Positional encoder": "False"
     }
     wandb.init(project="RF_Transformer", config=exp_config)
     wandb.run.name = f'{float(args.snr_db[0])} dBs {args.wchannel} sl:{ds_info["slice_len"]} sq:{ds_info["seq_len"]}'

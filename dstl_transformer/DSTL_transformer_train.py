@@ -205,6 +205,7 @@ if __name__ == "__main__":
     parser.add_argument("--wchannel", default=None, help="Wireless channel to be applied, it can be"
                                                          "TGn, TGax, Rayleigh or relative.")
     parser.add_argument("--cp_path", default='./model_cp', help='Path to the checkpoint to save/load the model.')
+    parser.add_argument("--dataset_ratio", default=1.0, type=float, help="Portion of the dataset used for training and validation.")
     #parser.add_argument("--slice_len", default=128, help="Slice length in which a sequence is divided.")
     #parser.add_argument("--seq_len", default=64, help="Sequence length to input to the transformer.")
     parser.add_argument("--Layers", type=int)
@@ -215,6 +216,7 @@ if __name__ == "__main__":
     parser.add_argument("--Sequence_length", type=int)
     parser.add_argument("--Positional_encoder")
     args, _ = parser.parse_known_args()
+    args.wchannel = args.wchannel if args.wchannel != 'None' else None
     args.Positional_encoder = args.Positional_encoder in {'True', 'true'}
     exp_config = { #Experiment configuration for tracking
         "Dataset": "1_1",
@@ -231,9 +233,9 @@ if __name__ == "__main__":
         "Positional encoder": args.Positional_encoder
     }
     protocols = ['802_11ax', '802_11b_upsampled', '802_11n', '802_11g']
-    ds_train = DSTLDataset(protocols, ds_type='train', snr_dbs=args.snr_db, seq_len=exp_config["Sequence length"], slice_len=exp_config["Slice length"], slice_overlap_ratio=0,
-                           override_gen_map=True, apply_wchannel=args.wchannel, transform=chan2sequence)
-    ds_test = DSTLDataset(protocols, ds_type='test', snr_dbs=args.snr_db, seq_len=exp_config["Sequence length"], slice_len=exp_config["Slice length"], slice_overlap_ratio=0,
+    ds_train = DSTLDataset(protocols, ds_type='train', snr_dbs=args.snr_db, seq_len=exp_config["Sequence length"], slice_len=exp_config["Slice length"], slice_overlap_ratio=0, raw_data_ratio=args.dataset_ratio,
+            override_gen_map=True, apply_wchannel=args.wchannel, transform=chan2sequence)
+    ds_test = DSTLDataset(protocols, ds_type='test', snr_dbs=args.snr_db, seq_len=exp_config["Sequence length"], slice_len=exp_config["Slice length"], slice_overlap_ratio=0, raw_data_ratio=args.dataset_ratio,
                           override_gen_map=False, apply_wchannel=args.wchannel, transform=chan2sequence)
 
     if not os.path.isdir(args.cp_path):

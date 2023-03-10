@@ -45,8 +45,9 @@ class DSTLDataset(Dataset):
                  slice_len: int,    # this will define the slice size of each signal that will be input to the model
                  ds_type='train',  # either 'train' or 'test'
                  slice_overlap_ratio=0,   # this is the overlap ratio for each slice generated from a signal
-                                            # this value will affect the number of slices that is possible to create from each signal
-                                            ds_path='/home/miquelsirera/Desktop/dstl/data/DSTL_DATASET_1_1',
+                                          # this value will affect the number of slices that is possible to create from each signal
+                 raw_data_ratio=1.0,      # ratio of the whole raw signal dataset to consider for generation
+                 ds_path='/home/miquelsirera/Desktop/dstl/data/DSTL_DATASET_1_1',
                  file_postfix='',
                  noise_model='AWGN', snr_dbs=[30], seed=None,
                  apply_noise=True, apply_wchannel=None,
@@ -57,6 +58,8 @@ class DSTLDataset(Dataset):
         self.protocols = protocols
         self.seq_len = seq_len
         self.slice_len = slice_len
+        self.raw_data_ratio = raw_data_ratio
+        self.n_sig_per_class = {} # this will be filled in the generate_ds_map() function
         self.slice_overlap_ratio = slice_overlap_ratio
         self.overlap = self.slice_len - int(self.slice_len * self.slice_overlap_ratio)
         self.noise_model = noise_model
@@ -127,12 +130,18 @@ class DSTLDataset(Dataset):
             path = os.path.join(ds_path, p)
             if os.path.isdir(path):
                 mat_list = sorted(glob(os.path.join(path, '*.mat')))
+                self.n_sig_per_class[p] = int(
+                    len(mat_list) * self.raw_data_ratio)  # for each protocol, we save the amount of raw signals to retain
+
+                mat_list = mat_list[:self.n_sig_per_class[p]] # then we just clip the list
+                num_mat = len(mat_list)                     # and store the new list value length
                 examples_map[p] = dict(
                     zip(
-                        list(range(len(mat_list))),
+                        list(range(num_mat)),
                         mat_list
                     )
                 )
+
             else:
                 sys.exit('[DSTLDataset] folder ' + path + ' not found. Aborting...')
 
