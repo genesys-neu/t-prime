@@ -37,9 +37,9 @@ num_feats = 1
 slice_len = 128
 snr_dBs = [30]
 
-
+"""
 homedir=os.path.expanduser('~')
-PATH = os.path.join(homedir, 'Research/DSTL/dstl/cnn_baseline/results/no_noise/')
+PATH = os.path.join(homedir, 'Research/DSTL/dstl/cnn_baseline/results/Rayleigh_ds11_tiny15/')
 model_file_name = 'model.best.pt'
 model_path = os.path.join(PATH, model_file_name)
 
@@ -60,5 +60,19 @@ slice_t = slice_t.to(model.device.type)
 out = model(slice_t.float())
 mean_ms, std_ms = timing_inference_GPU(slice_t, model)
 print("Mean (ms):", mean_ms, "Std ", std_ms)
+"""
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+for slice_len in [128, 256, 512]:
+    model = Baseline_CNN1D(classes=Nclass, numChannels=num_channels, slice_len=slice_len)
+    model.to(device)
+    slice_in = np.random.random((1,2,slice_len))
+    slice_t = torch.Tensor(slice_in)
+    slice_t = slice_t.to(model.device.type)
+    out = model(slice_t.float())
+    mean_ms, std_ms = timing_inference_GPU(slice_t, model)
+    print('Slice len', slice_len)
+    print("Mean (ms):", mean_ms, "Std ", std_ms)
+
+
 
 
