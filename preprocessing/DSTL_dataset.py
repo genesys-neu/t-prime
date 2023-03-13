@@ -255,6 +255,7 @@ class DSTLDataset(Dataset):
         rms = np.sqrt(np.mean(np.abs(sig) ** 2))
         sig_W = rms ** 2  # power of signal in Watts
         # convert signal power in dBW
+        assert(type(self.snr_dbs) is list)
         SNR = np.random.choice(self.snr_dbs)
         sig_dbW = 10 * np.log10(sig_W / 1)
         # now compute the relative noise power based on the specified SNR level

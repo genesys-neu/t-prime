@@ -163,7 +163,7 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument("--noise", action='store_true', default=False, help="Specify if noise needs to be applied or not during training")
+    parser.add_argument("--noise", action='store_false', default=True, help="Specify if noise needs to be applied or not during training")
     parser.add_argument("--snr_db", nargs='+', default=[30], help="SNR levels to be considered during training. "
                                                                   "It's possible to define multiple noise levels to be "
                                                                   "chosen at random during input slices generation.")
@@ -182,6 +182,8 @@ if __name__ == "__main__":
     parser.add_argument('--postfix', default='', help='Postfix to append to dataset file.')
     parser.add_argument('--raw_data_ratio', default=1.0, type=float, help='Specify the ratio of examples per class to consider while training/testing')
     args, _ = parser.parse_known_args()
+
+    print('Apply noise:', args.noise)
 
     protocols = args.protocols
     ds_train = DSTLDataset(protocols,
