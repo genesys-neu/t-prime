@@ -63,6 +63,7 @@ class DSTLDataset(Dataset):
         self.noise_model = noise_model
         self.snr_dbs = snr_dbs
         self.seed = seed
+        self.ds_path = ds_path
         if not (self.seed is None):
             np.random.seed(self.seed)
 
@@ -72,7 +73,7 @@ class DSTLDataset(Dataset):
         if file_postfix != '' and file_postfix[-1] != '_':
             file_postfix += '__'
         info_filename = 'ds_info__'+file_postfix+'slice'+str(slice_len)+'_'+str(len(protocols))+'class.pkl'
-        ds_info_path = os.path.join(ds_path, info_filename)
+        ds_info_path = os.path.join(self.ds_path, info_filename)
         do_gen_info = True
         if os.path.exists(ds_info_path) and (not override_gen_map):
             ans = input('File '+info_filename+' already exists. Do you wanna create a new one? [y/n]')
@@ -220,6 +221,15 @@ class DSTLDataset(Dataset):
         sig_dict = self.signal_cache.get(obs_info['path'])
         self.last_file_loaded = obs_info['path']
         if sig_dict is None:
+            if not os.path.exists(dataset['data'][s_idx]['path']):
+                # substitute the original path with the new raw source dir
+                fullpath, filename = os.path.split(obs_info['path'])
+                orig_raw_source, dirname = os.path.split(fullpath)
+                # update the entry in the dictionary
+                dataset['data'][s_idx]['path'] = os.path.join(self.ds_path, dirname, filename)
+                # re-obtain the observation info dict
+                obs_info = dataset['data'][s_idx]
+
             mat_dict = sio.loadmat(obs_info['path'])
             self.signal_cache.put(obs_info['path'], {'np': mat_dict['waveform'], \
                         'mat': self.mateng.py2mat_array(mat_dict['waveform']) if not (self.apply_wchannel is None) else ''})
