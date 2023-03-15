@@ -76,11 +76,11 @@ class DSTLDataset(Dataset):
         ds_info_path = os.path.join(self.ds_path, info_filename)
         do_gen_info = True
         if os.path.exists(ds_info_path) and (not override_gen_map):
-            ans = input('File '+info_filename+' already exists. Do you wanna create a new one? [y/n]')
-            if ans.lower() in ['n', 'no']:
-                do_gen_info = False
+            #ans = input('File '+info_filename+' already exists. Do you wanna create a new one? [y/n]')
+            #if ans.lower() in ['n', 'no']:
+            do_gen_info = False
 
-        if do_gen_info and (not override_gen_map):
+        if do_gen_info:
             self.ds_info = self.generate_ds_map(ds_path, info_filename)
         else:
             self.ds_info = pickle.load(open(ds_info_path, 'rb'))
@@ -123,6 +123,9 @@ class DSTLDataset(Dataset):
                     rayleigh = self.mateng.eng.comm.RayleighChannel('SampleRate', float(20e6), 'PathDelays', float(1.5e-9), 'AveragePathGains', float(-3), 'PathGainsOutputPort', True)
                     self.chan_models[ix] = rayleigh
                     self.channel_map['Rayleigh'] = ix
+    
+    def generate_windows(self, len_sig):
+        return list(range(0, len_sig-self.slice_len, self.overlap))
 
     def generate_ds_map(self, ds_path, filename, test_ratio=0.2):
         examples_map = {}
@@ -159,12 +162,12 @@ class DSTLDataset(Dataset):
             for ix, path in examples_map[c].items():
                 sig = sio.loadmat(path)
                 len_sig = sig['waveform'].shape[0]
-                window_ixs = list(range(0, len_sig-self.slice_len, self.overlap))
+                window_ixs = self.generate_windows(len_sig)
                 n_windows = len(window_ixs)
-                examples_map[c][ix] = {'slices': window_ixs,
+                examples_map[c][ix] = {'sample': window_ixs, # sample is slice for CNN or sequence for Transformer
                                        'path': examples_map[c][ix]}  # here we modify the original content
                 for w in window_ixs:
-                    data_ixs[ixs_count] = {'path': path, 'slice_ix': w}
+                    data_ixs[ixs_count] = {'path': path, 'sample_ix': w}
                     labels_ixs[ixs_count] = class_map[c]
                     ixs_count += 1
 
@@ -210,6 +213,14 @@ class DSTLDataset(Dataset):
 
     def __len__(self):
         return len(self.ds_info['ds_indexes'][self.ds_type]['data'].keys())
+    
+    def retrieve_obs(self, noisy_sig, obs_info):
+        obs = noisy_sig[obs_info['sample_ix']:obs_info['sample_ix']+self.slice_len, 0]
+        obs = np.stack((obs.real, obs.imag))
+
+        if self.transform:
+            obs = self.transform(obs)
+        return obs
 
     def __getitem__(self, idx):
         dataset = self.ds_info['ds_indexes'][self.ds_type]
@@ -240,12 +251,9 @@ class DSTLDataset(Dataset):
         chan_sig = self.apply_wchan(sig_dict['mat'], label) if not (self.apply_wchannel is None) else sig_dict['np']
         noisy_sig = self.apply_AWGN(chan_sig) if self.apply_noise else chan_sig
 
-        # then, retireve the relative slice of the requested dataset sample
-        obs = noisy_sig[obs_info['slice_ix']:obs_info['slice_ix']+self.slice_len, 0]
-        obs = np.stack((obs.real, obs.imag))
-
-        if self.transform:
-            obs = self.transform(obs)
+        # then, retrieve the relative slice of the requested dataset sample
+        
+        obs = self.retrieve_obs(noisy_sig, obs_info)
         if self.target_transform:
             label = self.target_transform(label)
         return obs, label
@@ -301,8 +309,39 @@ class DSTLDataset(Dataset):
         proc_sig = self.mateng.eng.step(channel, mat_sig, nargout=1)
         return np.array(proc_sig)
 
+class DSTLDataset_Transformer(DSTLDataset):
+    
+    def __init__(self, seq_len: int, **kwargs):
+        self.seq_len = seq_len
+        super().__init__(**kwargs)
+        
 
+    def generate_windows(self, len_sig):
+        return list(range(0, len_sig-(self.slice_len*self.seq_len), \
+                    self.overlap*(self.seq_len-1) + self.slice_len)) # window is now seq_len*slice_len
+    
+    def info(self):
+        ds_info = {
+            'seq_len': self.seq_len,
+            'slice_len': self.slice_len,
+            'numsamps': {'train' : len(self.ds_info['ds_indexes']['train']['data'].keys()),
+                         'test': len(self.ds_info['ds_indexes']['test']['data'].keys())},
+            'nclasses': len(self.protocols),
+            'nchans': 2,    # real and imag components are separated on different channels
+        }
+        return ds_info
 
+    def retrieve_obs(self, noisy_sig, obs_info):
+        obs = noisy_sig[obs_info['sample_ix']:obs_info['sample_ix'] + self.overlap*(self.seq_len-1) + self.slice_len, 0]
+        obs = np.stack((obs.real, obs.imag))
+
+        if self.transform:
+            obs = self.transform(obs)
+
+        slice_ixs = list(range(0, obs.size-self.slice_len*2+1, self.overlap*2))
+        obs = [obs[i:i+self.slice_len*2] for i in slice_ixs]
+        return np.asarray(obs)
+    
 if __name__ == "__main__":
 
 
@@ -336,5 +375,3 @@ if __name__ == "__main__":
     for _ in range(10):
         index = np.random.choice(list(myds.ds_info['ixs_maps']['train'].keys()))
         obs, lbl = myds[index]
-
-
