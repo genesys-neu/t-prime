@@ -1,4 +1,3 @@
-import sys
 import scipy.io as sio
 import numpy as np
 import torch
@@ -8,8 +7,9 @@ import argparse
 from glob import glob
 import os
 from tqdm import tqdm
-import matlab
-
+proj_root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.join(os.pardir, os.pardir)))
+import sys
+sys.path.append(proj_root_dir)
 
 class FileCache:
     def __init__(self, max_size):
@@ -45,7 +45,8 @@ class DSTLDataset(Dataset):
                  ds_type='train',  # either 'train' or 'test'
                  slice_overlap_ratio=0.5,   # this is the overlap ratio for each slice generated from a signal
                                             # this value will affect the number of slices that is possible to create from each signal
-                                            ds_path='/home/miquelsirera/Desktop/dstl/data/DSTL_DATASET_1_0',
+                 raw_data_ratio=1.0,        # ratio of the whole raw signal dataset to consider for generation
+                 ds_path='/home/mauro/Research/DSTL/DSTL_DATASET_1_0',
                  file_postfix='',
                  noise_model='AWGN', snr_dbs=[30], seed=None,
                  apply_noise=True, apply_wchannel=None,
@@ -56,7 +57,9 @@ class DSTLDataset(Dataset):
         self.protocols = protocols
         self.slice_len = slice_len
         self.slice_overlap_ratio = slice_overlap_ratio
-        self.overlap = int(self.slice_len * self.slice_overlap_ratio)
+        self.overlap = self.slice_len - int(self.slice_len * self.slice_overlap_ratio)
+        self.raw_data_ratio = raw_data_ratio
+        self.n_sig_per_class = {} # this will be filled in the generate_ds_map() function
         self.noise_model = noise_model
         self.snr_dbs = snr_dbs
         self.seed = seed
@@ -67,16 +70,16 @@ class DSTLDataset(Dataset):
         assert(ds_type in ['train', 'test'])
         self.ds_type = ds_type
         if file_postfix != '' and file_postfix[-1] != '_':
-            file_postfix += '_'
-        info_filename = 'ds_info__'+file_postfix+str(len(protocols))+'class.pkl'
+            file_postfix += '__'
+        info_filename = 'ds_info__'+file_postfix+'slice'+str(slice_len)+'_'+str(len(protocols))+'class.pkl'
         ds_info_path = os.path.join(ds_path, info_filename)
         do_gen_info = True
         if os.path.exists(ds_info_path) and (not override_gen_map):
-            ans = input('File '+info_filename+' already exists. Do you wanna create a new one? [y/n]')
-            if ans.lower() in ['n', 'no']:
-                do_gen_info = False
+            #ans = input('File '+info_filename+' already exists. Do you wanna create a new one? [y/n]')
+            #if ans.lower() in ['n', 'no']:
+            do_gen_info = False
 
-        if do_gen_info and (not override_gen_map):
+        if do_gen_info:
             self.ds_info = self.generate_ds_map(ds_path, info_filename)
         else:
             self.ds_info = pickle.load(open(ds_info_path, 'rb'))
@@ -119,6 +122,9 @@ class DSTLDataset(Dataset):
                     rayleigh = self.mateng.eng.comm.RayleighChannel('SampleRate', float(20e6), 'PathDelays', float(1.5e-9), 'AveragePathGains', float(-3), 'PathGainsOutputPort', True)
                     self.chan_models[ix] = rayleigh
                     self.channel_map['Rayleigh'] = ix
+    
+    def generate_windows(self, len_sig):
+        return list(range(0, len_sig-self.slice_len, self.overlap))
 
     def generate_ds_map(self, ds_path, filename, test_ratio=0.2):
         examples_map = {}
@@ -128,12 +134,18 @@ class DSTLDataset(Dataset):
             path = os.path.join(ds_path, p)
             if os.path.isdir(path):
                 mat_list = sorted(glob(os.path.join(path, '*.mat')))
+                self.n_sig_per_class[p] = int(
+                    len(mat_list) * self.raw_data_ratio)  # for each protocol, we save the amount of raw signals to retain
+
+                mat_list = mat_list[:self.n_sig_per_class[p]] # then we just clip the list
+                num_mat = len(mat_list)                     # and store the new list value length
                 examples_map[p] = dict(
                     zip(
-                        list(range(len(mat_list))),
+                        list(range(num_mat)),
                         mat_list
                     )
                 )
+
             else:
                 sys.exit('[DSTLDataset] folder ' + path + ' not found. Aborting...')
 
@@ -149,12 +161,12 @@ class DSTLDataset(Dataset):
             for ix, path in examples_map[c].items():
                 sig = sio.loadmat(path)
                 len_sig = sig['waveform'].shape[0]
-                window_ixs = list(range(0, len_sig-self.slice_len, self.overlap))
+                window_ixs = self.generate_windows(len_sig)
                 n_windows = len(window_ixs)
-                examples_map[c][ix] = {'slices': window_ixs,
+                examples_map[c][ix] = {'sample': window_ixs, # sample is slice for CNN or sequence for Transformer
                                        'path': examples_map[c][ix]}  # here we modify the original content
                 for w in window_ixs:
-                    data_ixs[ixs_count] = {'path': path, 'slice_ix': w}
+                    data_ixs[ixs_count] = {'path': path, 'sample_ix': w}
                     labels_ixs[ixs_count] = class_map[c]
                     ixs_count += 1
 
@@ -200,6 +212,14 @@ class DSTLDataset(Dataset):
 
     def __len__(self):
         return len(self.ds_info['ds_indexes'][self.ds_type]['data'].keys())
+    
+    def retrieve_obs(self, noisy_sig, obs_info):
+        obs = noisy_sig[obs_info['sample_ix']:obs_info['sample_ix']+self.slice_len, 0]
+        obs = np.stack((obs.real, obs.imag))
+
+        if self.transform:
+            obs = self.transform(obs)
+        return obs
 
     def __getitem__(self, idx):
         dataset = self.ds_info['ds_indexes'][self.ds_type]
@@ -221,12 +241,9 @@ class DSTLDataset(Dataset):
         chan_sig = self.apply_wchan(sig_dict['mat'], label) if not (self.apply_wchannel is None) else sig_dict['np']
         noisy_sig = self.apply_AWGN(chan_sig) if self.apply_noise else chan_sig
 
-        # then, retireve the relative slice of the requested dataset sample
-        obs = noisy_sig[obs_info['slice_ix']:obs_info['slice_ix']+self.slice_len, 0]
-        obs = np.stack((obs.real, obs.imag))
-
-        if self.transform:
-            obs = self.transform(obs)
+        # then, retrieve the relative slice of the requested dataset sample
+        
+        obs = self.retrieve_obs(noisy_sig, obs_info)
         if self.target_transform:
             label = self.target_transform(label)
         return obs, label
@@ -281,13 +298,56 @@ class DSTLDataset(Dataset):
         proc_sig = self.mateng.eng.step(channel, mat_sig, nargout=1)
         return np.array(proc_sig)
 
+class DSTLDataset_Transformer(DSTLDataset):
+    
+    def __init__(self, seq_len: int, **kwargs):
+        super().__init__(**kwargs)
+        self.seq_len = seq_len
 
+    def generate_windows(self, len_sig):
+        return list(range(0, len_sig-(self.slice_len*self.seq_len), \
+                    self.overlap*(self.seq_len-1) + self.slice_len)) # window is now seq_len*slice_len
+    
+    def info(self):
+        ds_info = {
+            'seq_len': self.seq_len,
+            'slice_len': self.slice_len,
+            'numsamps': {'train' : len(self.ds_info['ds_indexes']['train']['data'].keys()),
+                         'test': len(self.ds_info['ds_indexes']['test']['data'].keys())},
+            'nclasses': len(self.protocols),
+            'nchans': 2,    # real and imag components are separated on different channels
+        }
+        return ds_info
 
+    def retrieve_obs(self, noisy_sig, obs_info):
+        obs = noisy_sig[obs_info['seq_ix']:obs_info['seq_ix'] + self.overlap*(self.seq_len-1) + self.slice_len, 0]
+        obs = np.stack((obs.real, obs.imag))
+
+        if self.transform:
+            obs = self.transform(obs)
+
+        slice_ixs = list(range(0, obs.size-self.slice_len*2+1, self.overlap*2))
+        obs = [obs[i:i+self.slice_len*2] for i in slice_ixs]
+        return np.asarray(obs)
+    
 if __name__ == "__main__":
-    # myds = DSTLDataset(['802_11ax', '802_11b', '802_11n', '802_11g'], slice_len=128, slice_overlap_ratio=0.5) # case with mixed sampling rates and only AWGN
-    myds = DSTLDataset(['802_11ax', '802_11b_upsampled', '802_11n', '802_11g'], slice_len=128, slice_overlap_ratio=0.5,
-                      
-                       apply_wchannel='TGn', file_postfix='all20MHz')    # this case has consistent sampling rates (20 MHz) and applies a specific channel to all signals
+
+
+    import argparse
+
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument("--protocols", nargs='+', default=['802_11ax', '802_11b_upsampled', '802_11n', '802_11g'],
+                        choices=['802_11ax', '802_11b', '802_11b_upsampled', '802_11n', '802_11g'],
+                        help="Specify the protocols/classes to be included in the dataset")
+    parser.add_argument('--raw_path', default='/home/mauro/Research/DSTL/DSTL_DATASET_1_0', help='Path where raw signals are stored.')
+    parser.add_argument('--postfix', default='', help='Postfix to append to dataset file.')
+    parser.add_argument('--slicelen', default=128, type=int, help='Signal slice size')
+    parser.add_argument('--overlap_ratio', default=0.5, help='Overlap ratio for slices generation')
+    parser.add_argument('--raw_data_ratio', default=1.0, type=float, help='Specify the ratio of examples per class to consider while training/testing')
+    args, _ = parser.parse_known_args()
+
+    myds = DSTLDataset(protocols=args.protocols, ds_path=args.raw_path, slice_len=args.slicelen, slice_overlap_ratio=args.overlap_ratio, raw_data_ratio=args.raw_data_ratio,
+                       apply_wchannel='TGn', file_postfix=args.postfix)    # this case has consistent sampling rates (20 MHz) and applies a specific channel to all signals
 
     import matplotlib.pyplot as plt
     classes_slice_count = {}
@@ -303,5 +363,3 @@ if __name__ == "__main__":
     for _ in range(10):
         index = np.random.choice(list(myds.ds_info['ixs_maps']['train'].keys()))
         obs, lbl = myds[index]
-
-

@@ -72,7 +72,7 @@ class DSTLDataset(Dataset):
         assert(ds_type in ['train', 'test'])
         self.ds_type = ds_type
         if file_postfix != '' and file_postfix[-1] != '_':
-            file_postfix += '_'
+            file_postfix += '__'
         info_filename = 'ds_info__'+file_postfix+str(len(protocols))+'class.pkl'
         ds_info_path = os.path.join(ds_path, info_filename)
         do_gen_info = True
