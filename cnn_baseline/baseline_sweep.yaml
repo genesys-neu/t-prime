@@ -1,0 +1,25 @@
+program: DSTL_torch_train.py
+method: grid
+metric:
+  goal: minimize
+  name: Val_loss
+parameters:
+  slicelen:
+    values: [128, 256, 512]
+  postfix:
+    value: 'all20MHz_half'
+  channel:
+   values: ['TGn', 'TGax', 'Rayleigh']
+  raw_path:
+    value: '/home/belgiovinem/Research/DSTL/DSTL_DATASET_1_1'
+  cp_path:
+    value: 'results/'
+  raw_data_ratio:
+    value: 0.5
+  snr_db:
+    values: [-10, 0, 30]
+
+command:
+  - python3
+  - ${program}
+  - ${args}

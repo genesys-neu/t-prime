@@ -17,6 +17,7 @@ from torch.nn.modules.utils import consume_prefix_in_state_dict_if_present
 from tqdm import tqdm
 from model_cnn1d import Baseline_CNN1D
 from confusion_matrix import plot_confmatrix
+import wandb
 
 def train_epoch(dataloader, model, loss_fn, optimizer, use_ray=False):
     if use_ray:
@@ -24,12 +25,15 @@ def train_epoch(dataloader, model, loss_fn, optimizer, use_ray=False):
     else:
         size = len(dataloader.dataset)
     model.train()
+    correct = 0
+    loss = 0
     for batch, (X, y) in tqdm(enumerate(dataloader), desc="Training epochs.."):
         X = X.to(device)
         y = y.to(device)
         # Compute prediction error
         pred = model(X.float())
         loss = loss_fn(pred, y)
+        correct += (pred.argmax(1) == y).type(torch.float).sum().item()
 
         # Backpropagation
         optimizer.zero_grad()
@@ -40,6 +44,11 @@ def train_epoch(dataloader, model, loss_fn, optimizer, use_ray=False):
             loss, current = loss.item(), batch * len(X)
             print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
             print(f"Cached files: ", len(dataloader.dataset.signal_cache.cache.keys()))
+    correct /= size
+    print(f"Train Error: \n "
+          f"Accuracy: {(100 * correct):>0.1f}%, "
+          )
+    return loss, correct
 
 from sklearn.metrics import confusion_matrix as conf_mat
 def validate_epoch(dataloader, model, loss_fn, Nclasses, use_ray=False):
@@ -69,7 +78,7 @@ def validate_epoch(dataloader, model, loss_fn, Nclasses, use_ray=False):
         f"Avg loss: {test_loss:>8f} \n"
     )
 
-    return test_loss, conf_matrix
+    return test_loss, correct, conf_matrix
 
 def train_func(config: Dict):
     global_model = config['pytorch_model']
@@ -82,7 +91,8 @@ def train_func(config: Dict):
     num_feats = config['num_feats']
     num_channels = config['num_chans']
     device = config['device']
-    logdir = config['cp_path']
+    logdir = os.path.join(config['cp_path'], 'sweep_'+config['wchannel']+'_'+config['postfix'], 'slice'+str(slice_len)+'_snr'+config['snr_dB'])
+    os.makedirs(logdir, exist_ok=True)
 
     if not use_ray:
         worker_batch_size = batch_size
@@ -111,9 +121,14 @@ def train_func(config: Dict):
     scheduler = ReduceLROnPlateau(optimizer, 'min', min_lr=0.00001, verbose=True)
     loss_results = []
     best_loss = np.inf
+    wandb.watch(model, log_freq=10)
     for e in range(epochs):
-        train_epoch(train_dataloader, model, loss_fn, optimizer, use_ray)
-        loss, conf_matrix = validate_epoch(test_dataloader, model, loss_fn, Nclasses=Nclass, use_ray=use_ray)
+        tr_loss, tr_acc = train_epoch(train_dataloader, model, loss_fn, optimizer, use_ray)
+        wandb.log({'Tr_loss': tr_loss}, step=e)
+        wandb.log({'Tr_acc': tr_acc}, step=e)
+        loss, acc, conf_matrix = validate_epoch(test_dataloader, model, loss_fn, Nclasses=Nclass, use_ray=use_ray)
+        wandb.log({'Val_loss': loss}, step=e)
+        wandb.log({'Val_acc': acc}, step=e)
         scheduler.step(loss)
         loss_results.append(loss)
         if use_ray:
@@ -138,9 +153,8 @@ def train_func(config: Dict):
                     'optimizer_state_dict': optimizer.state_dict(),
                     'loss': loss,
                 }, os.path.join(logdir,'model.best.pt'))
-                plot_confmatrix(logdir, pkl_file, train_config['class_labels'], 'conf_mat_epoch'+str(e)+'.png')
-
-
+                df_confmat = plot_confmatrix(logdir, pkl_file, train_config['class_labels'], 'conf_mat_epoch'+str(e)+'.png')
+                wandb.log({'Confusion_Matrix': df_confmat.to_numpy()}, step=e)
     # return required for backwards compatibility with the old API
     # TODO(team-ml) clean up and remove return
     return loss_results
@@ -149,7 +163,7 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument("--noise", action='store_true', default=False, help="Specify if noise needs to be applied or not during training")
+    parser.add_argument("--noise", type=bool, default=True, help="Specify if noise needs to be applied or not during training")
     parser.add_argument("--snr_db", nargs='+', default=[30], help="SNR levels to be considered during training. "
                                                                   "It's possible to define multiple noise levels to be "
                                                                   "chosen at random during input slices generation.")
@@ -166,12 +180,34 @@ if __name__ == "__main__":
     parser.add_argument('--slicelen', default=128, type=int, help='Signal slice size')
     parser.add_argument('--overlap_ratio', default=0.5, help='Overlap ratio for slices generation')
     parser.add_argument('--postfix', default='', help='Postfix to append to dataset file.')
-
+    parser.add_argument('--raw_data_ratio', default=1.0, type=float, help='Specify the ratio of examples per class to consider while training/testing')
     args, _ = parser.parse_known_args()
 
+    print('Apply noise:', args.noise)
+
     protocols = args.protocols
-    ds_train = DSTLDataset(protocols, ds_path=args.raw_path, ds_type='train', snr_dbs=args.snr_db, slice_len=args.slicelen, slice_overlap_ratio=args.overlap_ratio, file_postfix=args.postfix, override_gen_map=True, apply_wchannel=args.channel, apply_noise=args.noise)
-    ds_test = DSTLDataset(protocols,  ds_path=args.raw_path, ds_type='test', snr_dbs=args.snr_db, slice_len=args.slicelen, slice_overlap_ratio=args.overlap_ratio, file_postfix=args.postfix, override_gen_map=True, apply_wchannel=args.channel, apply_noise=args.noise)
+    ds_train = DSTLDataset(protocols,
+                           ds_path=args.raw_path,
+                           ds_type='train',
+                           snr_dbs=args.snr_db,
+                           slice_len=args.slicelen,
+                           slice_overlap_ratio=args.overlap_ratio,
+                           raw_data_ratio=args.raw_data_ratio,
+                           file_postfix=args.postfix,
+                           override_gen_map=True,
+                           apply_wchannel=args.channel,
+                           apply_noise=args.noise)
+    ds_test = DSTLDataset(protocols,
+                          ds_path=args.raw_path,
+                          ds_type='test',
+                          snr_dbs=args.snr_db,
+                          slice_len=args.slicelen,
+                          slice_overlap_ratio=args.overlap_ratio,
+                          raw_data_ratio=args.raw_data_ratio,
+                          file_postfix=args.postfix,
+                          override_gen_map=True,    # it will use the same as above call
+                          apply_wchannel=args.channel,
+                          apply_noise=args.noise)
 
     if not os.path.isdir(args.cp_path):
         os.makedirs(args.cp_path)
@@ -189,6 +225,9 @@ if __name__ == "__main__":
     train_config['device'] = device
     train_config['cp_path'] = args.cp_path
     train_config['class_labels'] = protocols
+    train_config['wchannel'] = args.channel
+    train_config['postfix'] = args.postfix
+    train_config['snr_dB'] = args.snr_db[0]
 
     """
     if not train_config['isDebug']:
@@ -206,8 +245,22 @@ if __name__ == "__main__":
         train_func(train_config)
     """
 
+    exp_config = {  # Experiment configuration for tracking
+        "Dataset": "1_1",
+        "Dataset_Ratio": args.raw_data_ratio,
+        "Architecture": "Baseline_CNN1D",
+        "Wireless channel": args.channel,
+        "Snr (dbs)": args.snr_db,
+        "Learning rate": train_config['lr'],
+        "Batch size": train_config['batch_size'],
+        "Slice length": args.slicelen
+    }
+    wandb.init(project="RF_Baseline_CNN1D", config=exp_config)
+    wandb.run.name = f'{float(args.snr_db[0])} dBs {args.channel} sl:{ds_info["slice_len"]}'
+
     epochs_loss = train_func(train_config)
     pickle.dump(epochs_loss, open(os.path.join(args.cp_path, 'epochs_loss.pkl'), 'wb'))
     print(epochs_loss)
+    wandb.finish()
 
 
