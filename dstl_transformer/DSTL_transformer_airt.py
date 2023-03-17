@@ -33,7 +33,6 @@ def timing_inference_GPU(dummy_input, model):
 
 Nclass = 4
 num_channels = 2
-slice_len = 128
 snr_dBs = [30]
 transformer_layers = 2
 pos_encoder = False
@@ -45,10 +44,8 @@ for slice_len in [64, 128]:
     d_model = 2 * slice_len
     if slice_len == 128:
         seq_len = 64
-
     model = TransformerModel(classes=Nclass, d_model=d_model, seq_len=seq_len, nlayers=transformer_layers, use_pos=pos_encoder)
     model.to(device)
-
     slice_in = np.random.random((1,seq_len,d_model))
     slice_t = torch.Tensor(slice_in)
     slice_t = slice_t.to(model.device.type)
