@@ -46,7 +46,7 @@ for slice_len in [64, 128]:
     if slice_len == 128:
         seq_len = 64
 
-    model = TransformerModel(classes=Nclass, d_model=d_model, seq_len=seq_len, nlayers=transformer_layers, use_pos=pos_encoder))
+    model = TransformerModel(classes=Nclass, d_model=d_model, seq_len=seq_len, nlayers=transformer_layers, use_pos=pos_encoder)
     model.to(device)
 
     slice_in = np.random.random((1,seq_len,d_model))
