@@ -7,20 +7,17 @@ import os
 from glob import glob
 import numpy as np
 
-DATA_PATH = '/home/miquelsirera/Desktop/dstl/data/DSTL_DATASET_1_1'
+DATA_PATH = '/home/miquelsirera/Desktop/dstl/data/DSTL_DATASET_1_1_TEST'
 TEST_DATA_PATH = '/home/miquelsirera/Desktop/dstl/data/DSTL_DATASET_1_1_TEST'
 PROTOCOLS = ['802_11ax', '802_11b_upsampled', '802_11n', '802_11g']
 CHANNELS = ['None', 'TGn', 'TGax', 'Rayleigh']
 SNR = [-30.0, -20.0, -10.0, 0.0, 10.0, 20.0, 30.0] # in dBs
-TEST_RATIO = 0.05
+#TEST_RATIO = 0.05
 
-def create_test_directories():
+def check_test_directory():
     if not os.path.isdir(TEST_DATA_PATH):
-        os.mkdir(TEST_DATA_PATH)
-    # TEST_DATA_PATH exists, create protocols folders if necessary
-    for p in PROTOCOLS:
-        if not os.path.isdir(os.path.join(TEST_DATA_PATH, p)):
-            os.mkdir(os.path.join(TEST_DATA_PATH, p))
+        #os.mkdir(TEST_DATA_PATH)
+        raise Exception("No DSTL TEST DATASET found on ", TEST_DATA_PATH)
 
 
 def apply_AWGN(snr_dbs, sig):
@@ -64,26 +61,29 @@ if __name__ == "__main__":
     rayleigh = mateng.eng.comm.RayleighChannel('SampleRate', float(20e6), 'PathDelays', float(1.5e-9), 'AveragePathGains', float(-3), 'PathGainsOutputPort', True)
     channels = {'TGn': tgn, 'TGax': tgax, 'Rayleigh': rayleigh}
     assert(not ('802_11b' in PROTOCOLS))
-    create_test_directories()
+    check_test_directory()
     # retrieve the list of signals (.mat) from every folder/protocol specified
     for i, p in enumerate(PROTOCOLS):
         path = os.path.join(DATA_PATH, p)
         if os.path.isdir(path):
             mat_list = sorted(glob(os.path.join(path, '*.mat')))
-            n_signals = int(len(mat_list) * TEST_RATIO) 
-            mat_list = mat_list[len(mat_list) - n_signals:] # Pick last n_signals
+            #n_signals = int(len(mat_list) * TEST_RATIO) If there is a test portion to extract 
+            #mat_list = mat_list[len(mat_list) - n_signals:] # Pick last n_signals
             for file_name in mat_list:
                 mat_dict = sio.loadmat(file_name)
                 # move .mat and .yaml to the test directory
-                shutil.move(file_name, os.path.join(TEST_DATA_PATH, p))
-                shutil.move(file_name[:-4] + '.yaml', os.path.join(TEST_DATA_PATH, p))
+                #shutil.move(file_name, os.path.join(TEST_DATA_PATH, p))
+                #shutil.move(file_name[:-4] + '.yaml', os.path.join(TEST_DATA_PATH, p))
                 name = file_name.split("/")[-1][:-4]
                 for channel in CHANNELS:
-                    for noise in SNR:
-                        chan_sig = apply_wchan(mateng.py2mat_array(mat_dict['waveform']), mateng, channels, channel) if channel != 'None' else mat_dict['waveform']
-                        noisy_sig = apply_AWGN(noise, chan_sig)
-                        name_ch_noise = name + '_' + channel + '_' + str(noise) + 'dBs' + '.npy'
-                        np.save(os.path.join(TEST_DATA_PATH, p, name_ch_noise), noisy_sig)
+                    #for noise in SNR:
+                    chan_sig = apply_wchan(mateng.py2mat_array(mat_dict['waveform']), mateng, channels, channel) if channel != 'None' else mat_dict['waveform']
+                    #noisy_sig = apply_AWGN(noise, chan_sig)
+                    name_ch_noise = name + '_' + channel + '.mat' # + '.npy'
+                    if not os.path.join(TEST_DATA_PATH, p, channel):
+                        os.mkdir(os.path.join(TEST_DATA_PATH, p, channel))
+                    #np.save(os.path.join(TEST_DATA_PATH, p, channel, name_ch_noise), chan_sig)
+                    sio.savemat(os.path.join(TEST_DATA_PATH, p, channel, name_ch_noise), chan_sig)
 
         else:
             sys.exit('[DSTLDataset] folder ' + path + ' not found. Aborting...')
