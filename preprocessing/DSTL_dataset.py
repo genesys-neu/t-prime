@@ -48,7 +48,7 @@ class DSTLDataset(Dataset):
                  raw_data_ratio=1.0,        # ratio of the whole raw signal dataset to consider for generation
                  ds_path='/home/mauro/Research/DSTL/DSTL_DATASET_1_0',
                  file_postfix='',
-                 noise_model='AWGN', snr_dbs=[30], seed=None,
+                 noise_model='AWGN', snr_dbs=[30], seed=4389,
                  apply_noise=True, apply_wchannel=None,
                  override_gen_map=False,
                  normalize=False,
