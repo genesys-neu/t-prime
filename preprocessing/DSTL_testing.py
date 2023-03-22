@@ -1,4 +1,5 @@
 import scipy.io as sio
+import time
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
@@ -56,27 +57,33 @@ def chan2sequence(obs):
 def validate(model, class_map, seq_len, sli_len, channel):
     correct = np.zeros(len(SNR))
     total_samples = 0
+    start_time = time.time()
+    prev_time = time.time()
     for p in PROTOCOLS:
         path = os.path.join(TEST_DATA_PATH, p) if channel == 'None' else os.path.join(TEST_DATA_PATH, p, channel)
         mat_list = sorted(glob(os.path.join(path, '*.mat'))) if channel == 'None' else sorted(glob(os.path.join(path, '*.npy')))
         for signal_path in mat_list:
-            sig = sio.loadmat(path) if channel == 'None' else np.load(signal_path)
+            sig = sio.loadmat(signal_path) if channel == 'None' else np.load(signal_path)
             if channel == 'None':
                 sig = sig['waveform']
             len_sig = sig.shape[0]
             for i, dBs in enumerate(SNR):
                 noisy_sig = apply_AWGN(dBs, sig)
                 len_sig = noisy_sig.shape[0]
-                X = np.array([])
+                X = []
                 # create batch of sequences
                 idxs = list(range(0, len_sig-(sli_len*seq_len), (seq_len-1) + sli_len))
                 for idx in idxs:
-                    obs = noisy_sig[idx:idx+sli_len, 0]
+                    obs = noisy_sig[idx:idx+sli_len*(seq_len-1) + sli_len, 0]
                     obs = np.stack((obs.real, obs.imag))
                     obs = chan2sequence(obs)
                     slice_ixs = list(range(0, obs.size-sli_len*2+1, sli_len*2))
-                    obs = [obs[i:i+sli_len*2] for i in slice_ixs]
-                    np.concatenate(X, [np.asarray(obs)], axis=0)
+                    obs = [obs[j:j+sli_len*2] for j in slice_ixs]
+                    obs = np.asarray(obs)
+                    if len(X) == 0:
+                        X = [obs]
+                    else:
+                        X = np.concatenate((X, [obs]), axis=0)
                 # predict
                 X = torch.from_numpy(X)
                 y = np.empty(len(idxs))
@@ -87,6 +94,9 @@ def validate(model, class_map, seq_len, sli_len, channel):
                 correct[i] += (pred.argmax(1) == y).type(torch.float).sum().item()
                 if i == 0:
                     total_samples += len(idxs)
+            print("--- %s seconds ---" % (time.time() - prev_time))
+            prev_time = time.time()
+        print("--- %s seconds for protocol ---" % (time.time() - start_time))
     return correct/total_samples*100
 
 
@@ -96,10 +106,10 @@ if __name__ == "__main__":
     for channel in CHANNELS:
         # Load the two models
         model_lg = TransformerModel(classes=len(PROTOCOLS), d_model=128*2, seq_len=64, nlayers=2, use_pos=False)
-        model_lg.load_state_dict(torch.load(f"{MODELS_PATH}/model{channel}_lg.pt", map_location=torch.device('cpu')))
+        model_lg.load_state_dict(torch.load(f"{MODELS_PATH}/model{channel}_lg.pt", map_location=torch.device('cpu'))['model_state_dict'])
         model_lg.eval()
         model_sm = TransformerModel(classes=len(PROTOCOLS), d_model=64*2, seq_len=24, nlayers=2, use_pos=False)
-        model_sm.load_state_dict(torch.load(f"{MODELS_PATH}/model{channel}_sm.pt", map_location=torch.device('cpu')))
+        model_sm.load_state_dict(torch.load(f"{MODELS_PATH}/model{channel}_sm.pt", map_location=torch.device('cpu'))['model_state_dict'])
         model_sm.eval()
 
         y_trans_lg.append(validate(model_lg, class_map, seq_len=64, sli_len=128, channel=channel))

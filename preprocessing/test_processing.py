@@ -10,7 +10,7 @@ import numpy as np
 DATA_PATH = '/home/miquelsirera/Desktop/dstl/data/DSTL_DATASET_1_1_TEST'
 TEST_DATA_PATH = '/home/miquelsirera/Desktop/dstl/data/DSTL_DATASET_1_1_TEST'
 PROTOCOLS = ['802_11ax', '802_11b_upsampled', '802_11n', '802_11g']
-CHANNELS = ['None', 'TGn', 'TGax', 'Rayleigh']
+CHANNELS = ['TGn', 'TGax', 'Rayleigh']
 SNR = [-30.0, -20.0, -10.0, 0.0, 10.0, 20.0, 30.0] # in dBs
 #TEST_RATIO = 0.05
 
@@ -79,11 +79,11 @@ if __name__ == "__main__":
                     #for noise in SNR:
                     chan_sig = apply_wchan(mateng.py2mat_array(mat_dict['waveform']), mateng, channels, channel) if channel != 'None' else mat_dict['waveform']
                     #noisy_sig = apply_AWGN(noise, chan_sig)
-                    name_ch_noise = name + '_' + channel + '.mat' # + '.npy'
-                    if not os.path.join(TEST_DATA_PATH, p, channel):
+                    name_ch_noise = name + '_' + channel + '.npy'
+                    if not os.path.isdir(os.path.join(TEST_DATA_PATH, p, channel)):
                         os.mkdir(os.path.join(TEST_DATA_PATH, p, channel))
-                    #np.save(os.path.join(TEST_DATA_PATH, p, channel, name_ch_noise), chan_sig)
-                    sio.savemat(os.path.join(TEST_DATA_PATH, p, channel, name_ch_noise), chan_sig)
+                    np.save(os.path.join(TEST_DATA_PATH, p, channel, name_ch_noise), chan_sig)
+                
 
         else:
             sys.exit('[DSTLDataset] folder ' + path + ' not found. Aborting...')
