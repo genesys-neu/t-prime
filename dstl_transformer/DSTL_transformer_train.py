@@ -167,7 +167,7 @@ def train_func(config: Dict):
                     'model_state_dict': model.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
                     'loss': loss,
-                }, os.path.join(logdir,'model.best.pt'))
+                }, os.path.join(logdir,f'model{config["wchannel"]}_lg.pt'))
     
     fig = plt.figure(figsize=(8,8))
     best_conf_matrix = best_conf_matrix.astype('float') / best_conf_matrix.sum(axis=1)[np.newaxis]
@@ -259,7 +259,8 @@ if __name__ == "__main__":
         "device": device,
         "cp_path": args.cp_path,
         "use_positional_enc": exp_config["Positional encoder"],
-        "protocols": protocols
+        "protocols": protocols,
+        "wchannel": args.wchannel
         }
 
     """
