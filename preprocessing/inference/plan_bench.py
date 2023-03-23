@@ -12,10 +12,10 @@ import time
 import trt_utils
 
 # Default inference settings.
-PLAN_FILE_NAME = 'pytorch/avg_pow_net.plan'  # Plan file
-CPLX_SAMPLES_PER_INFER = 2048  # This should be half input_len from the neural network
-BATCH_SIZE = 128  # Must be less than or equal to max_batch_size when creating plan file
-NUM_BATCHES = 128  # Number of batches to run. Set to float('Inf') to run continuously
+PLAN_FILE_NAME = '/home/deepwave/Research/DSTL/dstl/cnn_baseline/dstl_baseline_CNN1D.plan'  # Plan file
+CPLX_SAMPLES_PER_INFER = 512  # This should be half input_len from the neural network
+BATCH_SIZE = 1  # Must be less than or equal to max_batch_size when creating plan file
+NUM_BATCHES = 512  # Number of batches to run. Set to float('Inf') to run continuously
 INPUT_DTYPE = np.float32
 
 
@@ -26,7 +26,7 @@ def plan_bench(plan_file_name=PLAN_FILE_NAME, cplx_samples=CPLX_SAMPLES_PER_INFE
 
     # Use pyCUDA to create a shared memory buffer that will receive samples from the
     # AIR-T to be fed into the neural network.
-    buff_len = 2 * cplx_samples * batch_size
+    buff_len = 2 * cplx_samples * batch_size # [MAURO] our shape is (1,2,512)
     sample_buffer = trt_utils.MappedBuffer(buff_len, input_dtype)
 
     # Set up the inference engine. Note that the output buffers are created for
@@ -37,6 +37,8 @@ def plan_bench(plan_file_name=PLAN_FILE_NAME, cplx_samples=CPLX_SAMPLES_PER_INFE
     # Populate input buffer with test data
     dnn.input_buff.host[:] = np.random.randn(buff_len).astype(input_dtype)
 
+    for _ in range(25):    # warmup GPU
+        dnn.feed_forward()
     # Time the DNN Execution
     start_time = time.monotonic()
     for _ in range(num_batches):
@@ -48,7 +50,8 @@ def plan_bench(plan_file_name=PLAN_FILE_NAME, cplx_samples=CPLX_SAMPLES_PER_INFE
     rate_gbps = throughput_msps * 2 * sample_buffer.host.itemsize * 8 / 1e3
     print('Result:')
     print('  Samples Processed : {:,}'.format(total_cplx_samples))
-    print('  Processing Time   : {:0.3f} msec'.format(elapsed_time / 1e-3))
+    print('  Tot. Processing Time   : {:0.3f} msec'.format(elapsed_time / 1e-3))
+    print('  Avg. batch infer time  : {:0.6f} msec'.format((elapsed_time / num_batches) / 1e-3))
     print('  Throughput        : {:0.3f} MSPS'.format(throughput_msps))
     print('  Data Rate         : {:0.3f} Gbit / sec'.format(rate_gbps))
 

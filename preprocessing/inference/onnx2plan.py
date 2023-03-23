@@ -10,7 +10,7 @@ must be executed on the platform that will be used for inference, i.e., the AIR-
 
 import tensorrt as trt
 import os
-from plan_benchplan_bench import plan_bench
+from plan_bench import plan_bench
 
 # Top-level inference settings.
 ONNX_FILE_NAME = '/home/deepwave/Research/DSTL/dstl/cnn_baseline/dstl_baseline_CNN1D.onnx'  # Name of input onnx file
@@ -48,7 +48,7 @@ def main():
         config.set_flag(trt.BuilderFlag.FP16)
 
     # Optimize the network
-    optimized_input_dims = (MAX_BATCH_SIZE, INPUT_LEN)
+    optimized_input_dims = (MAX_BATCH_SIZE, 2, INPUT_LEN)
     profile = builder.create_optimization_profile()
     input_name = INPUT_NODE_NAME + INPUT_PORT_NAME
     # Set the min, optimal, and max dimensions for the input layer.
