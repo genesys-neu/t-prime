@@ -80,8 +80,8 @@ def validate(model, class_map, seq_len, sli_len, channel):
                 # split stream in sequences
                 obs = np.split(obs, idxs)[:-1]
                 # split each sequence in slices
-                for i, seq in enumerate(obs):
-                    obs[i] = np.split(seq, seq_len)
+                for j, seq in enumerate(obs):
+                    obs[j] = np.split(seq, seq_len)
                 # create batch of sequences
                 X = np.asarray(obs)
                 # predict
