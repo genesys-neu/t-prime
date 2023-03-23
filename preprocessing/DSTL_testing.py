@@ -72,6 +72,7 @@ def validate(model, class_map, seq_len, sli_len, channel):
                 len_sig = noisy_sig.shape[0]
                 # stack real and imag parts
                 obs = np.stack((noisy_sig.real, noisy_sig.imag))
+                obs = np.squeeze(obs, axis=2)
                 # zip the I and Q values
                 obs = chan2sequence(obs)
                 # generate idxs for split
@@ -80,7 +81,7 @@ def validate(model, class_map, seq_len, sli_len, channel):
                 obs = np.split(obs, idxs)[:-1]
                 # split each sequence in slices
                 for i, seq in enumerate(obs):
-                    obs[i] = np.split(seq, 64)
+                    obs[i] = np.split(seq, seq_len)
                 # create batch of sequences
                 X = np.asarray(obs)
                 # predict
@@ -93,9 +94,8 @@ def validate(model, class_map, seq_len, sli_len, channel):
                 correct[i] += (pred.argmax(1) == y).type(torch.float).sum().item()
                 if i == 0:
                     total_samples += len(idxs)
-            print("--- %s seconds ---" % (time.time() - prev_time))
-            prev_time = time.time()
-        print("--- %s seconds for protocol ---" % (time.time() - start_time))
+        print("--- %s seconds for protocol ---" % (time.time() - prev_time))
+        prev_time = time.time()
     return correct/total_samples*100
 
 
