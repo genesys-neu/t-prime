@@ -70,20 +70,19 @@ def validate(model, class_map, seq_len, sli_len, channel):
             for i, dBs in enumerate(SNR):
                 noisy_sig = apply_AWGN(dBs, sig)
                 len_sig = noisy_sig.shape[0]
-                X = []
+                # stack real and imag parts
+                obs = np.stack((noisy_sig.real, noisy_sig.imag))
+                # zip the I and Q values
+                obs = chan2sequence(obs)
+                # generate idxs for split
+                idxs = list(range(seq_len*sli_len*2, len_sig, seq_len*sli_len*2)) # *2 because I and Q are already zipped
+                # split stream in sequences
+                obs = np.split(obs, idxs)[:-1]
+                # split each sequence in slices
+                for i, seq in enumerate(obs):
+                    obs[i] = np.split(seq, 64)
                 # create batch of sequences
-                idxs = list(range(0, len_sig-(sli_len*seq_len), (seq_len-1) + sli_len))
-                for idx in idxs:
-                    obs = noisy_sig[idx:idx+sli_len*(seq_len-1) + sli_len, 0]
-                    obs = np.stack((obs.real, obs.imag))
-                    obs = chan2sequence(obs)
-                    slice_ixs = list(range(0, obs.size-sli_len*2+1, sli_len*2))
-                    obs = [obs[j:j+sli_len*2] for j in slice_ixs]
-                    obs = np.asarray(obs)
-                    if len(X) == 0:
-                        X = [obs]
-                    else:
-                        X = np.concatenate((X, [obs]), axis=0)
+                X = np.asarray(obs)
                 # predict
                 X = torch.from_numpy(X)
                 y = np.empty(len(idxs))
