@@ -46,7 +46,7 @@ class DSTLDataset(Dataset):
                  slice_overlap_ratio=0.5,   # this is the overlap ratio for each slice generated from a signal
                                             # this value will affect the number of slices that is possible to create from each signal
                  raw_data_ratio=1.0,        # ratio of the whole raw signal dataset to consider for generation
-                 ds_path='/home/mauro/Research/DSTL/DSTL_DATASET_1_0',
+                 ds_path='/home/miquelsirera/Desktop/dstl/data/DSTL_DATASET_1_1',
                  file_postfix='',
                  noise_model='AWGN', snr_dbs=[30], seed=4389,
                  apply_noise=True, apply_wchannel=None,
