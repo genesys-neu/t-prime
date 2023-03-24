@@ -116,6 +116,8 @@ if __name__ == "__main__":
         y_trans_sm.append(validate(model_sm, class_map, seq_len=24, sli_len=64, channel=channel))
         print(f'Accuracy values for channel {channel} and small architecture are: ', y_trans_sm[-1])
     
+    with open('test_results_uniformdist.txt', 'w') as f:
+        f.write(str(y_trans_lg) + '%' + str(y_trans_sm))
     fig, ax = plt.subplots(2, 2, figsize = (12, 6))
 
     for i in range(2):
