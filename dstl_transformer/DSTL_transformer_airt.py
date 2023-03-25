@@ -54,6 +54,23 @@ for slice_len in [64, 128]:
     print('Slice len', slice_len)
     print("Mean (ms):", mean_ms, "Std ", std_ms)
 
+homedir=os.path.expanduser('~')
+PATH = os.path.join(homedir, '/home/miquelsirera/Desktop/dstl/dstl_transformer/model_cp')
+model_file_name = 'model.best_sm.pt'
+model_path = os.path.join(PATH, model_file_name)
+checkpoint = torch.load(model_path)
+model.load_state_dict(checkpoint['model_state_dict'])
 
+ONNX_FILE_NAME = 'dstl_baseline_transformer_SMALL.onnx'  # File name to save network
+INPUT_NODE_NAME = 'input_buffer'  # User defined name of input node
+OUTPUT_NODE_NAME = 'output_buffer'  # User defined name of output node
+ONNX_VERSION = 10  # the ONNX version to export the model to
+
+torch.onnx.export(model, slice_t, ONNX_FILE_NAME, export_params=True,
+                  opset_version=ONNX_VERSION, do_constant_folding=True,
+                  input_names=[INPUT_NODE_NAME], output_names=[OUTPUT_NODE_NAME],
+                  dynamic_axes={INPUT_NODE_NAME: {0: 'batch_size'},
+                                OUTPUT_NODE_NAME: {0: 'batch_size'}})
+# TODO: check the typing warning
 
 
