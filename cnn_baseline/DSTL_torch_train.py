@@ -256,7 +256,7 @@ if __name__ == "__main__":
         "Slice length": args.slicelen
     }
     wandb.init(project="RF_Baseline_CNN1D", config=exp_config)
-    wandb.run.name = f'{float(args.snr_db[0])} dBs {args.channel} sl:{ds_info["slice_len"]}'
+    wandb.run.name = f'{args.snr_db[0]} dBs {args.channel} sl:{ds_info["slice_len"]}'
 
     epochs_loss = train_func(train_config)
     pickle.dump(epochs_loss, open(os.path.join(args.cp_path, 'epochs_loss.pkl'), 'wb'))
