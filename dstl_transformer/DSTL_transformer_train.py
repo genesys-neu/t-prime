@@ -203,7 +203,7 @@ if __name__ == "__main__":
     parser.add_argument("--address", required=False, type=str, help="the address to use for Ray")
     parser.add_argument("--test", action="store_true", default=False, help="Testing the model")
     parser.add_argument("--wchannel", default=None, help="Wireless channel to be applied, it can be"
-                                                         "TGn, TGax, Rayleigh or relative.")
+                                                         "TGn, TGax, Rayleigh, relative or random.")
     parser.add_argument("--cp_path", default='./model_cp', help='Path to the checkpoint to save/load the model.')
     parser.add_argument("--dataset_ratio", default=1.0, type=float, help="Portion of the dataset used for training and validation.")
     #parser.add_argument("--slice_len", default=128, help="Slice length in which a sequence is divided.")
@@ -236,7 +236,7 @@ if __name__ == "__main__":
     ds_train = DSTLDataset_Transformer(protocols=protocols, ds_type='train', snr_dbs=args.snr_db, seq_len=exp_config["Sequence length"], slice_len=exp_config["Slice length"], slice_overlap_ratio=0, raw_data_ratio=args.dataset_ratio,
             override_gen_map=True, apply_wchannel=args.wchannel, transform=chan2sequence)
     ds_test = DSTLDataset_Transformer(protocols=protocols, ds_type='test', snr_dbs=args.snr_db, seq_len=exp_config["Sequence length"], slice_len=exp_config["Slice length"], slice_overlap_ratio=0, raw_data_ratio=args.dataset_ratio,
-                          override_gen_map=False, apply_wchannel=args.wchannel, transform=chan2sequence)
+            override_gen_map=False, apply_wchannel=args.wchannel, transform=chan2sequence)
 
     if not os.path.isdir(args.cp_path):
         os.makedirs(args.cp_path)
@@ -279,7 +279,7 @@ if __name__ == "__main__":
         train_func(train_config)
     """
     wandb.init(project="RF_Transformer", config=exp_config)
-    wandb.run.name = f'{float(args.snr_db[0])} dBs {args.wchannel} sl:{ds_info["slice_len"]} sq:{ds_info["seq_len"]}'
+    wandb.run.name = f'{args.snr_db[0]} dBs {args.wchannel} sl:{ds_info["slice_len"]} sq:{ds_info["seq_len"]}'
 
     _, conf_matrix = train_func(train_config)
     wandb.log({"Confusion Matrix": conf_matrix})

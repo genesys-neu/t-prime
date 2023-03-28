@@ -99,7 +99,7 @@ class DSTLDataset(Dataset):
 
         # let's initialize Matlab engine
         if not (self.apply_wchannel is None):
-            self.possible_channels = ['TGn', 'TGax', 'Rayleigh', 'relative']
+            self.possible_channels = ['TGn', 'TGax', 'Rayleigh', 'relative', 'random']
             assert(self.apply_wchannel in self.possible_channels)
             self.channel_map = {}
             from dstl.preprocessing.matutils import matutils
@@ -274,8 +274,10 @@ class DSTLDataset(Dataset):
         sig_W = rms ** 2  # power of signal in Watts
         # convert signal power in dBW
         assert(type(self.snr_dbs) is list)
-        #SNR = np.random.choice(self.snr_dbs)
-        SNR = np.random.uniform(-20.0, 30.0)
+        if self.snr_dbs[0] == 'range':
+            SNR = np.random.uniform(-20.0, 30.0)
+        else:
+            SNR = np.random.choice(self.snr_dbs)
         sig_dbW = 10 * np.log10(sig_W / 1)
         # now compute the relative noise power based on the specified SNR level
         noise_dbW = sig_dbW - float(SNR)
@@ -304,7 +306,11 @@ class DSTLDataset(Dataset):
             # in this case, 802.11b is not supported in its native sampling rate (11 MHz) due to consistency with
             # sampling rate of other standards (20 MHz)
             assert(not ('802_11b' in self.protocols))
-            chan_ix = self.channel_map[self.apply_wchannel]
+            if self.apply_wchannel == 'random':
+                # It is important that the protocols are in the following order 802_11ax, 802_11b_upsampled, 802_11n, 802_11g
+                chan_ix = np.random.randint(3)
+            else:
+                chan_ix = self.channel_map[self.apply_wchannel]
             channel = self.chan_models[chan_ix]
 
         proc_sig = self.mateng.eng.step(channel, mat_sig, nargout=1)

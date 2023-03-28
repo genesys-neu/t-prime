@@ -15,7 +15,7 @@ from cnn_baseline.model_cnn1d import Baseline_CNN1D
 # CONFIG
 TEST_DATA_PATH = '/home/miquelsirera/Desktop/dstl/data/DSTL_DATASET_1_1_TEST'
 TRANS_PATH = '/home/miquelsirera/Desktop/dstl/dstl_transformer/model_cp'
-CNN_PATH = '/home/miquelsirera/Desktop/dstl/cnn_baseline/model_cp'
+CNN_PATH = '/home/miquelsirera/Desktop/dstl/cnn_baseline/results_slice512'
 MODELS = ["Trans. (64 x 128) [6.8M params]", "Trans. (24 x 64) [1.6M params]", "CNN (1 x 512) [4.1M params]"]
 PROTOCOLS = ['802_11ax', '802_11b_upsampled', '802_11n', '802_11g']
 CHANNELS = ['None', 'TGn', 'TGax', 'Rayleigh']
@@ -109,7 +109,7 @@ if __name__ == "__main__":
     y_trans_lg, y_trans_sm, y_cnn = [], [], []
     class_map = dict(zip(PROTOCOLS, range(len(PROTOCOLS))))
     for channel in CHANNELS:
-        # Load the two models
+        # Load the three models
         model_lg = TransformerModel(classes=len(PROTOCOLS), d_model=128*2, seq_len=64, nlayers=2, use_pos=False)
         model_lg.load_state_dict(torch.load(f"{TRANS_PATH}/model{channel}_lg.pt", map_location=torch.device('cpu'))['model_state_dict'])
         model_lg.eval()
