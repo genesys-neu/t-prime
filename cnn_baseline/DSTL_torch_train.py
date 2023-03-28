@@ -91,7 +91,7 @@ def train_func(config: Dict):
     num_feats = config['num_feats']
     num_channels = config['num_chans']
     device = config['device']
-    logdir = os.path.join(config['cp_path'], 'sweep_'+config['wchannel']+'_'+config['postfix'], 'slice'+str(slice_len)+'_snr'+config['snr_dB'])
+    logdir = config['cp_path']
     os.makedirs(logdir, exist_ok=True)
 
     if not use_ray:
@@ -152,7 +152,7 @@ def train_func(config: Dict):
                     'model_state_dict': model.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
                     'loss': loss,
-                }, os.path.join(logdir,f'model.cnn.{args.channel}.pt'))
+                }, os.path.join(logdir,f'model.cnn.{config["wchannel"]}.pt'))
                 df_confmat = plot_confmatrix(logdir, pkl_file, train_config['class_labels'], 'conf_mat_epoch'+str(e)+'.png')
                 wandb.log({'Confusion_Matrix': df_confmat.to_numpy()}, step=e)
     # return required for backwards compatibility with the old API
@@ -175,7 +175,7 @@ if __name__ == "__main__":
     parser.add_argument("--cp_path", default='./', help='Path to the checkpoint to save/load the model.')
     parser.add_argument("--protocols", nargs='+', default=['802_11ax', '802_11b_upsampled', '802_11n', '802_11g'],
                         choices=['802_11ax', '802_11b', '802_11b_upsampled', '802_11n', '802_11g'], help="Specify the protocols/classes to be included in the training")
-    parser.add_argument("--channel", default=None, choices=['TGn', 'TGax', 'Rayleigh', 'relative', None], help="Specify the channel models to apply during data generation. ")
+    parser.add_argument("--channel", default=None, choices=['TGn', 'TGax', 'Rayleigh', 'relative', 'None', None], help="Specify the channel models to apply during data generation. ")
     parser.add_argument('--raw_path', default='/home/mauro/Research/DSTL/DSTL_DATASET_1_0', help='Path where raw signals are stored.')
     parser.add_argument('--slicelen', default=128, type=int, help='Signal slice size')
     parser.add_argument('--overlap_ratio', default=0.5, help='Overlap ratio for slices generation')
@@ -184,7 +184,8 @@ if __name__ == "__main__":
     args, _ = parser.parse_known_args()
 
     print('Apply noise:', args.noise)
-
+    
+    args.channel = args.channel if args.channel != 'None' else None
     protocols = args.protocols
     ds_train = DSTLDataset(protocols,
                            ds_path=args.raw_path,
@@ -205,7 +206,7 @@ if __name__ == "__main__":
                           slice_overlap_ratio=args.overlap_ratio,
                           raw_data_ratio=args.raw_data_ratio,
                           file_postfix=args.postfix,
-                          override_gen_map=True,    # it will use the same as above call
+                          override_gen_map=False,    # it will use the same as above call
                           apply_wchannel=args.channel,
                           apply_noise=args.noise)
 
