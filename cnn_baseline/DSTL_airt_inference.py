@@ -66,6 +66,7 @@ print("Mean (ms):", mean_ms, "Std ", std_ms)
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 for slice_len in [128, 256, 512]:
     model = Baseline_CNN1D(classes=Nclass, numChannels=num_channels, slice_len=slice_len)
+    model.eval()
     model.to(device)
     slice_in = np.random.random((1,2,slice_len))
     slice_t = torch.Tensor(slice_in)
@@ -81,6 +82,7 @@ model_file_name = 'model.best.pt'
 model_path = os.path.join(PATH, model_file_name)
 checkpoint = torch.load(model_path)
 model.load_state_dict(checkpoint['model_state_dict'])
+model.eval()
 model.to(model.device.type) # reload the model on the appropriate device
 
 ONNX_FILE_NAME = 'dstl_baseline_CNN1D.onnx'  # File name to save network
