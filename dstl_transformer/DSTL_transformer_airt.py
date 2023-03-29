@@ -45,6 +45,7 @@ for slice_len in [64, 128]:
     if slice_len == 128:
         seq_len = 64
     model = TransformerModel(classes=Nclass, d_model=d_model, seq_len=seq_len, nlayers=transformer_layers, use_pos=pos_encoder)
+    model.eval()
     model.to(device)
     slice_in = np.random.random((1,seq_len,d_model))
     slice_t = torch.Tensor(slice_in)
@@ -61,6 +62,7 @@ for slice_len in [64, 128]:
     model_path = os.path.join(PATH, model_file_name)
     checkpoint = torch.load(model_path)
     model.load_state_dict(checkpoint['model_state_dict'])
+    model.eval()
     SIZE = 'SMALL' if slice_len == 64 else 'LARGE'
     ONNX_FILE_NAME = 'dstl_baseline_transformer_'+str(SIZE)+'.onnx'  # File name to save network
     INPUT_NODE_NAME = 'input_buffer'  # User defined name of input node
