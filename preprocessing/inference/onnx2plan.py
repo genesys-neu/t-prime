@@ -5,8 +5,8 @@
 
 import tensorrt as trt
 import os
-import numpy as np
-from plan_bench import plan_bench
+#import numpy as np
+#from plan_bench import plan_bench
 
 def onnx2plan(onnx_file_name, nchan, input_len, logger, MAX_BATCH_SIZE, MAX_WORKSPACE_SIZE, framework='pytorch', FP16_MODE=True, BENCHMARK=False):
     assert((framework == 'pytorch') or (framework == 'tensorflow'))
@@ -59,10 +59,10 @@ def onnx2plan(onnx_file_name, nchan, input_len, logger, MAX_BATCH_SIZE, MAX_WORK
         print('CPLX_SAMPLES_PER_INFER = {}'.format(input_len))
         print('BATCH_SIZE <= {}'.format(MAX_BATCH_SIZE))
         # TODO modify this function to match new parameters
-        if BENCHMARK:
-            print('Running Inference Benchmark')
-            plan_bench(plan_file_name=plan_file, cplx_samples=input_len, num_chans=nchan,
-                       batch_size=MAX_BATCH_SIZE, num_batches=512, input_dtype=np.float32)
+        #if BENCHMARK:
+        #    print('Running Inference Benchmark')
+        #    plan_bench(plan_file_name=plan_file, cplx_samples=input_len, num_chans=nchan,
+        #               batch_size=MAX_BATCH_SIZE, num_batches=512, input_dtype=np.float32)
     else:
         print('Result    : FAILED - plan file not created')
 

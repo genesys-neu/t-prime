@@ -27,6 +27,7 @@ if MODE == 'TensorRT':
     CNN_PATH = '/home/deepwave/Research/DSTL/dstl/cnn_baseline/results_slice512'
     import tensorrt as trt
     from inference.onnx2plan import onnx2plan
+    from inference.plan_bench import plan_bench
 
 INPUT_NODE_NAME = 'input_buffer'  # (for TensorRT) User defined name of input node
 OUTPUT_NODE_NAME = 'output_buffer'  # User defined name of output node
@@ -179,6 +180,10 @@ if __name__ == "__main__":
                           input_len=slice_in.shape[2],  logger=trt.Logger(trt.Logger.VERBOSE),
                           MAX_BATCH_SIZE=slice_in.shape[0], MAX_WORKSPACE_SIZE=MAX_WORKSPACE_SIZE,
                           BENCHMARK=True)
+                print('Running Inference Benchmark')
+                plan_file = ONNX_FILE_NAME.replace('.onnx', '.plan')
+                plan_bench(plan_file_name=plan_file, cplx_samples=slice_in.shape[2], num_chans=slice_in.shape[1],
+                           batch_size=slice_in.shape[0], num_batches=512, input_dtype=np.float32)
 
 
             y = validate(model, class_map, seq_len=seq_len, sli_len=sli_len, channel=channel, cnn=isCNN)
