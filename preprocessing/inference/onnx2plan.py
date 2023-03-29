@@ -8,7 +8,7 @@ import os
 #import numpy as np
 #from plan_bench import plan_bench
 
-def onnx2plan(onnx_file_name, nchan, input_len, logger, MAX_BATCH_SIZE, MAX_WORKSPACE_SIZE, framework='pytorch', FP16_MODE=True, BENCHMARK=False):
+def onnx2plan(onnx_file_name, nchan, input_len, logger, MAX_BATCH_SIZE, MAX_WORKSPACE_SIZE, framework='pytorch', FP16_MODE=True, INPUT_NODE_NAME='input_buffer', BENCHMARK=False):
     assert((framework == 'pytorch') or (framework == 'tensorflow'))
     INPUT_PORT_NAME = '' if framework == 'pytorch' else ':0' # ':0' for tensorflow, '' for pytorch
     input_shape = (MAX_BATCH_SIZE, nchan, input_len)
