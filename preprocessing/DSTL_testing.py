@@ -22,6 +22,9 @@ CHANNELS = ['None', 'TGn', 'TGax', 'Rayleigh']
 SNR = [-30.0, -25.0, -20.0, -15.0, -10.0, -5.0, 0.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0]
 MODE = 'pytorch' # choices=['pytorch', 'TensorRT']
 if MODE == 'TensorRT':
+    TEST_DATA_PATH = '/home/deepwave/Research/DSTL/dstl/data/DSTL_DATASET_1_1_TEST'
+    TRANS_PATH = '/home/deepwave/Research/DSTL/dstl/dstl_transformer/model_cp'
+    CNN_PATH = '/home/deepwave/Research/DSTL/dstl/cnn_baseline/results_slice512'
     import tensorrt as trt
     from inference.onnx2plan import onnx2plan
 
