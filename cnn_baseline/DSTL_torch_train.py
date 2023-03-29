@@ -152,7 +152,7 @@ def train_func(config: Dict):
                     'model_state_dict': model.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
                     'loss': loss,
-                }, os.path.join(logdir,'model.best.pt'))
+                }, os.path.join(logdir,f'model.cnn.{args.channel}.pt'))
                 df_confmat = plot_confmatrix(logdir, pkl_file, train_config['class_labels'], 'conf_mat_epoch'+str(e)+'.png')
                 wandb.log({'Confusion_Matrix': df_confmat.to_numpy()}, step=e)
     # return required for backwards compatibility with the old API
@@ -256,7 +256,7 @@ if __name__ == "__main__":
         "Slice length": args.slicelen
     }
     wandb.init(project="RF_Baseline_CNN1D", config=exp_config)
-    wandb.run.name = f'{float(args.snr_db[0])} dBs {args.channel} sl:{ds_info["slice_len"]}'
+    wandb.run.name = f'{args.snr_db[0]} dBs {args.channel} sl:{ds_info["slice_len"]}'
 
     epochs_loss = train_func(train_config)
     pickle.dump(epochs_loss, open(os.path.join(args.cp_path, 'epochs_loss.pkl'), 'wb'))
