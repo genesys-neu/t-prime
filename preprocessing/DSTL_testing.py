@@ -28,6 +28,7 @@ if MODE == 'TensorRT':
     import tensorrt as trt
     from inference.onnx2plan import onnx2plan
     from inference.plan_bench import plan_bench
+    import inference.trt_utils as trt_utils
 
 INPUT_NODE_NAME = 'input_buffer'  # (for TensorRT) User defined name of input node
 OUTPUT_NODE_NAME = 'output_buffer'  # User defined name of output node
@@ -69,10 +70,15 @@ def chan2sequence(obs):
     seq[1::2] = obs[1]
     return seq
 
-def validate(model, class_map, seq_len, sli_len, channel, cnn=False):
+def validate(model, class_map, input_shape, seq_len, sli_len, channel, cnn=False, mode='pytorch', plan_file_name='', input_dtype=np.float32):
+    assert((mode == 'pytorch') or (mode == 'TensorRT'))
     correct = np.zeros(len(SNR))
     total_samples = 0
     prev_time = time.time()
+    if mode == 'TensorRT':
+        # Setup the pyCUDA context
+        trt_utils.make_cuda_context()
+
     for p in PROTOCOLS:
         print('Protocol ',p)
         path = os.path.join(TEST_DATA_PATH, p) if channel == 'None' else os.path.join(TEST_DATA_PATH, p, channel)
@@ -102,22 +108,41 @@ def validate(model, class_map, seq_len, sli_len, channel, cnn=False):
                     # generate idxs for split
                     idxs = list(range(sli_len, len_sig, sli_len))
                     obs = np.split(obs, idxs, axis=1)[:-1]
-                # create batch of sequences
-                X = np.asarray(obs)
-                # predict
-                X = torch.from_numpy(X)
-                y = np.empty(len(idxs))
-                y.fill(class_map[p])
-                y = torch.from_numpy(y)
-                X = X.to(model.device.type)
-                y = y.to(model.device.type)
-                pred = model(X.float())
+
+                if mode == 'pytorch':
+                    # create batch of sequences
+                    X = np.asarray(obs)
+                    # predict
+                    X = torch.from_numpy(X)
+                    y = np.empty(len(idxs))
+                    y.fill(class_map[p])
+                    y = torch.from_numpy(y)
+                    X = X.to(model.device.type)
+                    y = y.to(model.device.type)
+                    pred = model(X.float())
+                elif mode == 'TensorRT':
+                    # Use pyCUDA to create a shared memory buffer that will receive samples from the
+                    # AIR-T to be fed into the neural network.
+                    batch_size, seq_len, cplx_samples = input_shape
+                    buff_len = seq_len * cplx_samples * batch_size
+                    sample_buffer = trt_utils.MappedBuffer(buff_len, input_dtype)
+
+                    # Set up the inference engine. Note that the output buffers are created for
+                    # us when we create the inference object.
+                    dnn = trt_utils.TrtInferFromPlan(plan_file_name, batch_size,
+                                                     sample_buffer, verbose=True)
+
+                    # Populate input buffer with test data
+                    X = np.asarray(obs)
+                    dnn.input_buff.host[:] = np.flatten(X).astype(input_dtype)
+                    dnn.feed_forward()
+                    pred = dnn.output_buff
 
                 # add correct ones
                 correct[i] += (pred.argmax(1) == y).type(torch.float).sum().item()
                 if i == 0:
                     total_samples += len(idxs)
-        print("--- %s seconds for protocol ---" % (time.time() - prev_time))
+        print("\n --- %s seconds for protocol ---" % (time.time() - prev_time))
         prev_time = time.time()
     return correct/total_samples*100
 
@@ -184,9 +209,11 @@ if __name__ == "__main__":
                 plan_file = ONNX_FILE_NAME.replace('.onnx', '.plan')
                 plan_bench(plan_file_name=plan_file, cplx_samples=slice_in.shape[2], num_chans=slice_in.shape[1],
                            batch_size=slice_in.shape[0], num_batches=512, input_dtype=np.float32)
+            else:
+                plan_file = ''
 
 
-            y = validate(model, class_map, seq_len=seq_len, sli_len=sli_len, channel=channel, cnn=isCNN)
+            y = validate(model, class_map, input_shape=slice_in.shape, seq_len=seq_len, sli_len=sli_len, channel=channel, cnn=isCNN, mode=MODE, plan_file_name=plan_file)
 
             if m == 'cnn':
                 y_cnn.append(y)
