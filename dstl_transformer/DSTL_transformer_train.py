@@ -163,11 +163,12 @@ def train_func(config: Dict):
                 best_loss = loss
                 best_conf_matrix = conf_matrix
                 pickle.dump(conf_matrix, open(os.path.join(logdir, 'conf_matrix.best.pkl'), 'wb'))
+                model_name = f'model{config["wchannel"]}_lg.pt' if seq_len == 64 else f'model{config["wchannel"]}_sm.pt'
                 torch.save({
                     'model_state_dict': model.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
                     'loss': loss,
-                }, os.path.join(logdir,f'model{config["wchannel"]}_lg.pt'))
+                }, os.path.join(logdir, model_name))
     
     fig = plt.figure(figsize=(8,8))
     best_conf_matrix = best_conf_matrix.astype('float') / best_conf_matrix.sum(axis=1)[np.newaxis]
