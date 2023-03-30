@@ -13,7 +13,7 @@ from SoapySDR import SOAPY_SDR_RX, SOAPY_SDR_CS16
 # Data transfer settings
 rx_chan = 0               # RX1 = 0, RX2 = 1
 N = 16384                  # Number of complex samples per transfer
-fs = 20e6               # Radio sample Rate
+fs = 31.25e6               # Radio sample Rate
 freq = 2.417e9               # LO tuning frequency in Hz
 use_agc = True           # Use or don't use the AGC
 timeout_us = int(5e6)
