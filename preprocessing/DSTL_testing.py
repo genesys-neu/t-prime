@@ -18,9 +18,11 @@ TRANS_PATH = '/home/miquelsirera/Desktop/dstl/dstl_transformer/model_cp'
 CNN_PATH = '/home/miquelsirera/Desktop/dstl/cnn_baseline/results_slice512'
 MODELS = ["Trans. (64 x 128) [6.8M params]", "Trans. (24 x 64) [1.6M params]", "CNN (1 x 512) [4.1M params]"]
 PROTOCOLS = ['802_11ax', '802_11b_upsampled', '802_11n', '802_11g']
-CHANNELS = ['None', 'TGn', 'TGax', 'Rayleigh']
-SNR = [-30.0, -25.0, -20.0, -15.0, -10.0, -5.0, 0.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0]
-MODE = 'pytorch' # choices=['pytorch', 'TensorRT']
+#CHANNELS = ['None', 'TGn', 'TGax', 'Rayleigh']
+#SNR = [-30.0, -25.0, -20.0, -15.0, -10.0, -5.0, 0.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0]
+SNR = [30.0]
+CHANNELS = ['None']
+MODE = 'TensorRT' # choices=['pytorch', 'TensorRT']
 if MODE == 'TensorRT':
     TEST_DATA_PATH = '/home/deepwave/Research/DSTL/dstl/data/DSTL_DATASET_1_1_TEST'
     TRANS_PATH = '/home/deepwave/Research/DSTL/dstl/dstl_transformer/model_cp'
@@ -98,7 +100,7 @@ def validate(model, class_map, input_shape, seq_len, sli_len, channel, cnn=False
                 if not cnn: # Transformer architecture
                     obs = chan2sequence(obs)
                     # generate idxs for split
-                    idxs = list(range(seq_len*sli_len*2, len_sig, seq_len*sli_len*2)) # *2 because I and Q are already zipped
+                    idxs = list(range(seq_len*sli_len, len_sig, seq_len*sli_len))
                     # split stream in sequences
                     obs = np.split(obs, idxs)[:-1]
                     # split each sequence in slices
@@ -120,6 +122,9 @@ def validate(model, class_map, input_shape, seq_len, sli_len, channel, cnn=False
                     X = X.to(model.device.type)
                     y = y.to(model.device.type)
                     pred = model(X.float())
+                    # add correct ones
+                    correct[i] += (pred.argmax(1) == y).type(torch.float).sum().item()
+
                 elif mode == 'TensorRT':
                     # Use pyCUDA to create a shared memory buffer that will receive samples from the
                     # AIR-T to be fed into the neural network.
@@ -133,24 +138,28 @@ def validate(model, class_map, input_shape, seq_len, sli_len, channel, cnn=False
                                                      sample_buffer, verbose=True)
 
                     # Populate input buffer with test data
-                    X = np.asarray(obs)
-                    dnn.input_buff.host[:] = np.flatten(X).astype(input_dtype)
-                    dnn.feed_forward()
-                    pred = dnn.output_buff
+                    for bix in range(0,len(obs),batch_size):
+                        X = np.asarray(obs[bix:bix+batch_size])
+                        dnn.input_buff.host[:] = X.flatten().astype(input_dtype)
+                        y = np.empty(batch_size)
+                        y.fill(class_map[p])
+                        dnn.feed_forward()
+                        pred = dnn.output_buff.host.reshape((batch_size,4))
+                        # add correct ones
+                        correct[i] += (pred.argmax(1) == y).sum().item()
 
-                # add correct ones
-                correct[i] += (pred.argmax(1) == y).type(torch.float).sum().item()
                 if i == 0:
                     total_samples += len(idxs)
+
         print("\n --- %s seconds for protocol ---" % (time.time() - prev_time))
         prev_time = time.time()
     return correct/total_samples*100
 
 if __name__ == "__main__":
     y_trans_lg, y_trans_sm, y_cnn = [], [], []
-    models = ['cnn', 'trans_sm', 'trans_lg']
+    models = ['trans_lg', 'trans_sm', 'cnn']
     class_map = dict(zip(PROTOCOLS, range(len(PROTOCOLS))))
-    batch_size = 32
+    batch_size = 1
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     for channel in CHANNELS:
         for m in models:
@@ -171,7 +180,7 @@ if __name__ == "__main__":
                 model_lg.load_state_dict(torch.load(f"{TRANS_PATH}/model{channel}_lg.pt", map_location=torch.device('cpu'))['model_state_dict'])
                 model_lg.eval()
                 seq_len = 64
-                sli_len = 128
+                sli_len = 128*2
                 isCNN = False
                 ONNX_FILE_NAME = os.path.join(TRANS_PATH, f"model{channel}_lg.onnx")
                 slice_in = np.random.random((batch_size, seq_len, sli_len))
@@ -182,7 +191,7 @@ if __name__ == "__main__":
                 model_sm.load_state_dict(torch.load(f"{TRANS_PATH}/model{channel}_sm.pt", map_location=torch.device('cpu'))['model_state_dict'])
                 model_sm.eval()
                 seq_len = 24
-                sli_len = 64
+                sli_len = 64*2
                 isCNN = False
                 ONNX_FILE_NAME = os.path.join(TRANS_PATH, f"model{channel}_sm.onnx")
                 slice_in = np.random.random((batch_size, seq_len, sli_len))
