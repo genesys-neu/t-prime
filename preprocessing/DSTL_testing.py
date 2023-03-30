@@ -9,6 +9,7 @@ proj_root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.
 import sys
 sys.path.append(proj_root_dir)
 sys.path.insert(0, '../')
+import argparse
 from dstl_transformer.model_transformer import TransformerModel
 from cnn_baseline.model_cnn1d import Baseline_CNN1D
 
@@ -106,29 +107,57 @@ def validate(model, class_map, seq_len, sli_len, channel, cnn=False):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--one_model", action='store_true', default=False, help="Use one model for all channels")
+    args, _ = parser.parse_known_args()
     y_trans_lg, y_trans_sm, y_cnn = [], [], []
     class_map = dict(zip(PROTOCOLS, range(len(PROTOCOLS))))
-    for channel in CHANNELS:
-        # Load the three models
+
+    if args.one_model:
+        # Load the three models only one time
         model_lg = TransformerModel(classes=len(PROTOCOLS), d_model=128*2, seq_len=64, nlayers=2, use_pos=False)
-        model_lg.load_state_dict(torch.load(f"{TRANS_PATH}/model{channel}_lg.pt", map_location=torch.device('cpu'))['model_state_dict'])
+        model_lg.load_state_dict(torch.load(f"{TRANS_PATH}/modelrandom_lg.pt", map_location=torch.device('cpu'))['model_state_dict'])
         model_lg.eval()
         model_sm = TransformerModel(classes=len(PROTOCOLS), d_model=64*2, seq_len=24, nlayers=2, use_pos=False)
-        model_sm.load_state_dict(torch.load(f"{TRANS_PATH}/model{channel}_sm.pt", map_location=torch.device('cpu'))['model_state_dict'])
+        model_sm.load_state_dict(torch.load(f"{TRANS_PATH}/modelrandom_sm.pt", map_location=torch.device('cpu'))['model_state_dict'])
         model_sm.eval()
         cnn = Baseline_CNN1D(classes=len(PROTOCOLS), numChannels=2, slice_len=512)
-        cnn.load_state_dict(torch.load(f"{CNN_PATH}/model.cnn.{channel}.pt", map_location=torch.device('cpu'))['model_state_dict'])
+        cnn.load_state_dict(torch.load(f"{CNN_PATH}/model.cnn.random.pt", map_location=torch.device('cpu'))['model_state_dict'])
         cnn.eval()
+        for channel in CHANNELS:
+            y_trans_lg.append(validate(model_lg, class_map, seq_len=64, sli_len=128, channel=channel))
+            print(f'Accuracy values for channel {channel} and large architecture are: ', y_trans_lg[-1])
+            y_trans_sm.append(validate(model_sm, class_map, seq_len=24, sli_len=64, channel=channel))
+            print(f'Accuracy values for channel {channel} and small architecture are: ', y_trans_sm[-1])
+            y_cnn.append(validate(cnn, class_map, seq_len=1, sli_len=512, channel=channel, cnn=True))
+            print(f'Accuracy values for channel {channel} and cnn architecture are: ', y_cnn[-1])
+        
+        with open('test_results_uniformdist_onemodel.txt', 'w') as f:
+            f.write(str(y_trans_lg) + '%' + str(y_trans_sm) + '%' + str(y_cnn))
 
-        y_trans_lg.append(validate(model_lg, class_map, seq_len=64, sli_len=128, channel=channel))
-        print(f'Accuracy values for channel {channel} and large architecture are: ', y_trans_lg[-1])
-        y_trans_sm.append(validate(model_sm, class_map, seq_len=24, sli_len=64, channel=channel))
-        print(f'Accuracy values for channel {channel} and small architecture are: ', y_trans_sm[-1])
-        y_cnn.append(validate(cnn, class_map, seq_len=1, sli_len=512, channel=channel, cnn=True))
-        print(f'Accuracy values for channel {channel} and cnn architecture are: ', y_cnn[-1])
+    else:
+        for channel in CHANNELS:
+            # Load the three models for each channel evaluation
+            model_lg = TransformerModel(classes=len(PROTOCOLS), d_model=128*2, seq_len=64, nlayers=2, use_pos=False)
+            model_lg.load_state_dict(torch.load(f"{TRANS_PATH}/model{channel}_lg.pt", map_location=torch.device('cpu'))['model_state_dict'])
+            model_lg.eval()
+            model_sm = TransformerModel(classes=len(PROTOCOLS), d_model=64*2, seq_len=24, nlayers=2, use_pos=False)
+            model_sm.load_state_dict(torch.load(f"{TRANS_PATH}/model{channel}_sm.pt", map_location=torch.device('cpu'))['model_state_dict'])
+            model_sm.eval()
+            cnn = Baseline_CNN1D(classes=len(PROTOCOLS), numChannels=2, slice_len=512)
+            cnn.load_state_dict(torch.load(f"{CNN_PATH}/model.cnn.{channel}.pt", map_location=torch.device('cpu'))['model_state_dict'])
+            cnn.eval()
+
+            y_trans_lg.append(validate(model_lg, class_map, seq_len=64, sli_len=128, channel=channel))
+            print(f'Accuracy values for channel {channel} and large architecture are: ', y_trans_lg[-1])
+            y_trans_sm.append(validate(model_sm, class_map, seq_len=24, sli_len=64, channel=channel))
+            print(f'Accuracy values for channel {channel} and small architecture are: ', y_trans_sm[-1])
+            y_cnn.append(validate(cnn, class_map, seq_len=1, sli_len=512, channel=channel, cnn=True))
+            print(f'Accuracy values for channel {channel} and cnn architecture are: ', y_cnn[-1])
+        
+        with open('test_results_uniformdist.txt', 'w') as f:
+            f.write(str(y_trans_lg) + '%' + str(y_trans_sm) + '%' + str(y_cnn))
     
-    with open('test_results_uniformdist.txt', 'w') as f:
-        f.write(str(y_trans_lg) + '%' + str(y_trans_sm) + '%' + str(y_cnn))
     fig, ax = plt.subplots(2, 2, figsize = (12, 6))
 
     for i in range(2):
@@ -144,4 +173,5 @@ if __name__ == "__main__":
     plt.suptitle('Results comparison between different architectures')
     fig.legend(MODELS, bbox_to_anchor=(0.87, 0.02), ncols=3, labelspacing=1)
     plt.tight_layout() 
-    plt.savefig('TESTING.png')
+    img_name = 'Testing_onemodel.png' if args.one_model else 'Testing_modelperchannel.png'
+    plt.savefig(img_name) 
