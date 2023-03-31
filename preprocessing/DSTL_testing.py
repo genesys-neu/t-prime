@@ -93,9 +93,11 @@ def validate(model, class_map, seq_len, sli_len, channel, cnn=False):
                 X = np.asarray(obs)
                 # predict
                 X = torch.from_numpy(X)
+                X = X.to(device)
                 y = np.empty(len(idxs))
                 y.fill(class_map[p])
                 y = torch.from_numpy(y)
+                y = y.to(device)
                 pred = model(X.float())
                 # add correct ones
                 correct[i] += (pred.argmax(1) == y).type(torch.float).sum().item()
@@ -109,20 +111,23 @@ def validate(model, class_map, seq_len, sli_len, channel, cnn=False):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--one_model", action='store_true', default=False, help="Use one model for all channels")
+    parser.add_argument("--use_gpu", action='store_true', default=False, help="Use gpu for inference")
     args, _ = parser.parse_known_args()
     y_trans_lg, y_trans_sm, y_cnn = [], [], []
     class_map = dict(zip(PROTOCOLS, range(len(PROTOCOLS))))
 
+    device = torch.device("cuda" if torch.cuda.is_available() and args.use_gpu else "cpu")
+
     if args.one_model:
         # Load the three models only one time
         model_lg = TransformerModel(classes=len(PROTOCOLS), d_model=128*2, seq_len=64, nlayers=2, use_pos=False)
-        model_lg.load_state_dict(torch.load(f"{TRANS_PATH}/modelrandom_lg.pt", map_location=torch.device('cpu'))['model_state_dict'])
+        model_lg.load_state_dict(torch.load(f"{TRANS_PATH}/modelrandom_lg.pt", map_location=device)['model_state_dict'])
         model_lg.eval()
         model_sm = TransformerModel(classes=len(PROTOCOLS), d_model=64*2, seq_len=24, nlayers=2, use_pos=False)
-        model_sm.load_state_dict(torch.load(f"{TRANS_PATH}/modelrandom_sm.pt", map_location=torch.device('cpu'))['model_state_dict'])
+        model_sm.load_state_dict(torch.load(f"{TRANS_PATH}/modelrandom_sm.pt", map_location=device)['model_state_dict'])
         model_sm.eval()
         cnn = Baseline_CNN1D(classes=len(PROTOCOLS), numChannels=2, slice_len=512)
-        cnn.load_state_dict(torch.load(f"{CNN_PATH}/model.cnn.random.pt", map_location=torch.device('cpu'))['model_state_dict'])
+        cnn.load_state_dict(torch.load(f"{CNN_PATH}/model.cnn.random.pt", map_location=device)['model_state_dict'])
         cnn.eval()
         for channel in CHANNELS:
             y_trans_lg.append(validate(model_lg, class_map, seq_len=64, sli_len=128, channel=channel))
@@ -139,13 +144,13 @@ if __name__ == "__main__":
         for channel in CHANNELS:
             # Load the three models for each channel evaluation
             model_lg = TransformerModel(classes=len(PROTOCOLS), d_model=128*2, seq_len=64, nlayers=2, use_pos=False)
-            model_lg.load_state_dict(torch.load(f"{TRANS_PATH}/model{channel}_lg.pt", map_location=torch.device('cpu'))['model_state_dict'])
+            model_lg.load_state_dict(torch.load(f"{TRANS_PATH}/model{channel}_lg.pt", map_location=device)['model_state_dict'])
             model_lg.eval()
             model_sm = TransformerModel(classes=len(PROTOCOLS), d_model=64*2, seq_len=24, nlayers=2, use_pos=False)
-            model_sm.load_state_dict(torch.load(f"{TRANS_PATH}/model{channel}_sm.pt", map_location=torch.device('cpu'))['model_state_dict'])
+            model_sm.load_state_dict(torch.load(f"{TRANS_PATH}/model{channel}_sm.pt", map_location=device)['model_state_dict'])
             model_sm.eval()
             cnn = Baseline_CNN1D(classes=len(PROTOCOLS), numChannels=2, slice_len=512)
-            cnn.load_state_dict(torch.load(f"{CNN_PATH}/model.cnn.{channel}.pt", map_location=torch.device('cpu'))['model_state_dict'])
+            cnn.load_state_dict(torch.load(f"{CNN_PATH}/model.cnn.{channel}.pt", map_location=device)['model_state_dict'])
             cnn.eval()
 
             y_trans_lg.append(validate(model_lg, class_map, seq_len=64, sli_len=128, channel=channel))
