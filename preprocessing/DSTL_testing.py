@@ -20,7 +20,7 @@ MODELS = ["Trans. (64 x 128) [6.8M params]", "Trans. (24 x 64) [1.6M params]", "
 PROTOCOLS = ['802_11ax', '802_11b_upsampled', '802_11n', '802_11g']
 #CHANNELS = ['None', 'TGn', 'TGax', 'Rayleigh']
 #SNR = [-30.0, -25.0, -20.0, -15.0, -10.0, -5.0, 0.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0]
-SNR = [30.0]
+SNR = [-30.0, -10.0, 0.0, 10.0, 30.0]
 CHANNELS = ['None']
 MODE = 'TensorRT' # choices=['pytorch', 'TensorRT']
 if MODE == 'TensorRT':
@@ -135,7 +135,7 @@ def validate(model, class_map, input_shape, seq_len, sli_len, channel, cnn=False
                     # Set up the inference engine. Note that the output buffers are created for
                     # us when we create the inference object.
                     dnn = trt_utils.TrtInferFromPlan(plan_file_name, batch_size,
-                                                     sample_buffer, verbose=True)
+                                                     sample_buffer, verbose=False)
 
                     # Populate input buffer with test data
                     for bix in range(0,len(obs),batch_size):
@@ -211,7 +211,7 @@ if __name__ == "__main__":
                 # Then create the relative plan file using TensorRT
                 MAX_WORKSPACE_SIZE = 1073741824  # 1 GB for example
                 onnx2plan(onnx_file_name=ONNX_FILE_NAME, nchan=slice_in.shape[1],
-                          input_len=slice_in.shape[2],  logger=trt.Logger(trt.Logger.VERBOSE),
+                          input_len=slice_in.shape[2],  logger=trt.Logger(trt.Logger.WARNING),
                           MAX_BATCH_SIZE=slice_in.shape[0], MAX_WORKSPACE_SIZE=MAX_WORKSPACE_SIZE,
                           BENCHMARK=True)
                 print('Running Inference Benchmark')
