@@ -129,6 +129,11 @@ if __name__ == "__main__":
         cnn = Baseline_CNN1D(classes=len(PROTOCOLS), numChannels=2, slice_len=512)
         cnn.load_state_dict(torch.load(f"{CNN_PATH}/model.cnn.random.pt", map_location=device)['model_state_dict'])
         cnn.eval()
+        if args.use_gpu:
+            model_lg.cuda()
+            model_sm.cuda()
+            cnn.cuda()
+
         for channel in CHANNELS:
             y_trans_lg.append(validate(model_lg, class_map, seq_len=64, sli_len=128, channel=channel))
             print(f'Accuracy values for channel {channel} and large architecture are: ', y_trans_lg[-1])
@@ -152,6 +157,10 @@ if __name__ == "__main__":
             cnn = Baseline_CNN1D(classes=len(PROTOCOLS), numChannels=2, slice_len=512)
             cnn.load_state_dict(torch.load(f"{CNN_PATH}/model.cnn.{channel}.pt", map_location=device)['model_state_dict'])
             cnn.eval()
+            if args.use_gpu:
+                model_lg.cuda()
+                model_sm.cuda()
+                cnn.cuda()
 
             y_trans_lg.append(validate(model_lg, class_map, seq_len=64, sli_len=128, channel=channel))
             print(f'Accuracy values for channel {channel} and large architecture are: ', y_trans_lg[-1])
