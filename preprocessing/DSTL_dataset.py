@@ -308,7 +308,9 @@ class DSTLDataset(Dataset):
             assert(not ('802_11b' in self.protocols))
             if self.apply_wchannel == 'random':
                 # It is important that the protocols are in the following order 802_11ax, 802_11b_upsampled, 802_11n, 802_11g
-                chan_ix = np.random.randint(3)
+                chan_ix = np.random.randint(4)
+                if chan_ix == 3: # no channel applied
+                    return np.array(mat_sig)
             else:
                 chan_ix = self.channel_map[self.apply_wchannel]
             channel = self.chan_models[chan_ix]

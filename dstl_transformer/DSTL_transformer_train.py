@@ -186,7 +186,7 @@ def train_func(config: Dict):
     
     plt.ylabel('True label')
     plt.xlabel('Predicted label')
-    plt.title(f"Confusion matrix: {float(args.snr_db[0])} dBs, channel: {args.wchannel}, slice: {slice_len}, seq.: {seq_len}")
+    plt.title(f"Confusion matrix: {args.snr_db[0]} dBs, channel: {args.wchannel}, slice: {slice_len}, seq.: {seq_len}")
     # return required for backwards compatibility with the old API
     # TODO(team-ml) clean up and remove return
     return loss_results, fig
