@@ -129,7 +129,6 @@ def train_func(config: Dict):
         print(f'{name:20} {param.numel()} {list(param.shape)}')
     total_params = sum(p.numel() for p in model.parameters())
     print(f'TOTAL                {total_params}')
-    wandb.log({"Num. params": total_params})
     loss_fn = nn.NLLLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     scheduler = ReduceLROnPlateau(optimizer, 'min', min_lr=0.00001, verbose=True)
@@ -170,6 +169,7 @@ def train_func(config: Dict):
                     'loss': loss,
                 }, os.path.join(logdir, model_name))
     
+    wandb.log({"Num. params": total_params})
     fig = plt.figure(figsize=(8,8))
     best_conf_matrix = best_conf_matrix.astype('float') / best_conf_matrix.sum(axis=1)[np.newaxis]
     plt.imshow(best_conf_matrix, interpolation='none', cmap=plt.cm.Blues)
