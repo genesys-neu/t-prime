@@ -18,7 +18,7 @@ from sklearn.metrics import confusion_matrix as conf_mat
 import wandb
 import matplotlib.pyplot as plt
 
-from model_transformer import TransformerModel
+from model_transformer import TransformerModel, TransformerModel_v2
 
 
 # Function to change the shape of obs
@@ -206,22 +206,23 @@ if __name__ == "__main__":
     parser.add_argument("--wchannel", default=None, help="Wireless channel to be applied, it can be"
                                                          "TGn, TGax, Rayleigh, relative or random.")
     parser.add_argument("--cp_path", default='./model_cp', help='Path to the checkpoint to save/load the model.')
+    parser.add_argument("--cls_token", action="store_true", default=False, help="Use the Transformer v2")
     parser.add_argument("--dataset_ratio", default=1.0, type=float, help="Portion of the dataset used for training and validation.")
-    #parser.add_argument("--slice_len", default=128, help="Slice length in which a sequence is divided.")
-    #parser.add_argument("--seq_len", default=64, help="Sequence length to input to the transformer.")
-    parser.add_argument("--Layers", type=int)
+    parser.add_argument("--Layers", type=int, default=2)
     parser.add_argument("--Epochs", type=int)
     parser.add_argument("--Learning_rate", type=float)
-    parser.add_argument("--Batch_size", type=int)
-    parser.add_argument("--Slice_length", type=int)
-    parser.add_argument("--Sequence_length", type=int)
+    parser.add_argument("--Batch_size", type=int, default=122)
+    parser.add_argument("--Slice_length", type=int, default=128, help="Slice length in which a sequence is divided.")
+    parser.add_argument("--Sequence_length", type=int, default=64, help="Sequence length to input to the transformer.")
     parser.add_argument("--Positional_encoder")
     args, _ = parser.parse_known_args()
     args.wchannel = args.wchannel if args.wchannel != 'None' else None
     args.Positional_encoder = args.Positional_encoder in {'True', 'true'}
+    postfix = '' if args.cls_token else '_v2'
+    args.cp_path = args.cp_path + postfix
     exp_config = { #Experiment configuration for tracking
         "Dataset": "1_1",
-        "Architecture": "Transformer_v1",
+        "Architecture": "Transformer_v1" if not args.cls_token else "Transformer_v2",
         "Layers": args.Layers,
         "Wireless channel": args.wchannel,
         "Snr (dbs)": args.snr_db,
@@ -250,7 +251,7 @@ if __name__ == "__main__":
         "lr": exp_config["Learning rate"], 
         "batch_size": exp_config["Batch size"], 
         "epochs": exp_config["Epochs"],
-        "pytorch_model": TransformerModel,
+        "pytorch_model": TransformerModel if not args.cls_token else TransformerModel_v2,
         "transformer_layers": exp_config["Layers"],
         "Nclass": Nclass,
         "useRay": args.useRay, # TODO: fix this, currently it's not working with Ray because the dataset gets replicated among workers 
@@ -280,7 +281,7 @@ if __name__ == "__main__":
         train_func(train_config)
     """
     wandb.init(project="RF_Transformer", config=exp_config)
-    wandb.run.name = f'{args.snr_db[0]} dBs {args.wchannel} sl:{ds_info["slice_len"]} sq:{ds_info["seq_len"]}'
+    wandb.run.name = f'{args.snr_db[0]} dBs {args.wchannel} sl:{ds_info["slice_len"]} sq:{ds_info["seq_len"]} {postfix}'
 
     _, conf_matrix = train_func(train_config)
     wandb.log({"Confusion Matrix": conf_matrix})
