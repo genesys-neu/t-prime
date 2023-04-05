@@ -66,7 +66,7 @@ while file_ctr < nfiles:
         #print(samples)
         
         # Low-Pass Filter
-        taps = firwin(numtaps=101, cutoff=10e6, fs=sample_rate)
+        taps = firwin(numtaps=101, cutoff=10e6, fs=fs)
         lpf_samples = np.convolve(samples, taps, 'valid')
         
         # rational resample
