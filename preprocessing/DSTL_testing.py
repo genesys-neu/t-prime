@@ -19,8 +19,7 @@ CNN_PATH = '/home/miquelsirera/Desktop/dstl/cnn_baseline/results_slice512'
 MODELS = ["Trans. (64 x 128) [6.8M params]", "Trans. (24 x 64) [1.6M params]", "CNN (1 x 512) [4.1M params]"]
 PROTOCOLS = ['802_11ax', '802_11b_upsampled', '802_11n', '802_11g']
 #CHANNELS = ['None', 'TGn', 'TGax', 'Rayleigh']
-#SNR = [-30.0, -25.0, -20.0, -15.0, -10.0, -5.0, 0.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0]
-SNR = [-30.0, -10.0, 0.0, 10.0, 30.0]
+SNR = [-30.0, -25.0, -20.0, -15.0, -10.0, -5.0, 0.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0]
 CHANNELS = ['None']
 MODE = 'TensorRT' # choices=['pytorch', 'TensorRT']
 if MODE == 'TensorRT':
@@ -72,7 +71,7 @@ def chan2sequence(obs):
     seq[1::2] = obs[1]
     return seq
 
-def validate(model, class_map, input_shape, seq_len, sli_len, channel, cnn=False, mode='pytorch', plan_file_name='', input_dtype=np.float32):
+def validate(model, class_map, input_shape, seq_len, sli_len, channel, cnn=False, mode='pytorch', plan_file_name='', input_dtype=np.float32, max_samples_p_protocol=99999):
     assert((mode == 'pytorch') or (mode == 'TensorRT'))
     correct = np.zeros(len(SNR))
     total_samples = 0
@@ -85,7 +84,7 @@ def validate(model, class_map, input_shape, seq_len, sli_len, channel, cnn=False
         print('Protocol ',p)
         path = os.path.join(TEST_DATA_PATH, p) if channel == 'None' else os.path.join(TEST_DATA_PATH, p, channel)
         mat_list = sorted(glob(os.path.join(path, '*.mat'))) if channel == 'None' else sorted(glob(os.path.join(path, '*.npy')))
-        for signal_path in tqdm(mat_list, desc=f"TEST signal dataset, protocol {p}..."):
+        for signal_path in tqdm(mat_list[:max_samples_p_protocol], desc=f"TEST signal dataset, protocol {p}..."):
             sig = sio.loadmat(signal_path) if channel == 'None' else np.load(signal_path)
             if channel == 'None':
                 sig = sig['waveform']
@@ -158,6 +157,7 @@ def validate(model, class_map, input_shape, seq_len, sli_len, channel, cnn=False
 if __name__ == "__main__":
     y_trans_lg, y_trans_sm, y_cnn = [], [], []
     models = ['trans_lg', 'trans_sm', 'cnn']
+    #models = ['cnn']
     class_map = dict(zip(PROTOCOLS, range(len(PROTOCOLS))))
     batch_size = 1
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -222,7 +222,16 @@ if __name__ == "__main__":
                 plan_file = ''
 
 
-            y = validate(model, class_map, input_shape=slice_in.shape, seq_len=seq_len, sli_len=sli_len, channel=channel, cnn=isCNN, mode=MODE, plan_file_name=plan_file)
+            y = validate(model,
+                         class_map,
+                         input_shape=slice_in.shape,
+                         seq_len=seq_len,
+                         sli_len=sli_len,
+                         channel=channel,
+                         cnn=isCNN,
+                         mode=MODE,
+                         plan_file_name=plan_file,
+                         max_samples_p_protocol=50)
 
             if m == 'cnn':
                 y_cnn.append(y)
