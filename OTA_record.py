@@ -3,9 +3,10 @@
 # Import Packages
 import numpy as np
 import os
-from matplotlib import pyplot as plt
 import SoapySDR
 from SoapySDR import SOAPY_SDR_RX, SOAPY_SDR_CS16
+from scipy.signal import resample_poly, firwin, bilinear, lfilter
+import matplotlib.pyplot as plt
 
 ########################################################################################
 # Settings
@@ -60,7 +61,20 @@ while file_ctr < nfiles:
         file_name = os.path.join(rec_dir, '{}_{}.bin'.format(file_prefix, file_ctr))
 
         # Write signal to disk
-        file_data.tofile(file_name)
+        s0 = file_data.astype(float)
+        samples = s0[::2] + 1j*s0[1::2] # convert to IQIQIQ...
+        #print(samples)
+        
+        # Low-Pass Filter
+        taps = firwin(numtaps=101, cutoff=10e6, fs=sample_rate)
+        lpf_samples = np.convolve(samples, taps, 'valid')
+        
+        # rational resample
+        # Resample to 20e6
+        resampled_samples = resample_poly(lpf_samples, 16, 25) # 16*31.25=500,20*25=500(need LCM because input needs to be an int). 
+        # So we go up by factor of 16, then down by factor of 25 to reach final samp_rate of 20e6
+        
+        file_data.tofile(resampled_samples)
 
         # Save file name for plotting later. Remove this if you are not going to plot.
         # file_names.append(file_name)
