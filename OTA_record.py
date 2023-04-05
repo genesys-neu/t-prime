@@ -74,7 +74,7 @@ while file_ctr < nfiles:
         resampled_samples = resample_poly(lpf_samples, 16, 25) # 16*31.25=500,20*25=500(need LCM because input needs to be an int). 
         # So we go up by factor of 16, then down by factor of 25 to reach final samp_rate of 20e6
         
-        file_data.tofile(resampled_samples)
+        resampled_samples.tofile(file_name)
 
         # Save file name for plotting later. Remove this if you are not going to plot.
         # file_names.append(file_name)
