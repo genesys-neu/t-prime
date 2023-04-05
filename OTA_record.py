@@ -7,6 +7,7 @@ import SoapySDR
 from SoapySDR import SOAPY_SDR_RX, SOAPY_SDR_CS16
 from scipy.signal import resample_poly, firwin, bilinear, lfilter
 import matplotlib.pyplot as plt
+import time
 
 ########################################################################################
 # Settings
@@ -23,7 +24,8 @@ timeout_us = int(5e6)
 cplx_samples_per_file = 16384  # Complex samples per file
 nfiles = 1              # Number of files to record
 rec_dir = '/home/deepwave/Research/DSTL/OTA_dataset'  # Location of drive for recording
-file_prefix = 'OTA'   # File prefix for each file
+timestr = time.strftime("%Y%m%d-%H%M%S")
+file_prefix = 'OTA' + timestr   # File prefix for each file
 
 ########################################################################################
 # Receive Signal
