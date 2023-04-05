@@ -218,7 +218,7 @@ if __name__ == "__main__":
     args, _ = parser.parse_known_args()
     args.wchannel = args.wchannel if args.wchannel != 'None' else None
     args.Positional_encoder = args.Positional_encoder in {'True', 'true'}
-    postfix = '' if args.cls_token else '_v2'
+    postfix = '' if not args.cls_token else '_v2'
     args.cp_path = args.cp_path + postfix
     exp_config = { #Experiment configuration for tracking
         "Dataset": "1_1",

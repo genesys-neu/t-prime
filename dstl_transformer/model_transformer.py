@@ -94,7 +94,7 @@ class TransformerModel_v2(nn.Module):
 
     def __init__(self, d_model: int = 512, seq_len: int = 64, nhead: int = 8, nlayers: int = 2,
                  dropout: float = 0.1, classes: int = 4, use_pos: bool = False):
-        super(TransformerModel, self).__init__()
+        super(TransformerModel_v2, self).__init__()
         self.model_type = 'Transformer'
 
         self.norm = nn.LayerNorm(d_model)
