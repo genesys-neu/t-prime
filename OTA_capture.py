@@ -16,6 +16,7 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument("-nf", "--nfiles", help="number of files to capture", type=int)
 parser.add_argument('-fq', '--frequency', help='center frequency', type=float)
+parser.add_argument('-p', '--plot', help='to plot spectrogram of last file captured')
 args = parser.parse_args()
 
 # Determine how much data to record
@@ -101,12 +102,13 @@ sdr.deactivateStream(rx_stream)
 sdr.closeStream(rx_stream)
 
 ##############################################################################
-# If we are not plotting comment out this section
-plt.title('Spectrogram')
-plt.specgram(resampled_samples, Fs=20e6)
-plt.xlabel('Time')
-plt.ylabel('Frequency')
-
-plt.show()
+# To Plot
 ##############################################################################
 
+if args.plot:
+    plt.title('Spectrogram')
+    plt.specgram(resampled_samples, Fs=20e6)
+    plt.xlabel('Time')
+    plt.ylabel('Frequency')
+
+    plt.show()
