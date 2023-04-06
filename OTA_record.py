@@ -44,6 +44,8 @@ sdr.setSampleRate(SOAPY_SDR_RX, 0, fs)           # Set sample rate
 sdr.setGainMode(SOAPY_SDR_RX, 0, use_agc)        # Set the gain mode
 sdr.setFrequency(SOAPY_SDR_RX, 0, freq)          # Tune the LO
 
+N = int(N)
+#print(N)
 # Create data buffer and start streaming samples to it
 rx_buff = np.empty(2 * N, np.int16)  # Create memory buffer for data stream
 rx_stream = sdr.setupStream(SOAPY_SDR_RX, SOAPY_SDR_CS16, [rx_chan]) # Setup data stream
