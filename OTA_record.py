@@ -18,7 +18,7 @@ parser.add_argument("-f", "--nfiles", type=int, default=1, help="number of files
 args = parser.parse_args()
 
 # Determine how much data to record
-nfiles = 1              # Number of files to record
+nfiles = 1              # Number of files to record fix this to allow args input
 N = 16384 * 38          # Number of complex samples per file - approximately 20ms
 
 # Data transfer settings
