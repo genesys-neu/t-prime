@@ -18,7 +18,7 @@ parser.add_argument("-f", "--nfiles", type=int, default=1, help="number of files
 args = parser.parse_args()
 
 # Determine how much data to record
-nfiles = args              # Number of files to record
+nfiles = 1              # Number of files to record
 N = 16384 * 38          # Number of complex samples per file - approximately 20ms
 
 # Data transfer settings
@@ -39,8 +39,8 @@ file_prefix = 'OTA' + timestr                         # File prefix for each fil
 # Receive Signal
 ########################################################################################
 # File calculations and checks
-files_per_buffer = nfiles
-real_samples_per_file = 2 * cplx_samples_per_file
+files_per_buffer = int(nfiles)
+real_samples_per_file = int(2 * cplx_samples_per_file)
 
 
 #  Initialize the AIR-T receiver using SoapyAIRT
@@ -120,3 +120,5 @@ sdr.closeStream(rx_stream)
 #     ax.set_title(os.path.basename(file_name))
 #
 # plt.show()
+
+
