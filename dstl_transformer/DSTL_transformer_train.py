@@ -162,7 +162,7 @@ def train_func(config: Dict):
                 best_loss = loss
                 best_conf_matrix = conf_matrix
                 pickle.dump(conf_matrix, open(os.path.join(logdir, 'conf_matrix.best.pkl'), 'wb'))
-                model_name = f'model{config["wchannel"]}_lg.pt' if seq_len == 64 else f'model{config["wchannel"]}_sm.pt'
+                model_name = f'model{config["wchannel"]}_{config["snr"]}_lg.pt' if seq_len == 64 else f'model{config["wchannel"]}_{config["snr"]}_sm.pt'
                 torch.save({
                     'model_state_dict': model.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
@@ -262,7 +262,8 @@ if __name__ == "__main__":
         "cp_path": args.cp_path,
         "use_positional_enc": exp_config["Positional encoder"],
         "protocols": protocols,
-        "wchannel": args.wchannel
+        "wchannel": args.wchannel,
+        "snr": args.snr_db[0]
         }
 
     """
