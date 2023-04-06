@@ -14,7 +14,7 @@ import time
 ########################################################################################
 # Determine how much data to record
 nfiles = 1              # Number of files to record
-N = 16384               # Number of complex samples per file
+N = 16384 * 38          # Number of complex samples per file - approximately 20ms
 
 # Data transfer settings
 rx_chan = 0                         # RX1 = 0, RX2 = 1
