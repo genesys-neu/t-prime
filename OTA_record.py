@@ -12,27 +12,29 @@ import time
 ########################################################################################
 # Settings
 ########################################################################################
+# Determine how much data to record
+nfiles = 1              # Number of files to record
+N = 16384               # Number of complex samples per file
+
 # Data transfer settings
-rx_chan = 0               # RX1 = 0, RX2 = 1
-N = 16384                  # Number of complex samples per transfer
-fs = 31.25e6               # Radio sample Rate
-freq = 2.417e9               # LO tuning frequency in Hz
-use_agc = True           # Use or don't use the AGC
+rx_chan = 0                         # RX1 = 0, RX2 = 1
+cplx_samples_per_file = N * 25/16   # Increase number of samples to account fo resampling
+N = nfiles * cplx_samples_per_file  # total number of samples to record
+fs = 31.25e6                        # Radio sample Rate
+freq = 2.417e9                      # LO tuning frequency in Hz
+use_agc = True                      # Use or don't use the AGC
 timeout_us = int(5e6)
 
 # Recording Settings
-cplx_samples_per_file = 16384  # Complex samples per file
-nfiles = 1              # Number of files to record
 rec_dir = '/home/deepwave/Research/DSTL/OTA_dataset'  # Location of drive for recording
 timestr = time.strftime("%Y%m%d-%H%M%S")
-file_prefix = 'OTA' + timestr   # File prefix for each file
+file_prefix = 'OTA' + timestr                         # File prefix for each file
 
 ########################################################################################
 # Receive Signal
 ########################################################################################
 # File calculations and checks
-assert N % cplx_samples_per_file == 0, 'samples_per_file must be divisible by N'
-files_per_buffer = int(N / cplx_samples_per_file)
+files_per_buffer = nfiles
 real_samples_per_file = 2 * cplx_samples_per_file
 
 
@@ -65,7 +67,7 @@ while file_ctr < nfiles:
         # Write signal to disk
         s0 = file_data.astype(float)
         samples = s0[::2] + 1j*s0[1::2] # convert to IQIQIQ...
-        #print(samples)
+        # print(samples)
         
         # Low-Pass Filter
         taps = firwin(numtaps=101, cutoff=10e6, fs=fs)
@@ -81,10 +83,9 @@ while file_ctr < nfiles:
         # Save file name for plotting later. Remove this if you are not going to plot.
         # file_names.append(file_name)
 
-        # Increment file write counter and see if we are done
+        # Increment file write counter
         file_ctr += 1
-        if file_ctr > nfiles:
-            break
+
 
 # Stop streaming and close the connection to the radio
 sdr.deactivateStream(rx_stream)
