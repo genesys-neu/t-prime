@@ -41,7 +41,7 @@ rx_bits = 16            # The AIR-T's ADC is 16 bits
 # Recording Settings
 dir = '/home/deepwave/Research/DSTL/OTA_dataset'  # Location of drive for recording
 if args.standard:
-    rec_dir = "/".join([rec_dir, args.standard])
+    rec_dir = "/".join([dir, args.standard])
     if not os.path.isdir(rec_dir):
         os.makedirs(rec_dir)
 else:
