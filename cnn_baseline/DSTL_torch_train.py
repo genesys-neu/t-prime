@@ -114,7 +114,7 @@ def train_func(config: Dict):
     else:
         model.to(device)
 
-    loss_fn = nn.CrossEntropyLoss()
+    loss_fn = nn.NLLLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     from torch.optim.lr_scheduler import ReduceLROnPlateau
 
@@ -152,7 +152,7 @@ def train_func(config: Dict):
                     'model_state_dict': model.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
                     'loss': loss,
-                }, os.path.join(logdir,f'model.cnn.{config["wchannel"]}.pt'))
+                }, os.path.join(logdir,f'model.cnn.{config["wchannel"]}.{config["snr_dB"]}.pt'))
                 df_confmat = plot_confmatrix(logdir, pkl_file, train_config['class_labels'], 'conf_mat_epoch'+str(e)+'.png')
                 wandb.log({'Confusion_Matrix': df_confmat.to_numpy()}, step=e)
     # return required for backwards compatibility with the old API
