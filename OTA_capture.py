@@ -17,6 +17,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-nf", "--nfiles", help="number of files to capture", type=int)
 parser.add_argument('-fq', '--frequency', help='center frequency', type=float)
 parser.add_argument('-p', '--plot', help='to plot spectrogram of last file captured')
+parser.add_argument('-s', '--standard', help='Specifiy the 802.11 standard - results will be saved to a specific directory based on the standard')
 args = parser.parse_args()
 
 # Determine how much data to record
@@ -38,8 +39,13 @@ rx_bits = 16            # The AIR-T's ADC is 16 bits
 
 
 # Recording Settings
-rec_dir = '/home/deepwave/Research/DSTL/OTA_dataset'  # Location of drive for recording
-
+dir = '/home/deepwave/Research/DSTL/OTA_dataset'  # Location of drive for recording
+if args.standard:
+    rec_dir = "/".join([rec_dir, args.standard])
+    if not os.path.isdir(rec_dir):
+        os.makedirs(rec_dir)
+else:
+    rec_dir = dir
 
 ########################################################################################
 # Receive Signal
