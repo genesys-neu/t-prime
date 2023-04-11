@@ -216,5 +216,10 @@ if __name__ == "__main__":
     plt.suptitle('Results comparison between different architectures')
     fig.legend(MODELS, bbox_to_anchor=(0.87, 0.02), ncols=3, labelspacing=1)
     plt.tight_layout() 
-    img_name = 'Testing_onemodel.png' if args.one_model else 'Testing_modelperchannel.png'
+    if args.experiment == '1':
+        img_name = 'Testing_noiseandchannel.png'
+    elif args.experiment == '2':
+        img_name = 'Testing_modelperchannel.png'
+    else: # experiment 3
+        img_name = 'Testing_onemodel.png'
     plt.savefig(img_name) 
