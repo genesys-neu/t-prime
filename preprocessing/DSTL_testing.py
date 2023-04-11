@@ -138,11 +138,11 @@ if __name__ == "__main__":
 
             for test_channel in CHANNELS:
                 y_trans_lg.append(validate(model_lg, class_map, seq_len=64, sli_len=128, channel=test_channel))
-                print(f'Accuracy values for channel {test_channel} and large architecture are: ', y_trans_lg[-1])
+                print(f'Accuracy values for channel {test_channel} and large architecture trained for {channel} and 10 dBs are: ', y_trans_lg[-1])
                 y_trans_sm.append(validate(model_sm, class_map, seq_len=24, sli_len=64, channel=test_channel))
-                print(f'Accuracy values for channel {test_channel} and small architecture are: ', y_trans_sm[-1])
+                print(f'Accuracy values for channel {test_channel} and small architecture trained for {channel} and 10 dBs are: ', y_trans_sm[-1])
                 y_cnn.append(validate(cnn, class_map, seq_len=1, sli_len=512, channel=test_channel, cnn=True))
-                print(f'Accuracy values for channel {test_channel} and cnn architecture are: ', y_cnn[-1])
+                print(f'Accuracy values for channel {test_channel} and cnn architecture trained for {channel} and 10 dBs are: ', y_cnn[-1])
         
             with open(f'test_results_10dBs_{channel}.txt', 'w') as f:
                 f.write(str(y_trans_lg) + '%' + str(y_trans_sm) + '%' + str(y_cnn))
@@ -166,11 +166,11 @@ if __name__ == "__main__":
 
             for test_channel in CHANNELS:
                 y_trans_lg.append(validate(model_lg, class_map, seq_len=64, sli_len=128, channel=test_channel))
-                print(f'Accuracy values for channel {test_channel} and large architecture are: ', y_trans_lg[-1])
+                print(f'Accuracy values for channel {test_channel} and large architecture trained for {channel} are: ', y_trans_lg[-1])
                 y_trans_sm.append(validate(model_sm, class_map, seq_len=24, sli_len=64, channel=test_channel))
-                print(f'Accuracy values for channel {test_channel} and small architecture are: ', y_trans_sm[-1])
+                print(f'Accuracy values for channel {test_channel} and small architecture trained for {channel} are: ', y_trans_sm[-1])
                 y_cnn.append(validate(cnn, class_map, seq_len=1, sli_len=512, channel=test_channel, cnn=True))
-                print(f'Accuracy values for channel {test_channel} and cnn architecture are: ', y_cnn[-1])
+                print(f'Accuracy values for channel {test_channel} and cnn architecture trained for {channel} are: ', y_cnn[-1])
         
             with open(f'test_results_uniformdist_{channel}.txt', 'w') as f:
                 f.write(str(y_trans_lg) + '%' + str(y_trans_sm) + '%' + str(y_cnn))
