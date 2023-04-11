@@ -16,7 +16,7 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument("-nf", "--nfiles", help="number of files to capture, each file is approximately 20ms long", type=int)
 parser.add_argument('-fq', '--frequency', help='center frequency, default is 2.457e9', type=float)
-parser.add_argument('-p', '--plot', help='flag to plot a spectrogram of last file captured')
+parser.add_argument('-p', '--plot', help='flag to plot a spectrogram of last file captured', action="store_true")
 parser.add_argument('-s', '--standard', help='Specifiy the 802.11 standard - results will be saved to a specific directory based on the standard')
 args = parser.parse_args()
 
