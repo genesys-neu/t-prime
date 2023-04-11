@@ -64,11 +64,12 @@ sdr.activateStream(rx_stream)  # this turns the radio on
 
 file_cntr = 0
 while file_cntr < nfiles:
-    print('Reading file number {}'.format(file_cntr))
+    print('Reading buffer for file number {}'.format(file_cntr))
     # Read the samples from the data buffer
     sr = sdr.readStream(rx_stream, [rx_buff], N, timeoutUs=timeout_us)
     rc = sr.ret  # number of samples read or the error code
-    assert rc == N, 'Error {} after {} files read'.format(sr.ret, file_cntr)
+    print('Read {} samples'.format(rc))
+    assert rc == N, 'Error {} after {} attempts at reading the buffer'.format(sr.ret, file_cntr)
 
 
     ############################################################################################
