@@ -114,7 +114,6 @@ if __name__ == "__main__":
                         noise and channel, 2 is for specific model per channel and 3 is for single model for all channel and noise conditions")
     parser.add_argument("--use_gpu", action='store_true', default=False, help="Use gpu for inference")
     args, _ = parser.parse_known_args()
-    y_trans_lg, y_trans_sm, y_cnn = [], [], []
     class_map = dict(zip(PROTOCOLS, range(len(PROTOCOLS))))
 
     device = torch.device("cuda" if torch.cuda.is_available() and args.use_gpu else "cpu")
@@ -135,7 +134,7 @@ if __name__ == "__main__":
                 model_lg.cuda()
                 model_sm.cuda()
                 cnn.cuda()
-
+            y_trans_lg, y_trans_sm, y_cnn = [], [], []
             for test_channel in CHANNELS:
                 y_trans_lg.append(validate(model_lg, class_map, seq_len=64, sli_len=128, channel=test_channel))
                 print(f'Accuracy values for channel {test_channel} and large architecture trained for {channel} and 10 dBs are: ', y_trans_lg[-1])
@@ -163,7 +162,7 @@ if __name__ == "__main__":
                 model_lg.cuda()
                 model_sm.cuda()
                 cnn.cuda()
-
+            y_trans_lg, y_trans_sm, y_cnn = [], [], []
             for test_channel in CHANNELS:
                 y_trans_lg.append(validate(model_lg, class_map, seq_len=64, sli_len=128, channel=test_channel))
                 print(f'Accuracy values for channel {test_channel} and large architecture trained for {channel} are: ', y_trans_lg[-1])
@@ -190,7 +189,7 @@ if __name__ == "__main__":
             model_lg.cuda()
             model_sm.cuda()
             cnn.cuda()
-
+        y_trans_lg, y_trans_sm, y_cnn = [], [], []
         for channel in CHANNELS:
             y_trans_lg.append(validate(model_lg, class_map, seq_len=64, sli_len=128, channel=channel))
             print(f'Accuracy values for channel {channel} and large architecture are: ', y_trans_lg[-1])
