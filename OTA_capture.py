@@ -76,10 +76,10 @@ while file_cntr < nfiles:
     print('Read {} samples'.format(rc))
     if rc != N:
         print('Error {} after {} attempts at reading the buffer'.format(sr.ret, file_cntr))
-        t1 = time.process_time_ns()
+        t1 = time.process_time()
         sdr.deactivateStream(rx_stream)  # turn off the stream
         sdr.activateStream(rx_stream)  # turn on the stream again
-        t2 = time.process_time_ns()
+        t2 = time.process_time()
         print('restarting the stream took {} ns'.format(t2-t1))
 
     ############################################################################################
@@ -114,14 +114,14 @@ while file_cntr < nfiles:
     resampled_samples.tofile(file_name)
     print('Wrote file number {}'.format(file_cntr))
     file_cntr += 1
-    
+   
+    clock_name = 'process_time'
     if file_cntr % 5 == 0:  # this releases and restarts the stream every 5 files
-        t1 = time.process_time_ns()
+        t1 = time.process_time() 
         sdr.deactivateStream(rx_stream)  # this releases the stream 
         sdr.activateStream(rx_stream)  # this turns the stream on again
-        t2 = time.process_time_ns()
-        print('Restarting the stream took {} ns'.format(t2-t1))
-    
+        t2 = time.process_time()
+        print("Restarting the stream took {} ns".format(t2-t1))
 
 # Stop streaming
 sdr.deactivateStream(rx_stream)
