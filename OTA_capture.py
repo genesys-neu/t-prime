@@ -69,17 +69,19 @@ sdr.activateStream(rx_stream)  # this turns the radio on
 
 file_cntr = 0
 while file_cntr < nfiles:
-    print('Reading buffer for file number {}'.format(file_cntr))
+    # print('Reading buffer for file number {}'.format(file_cntr))
     # Read the samples from the data buffer
+    # t1 = time.perf_counter()
     sr = sdr.readStream(rx_stream, [rx_buff], N, timeoutUs=timeout_us)
     rc = sr.ret  # number of samples read or the error code
-    print('Read {} samples'.format(rc))
+    # t2 = time.perf_counter()
+    # print('Read {} samples in {} s'.format(rc, t2-t1))
     if rc != N:
         print('Error {} after {} attempts at reading the buffer'.format(sr.ret, file_cntr))
-        t1 = time.process_time()
+        t1 = time.perf_counter()
         sdr.deactivateStream(rx_stream)  # turn off the stream
         sdr.activateStream(rx_stream)  # turn on the stream again
-        t2 = time.process_time()
+        t2 = time.perf_counter()
         print('restarting the stream took {} s'.format(t2-t1))
 
     ############################################################################################
@@ -112,15 +114,15 @@ while file_cntr < nfiles:
     file_name = os.path.join(rec_dir, '{}_{}.bin'.format(file_prefix, file_cntr))
 
     resampled_samples.tofile(file_name)
-    print('Wrote file number {}'.format(file_cntr))
+    # print('Wrote file number {}'.format(file_cntr))
     file_cntr += 1
    
     clock_name = 'process_time'
-    if file_cntr % 5 == 0:  # this releases and restarts the stream every 5 files
-        t1 = time.process_time() 
+    if file_cntr % 15 == 0:  # this releases and restarts the stream every 5 files
+        t1 = time.perf_counter() 
         sdr.deactivateStream(rx_stream)  # this releases the stream 
         sdr.activateStream(rx_stream)  # this turns the stream on again
-        t2 = time.process_time()
+        t2 = time.perf_counter()
         print("Restarting the stream took {} s".format(t2-t1))
 
 # Stop streaming
