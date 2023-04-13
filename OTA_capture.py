@@ -80,7 +80,7 @@ while file_cntr < nfiles:
         sdr.deactivateStream(rx_stream)  # turn off the stream
         sdr.activateStream(rx_stream)  # turn on the stream again
         t2 = time.process_time()
-        print('restarting the stream took {} ns'.format(t2-t1))
+        print('restarting the stream took {} s'.format(t2-t1))
 
     ############################################################################################
     # Process Signal
@@ -121,7 +121,7 @@ while file_cntr < nfiles:
         sdr.deactivateStream(rx_stream)  # this releases the stream 
         sdr.activateStream(rx_stream)  # this turns the stream on again
         t2 = time.process_time()
-        print("Restarting the stream took {} ns".format(t2-t1))
+        print("Restarting the stream took {} s".format(t2-t1))
 
 # Stop streaming
 sdr.deactivateStream(rx_stream)
