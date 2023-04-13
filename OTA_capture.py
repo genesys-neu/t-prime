@@ -26,7 +26,8 @@ nfiles = 1  # Number of files to record, each is approximately 20ms long
 if args.nfiles:
     nfiles = args.nfiles
 
-N = 16384 * 19  # Number of complex samples per file - approximately 10ms
+N = 12900 * 24  # Number of complex samples per file - *24 gives approximately 10ms
+# for live capture, remove the multiple
 
 rx_chan = 0  # RX1 = 0, RX2 = 1
 fs = 31.25e6  # Radio sample Rate
@@ -89,9 +90,9 @@ while file_cntr < nfiles:
     ############################################################################################
     # Convert interleaved shorts (received signal) to numpy.complex64 normalized between [-1, 1]
     s0 = rx_buff.astype(float) / np.power(2.0, rx_bits-1)
-    # print(s0.size)
+    # print('s0 {}'.format(s0.size))
     s = (s0[::2] + 1j*s0[1::2])
-    # print(s.size)
+    # print('s {}'.format(s.size))
 
     # Low-Pass Filter
     taps = firwin(numtaps=101, cutoff=10e6, fs=fs)
@@ -104,6 +105,7 @@ while file_cntr < nfiles:
     # So we go up by factor of 16, then down by factor of 25 to reach final samp_rate of 20e6
     # print(resampled_samples.size)
     N_plot = resampled_samples.size
+    # print('resample size {}'.format(N_plot))
 
     ############################################################################################
     # Save Signal
@@ -117,8 +119,8 @@ while file_cntr < nfiles:
     # print('Wrote file number {}'.format(file_cntr))
     file_cntr += 1
    
-    clock_name = 'process_time'
-    if file_cntr % 15 == 0:  # this releases and restarts the stream every 5 files
+    # remove the restart code when running live. the stream reader will restart if it crashes
+    if file_cntr % 15 == 0:  # this releases and restarts the stream every x files
         t1 = time.perf_counter() 
         sdr.deactivateStream(rx_stream)  # this releases the stream 
         sdr.activateStream(rx_stream)  # this turns the stream on again
