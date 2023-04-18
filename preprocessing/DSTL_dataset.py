@@ -52,6 +52,7 @@ class DSTLDataset(Dataset):
                  apply_noise=True, apply_wchannel=None,
                  override_gen_map=False,
                  normalize=False,
+                 ota=False, # OVER THE AIR
                  transform=None, target_transform=None):
 
         self.protocols = protocols
@@ -61,18 +62,24 @@ class DSTLDataset(Dataset):
         self.raw_data_ratio = raw_data_ratio
         self.n_sig_per_class = {} # this will be filled in the generate_ds_map() function
         self.noise_model = noise_model
+        self.ota = ota
         self.snr_dbs = snr_dbs
         self.seed = seed
         self.ds_path = ds_path
         if not (self.seed is None):
             np.random.seed(self.seed)
 
+        if ota:
+            assert(apply_wchannel is None)
 
         assert(ds_type in ['train', 'test'])
         self.ds_type = ds_type
         if file_postfix != '' and file_postfix[-1] != '_':
             file_postfix += '__'
-        info_filename = 'ds_info__'+file_postfix+'slice'+str(slice_len)+'_'+str(len(protocols))+'class.pkl'
+        if not ota:
+            info_filename = 'ds_info__'+file_postfix+'slice'+str(slice_len)+'_'+str(len(protocols))+'class.pkl'
+        else: # over the air
+            info_filename = 'ds_info__'+file_postfix+'slice'+str(slice_len)+'_'+str(len(protocols))+'class_ota.pkl'
         ds_info_path = os.path.join(self.ds_path, info_filename)
         do_gen_info = True
         if os.path.exists(ds_info_path) and (not override_gen_map):
@@ -126,6 +133,10 @@ class DSTLDataset(Dataset):
     
     def generate_windows(self, len_sig):
         return list(range(0, len_sig-self.slice_len, self.overlap))
+    
+    def generate_windows_ota(self, len_sig):
+        #ToDo: generate windows for ota data for CNN
+        return
 
     def generate_ds_map(self, ds_path, filename, test_ratio=0.2):
         examples_map = {}
@@ -134,7 +145,7 @@ class DSTLDataset(Dataset):
         for i, p in enumerate(self.protocols):
             path = os.path.join(ds_path, p)
             if os.path.isdir(path):
-                mat_list = sorted(glob(os.path.join(path, '*.mat')))
+                mat_list = sorted(glob(os.path.join(path, '*.bin'))) if self.ota else sorted(glob(os.path.join(path, '*.mat')))
                 self.n_sig_per_class[p] = int(
                     len(mat_list) * self.raw_data_ratio)  # for each protocol, we save the amount of raw signals to retain
 
@@ -160,9 +171,15 @@ class DSTLDataset(Dataset):
         ixs_count = 0
         for c in tqdm(examples_map.keys(), desc='Analyzing signal dataset...'):
             for ix, path in examples_map[c].items():
-                sig = sio.loadmat(path)
-                len_sig = sig['waveform'].shape[0]
-                window_ixs = self.generate_windows(len_sig)
+                if not self.ota: # simulation files
+                    sig = sio.loadmat(path)
+                    len_sig = sig['waveform'].shape[0]
+                    window_ixs = self.generate_windows(len_sig)
+                else:
+                    # read binary files and get length
+                    sig = np.fromfile(path)
+                    len_sig = sig.shape[0]
+                    window_ixs = self.generate_windows_ota(len_sig)
                 n_windows = len(window_ixs)
                 examples_map[c][ix] = {'sample': window_ixs, # sample is slice for CNN or sequence for Transformer
                                        'path': examples_map[c][ix]}  # here we modify the original content
@@ -222,6 +239,10 @@ class DSTLDataset(Dataset):
             obs = self.transform(obs)
         return obs
 
+    def retrieve_obs_ota(self, noisy_sig, obs_info):
+        # ToDo: still need implementation for cnn
+        return 'obs'
+
     def __getitem__(self, idx):
         dataset = self.ds_info['ds_indexes'][self.ds_type]
         # first retrieve the internal sample index relative to the linear index idx
@@ -240,10 +261,14 @@ class DSTLDataset(Dataset):
                 dataset['data'][s_idx]['path'] = os.path.join(self.ds_path, dirname, filename)
                 # re-obtain the observation info dict
                 obs_info = dataset['data'][s_idx]
+            if not self.ota:
+                mat_dict = sio.loadmat(obs_info['path'])
+                self.signal_cache.put(obs_info['path'], {'np': mat_dict['waveform'], \
+                            'mat': self.mateng.py2mat_array(mat_dict['waveform']) if not (self.apply_wchannel is None) else ''})
+            else:
+                mat_dict = np.fromfile(obs_info['path'])
+                self.signal_cache.put(obs_info['path'], {'np': mat_dict, 'mat': ''}) # WCHANNEL SHOULD ALWAYS BE NONE WITH OTA SAMPLES
 
-            mat_dict = sio.loadmat(obs_info['path'])
-            self.signal_cache.put(obs_info['path'], {'np': mat_dict['waveform'], \
-                        'mat': self.mateng.py2mat_array(mat_dict['waveform']) if not (self.apply_wchannel is None) else ''})
             sig_dict = self.signal_cache.get(obs_info['path'])
 
         label = dataset['labels'][s_idx]
@@ -252,8 +277,10 @@ class DSTLDataset(Dataset):
         noisy_sig = self.apply_AWGN(chan_sig) if self.apply_noise else chan_sig
 
         # then, retrieve the relative slice of the requested dataset sample
-        
-        obs = self.retrieve_obs(noisy_sig, obs_info)
+        if self.ota:
+            obs = noisy_sig[obs_info['sample_ix']:obs_info['sample_ix']+self.slice_len, 0]
+        else:
+            obs = self.retrieve_obs(noisy_sig, obs_info)
         if self.target_transform:
             label = self.target_transform(label)
         return obs, label
@@ -329,6 +356,10 @@ class DSTLDataset_Transformer(DSTLDataset):
         return list(range(0, len_sig-(self.slice_len*self.seq_len), \
                     self.overlap*(self.seq_len-1) + self.slice_len)) # window is now seq_len*slice_len
     
+    def generate_windows_ota(self, len_sig):
+        return list(range(0, len_sig-(self.slice_len*self.seq_len), \
+                    (self.overlap*(self.seq_len-1) + self.slice_len)*2)) # window is now seq_len*slice_len
+    
     def info(self):
         ds_info = {
             'seq_len': self.seq_len,
@@ -347,6 +378,12 @@ class DSTLDataset_Transformer(DSTLDataset):
         if self.transform:
             obs = self.transform(obs)
 
+        slice_ixs = list(range(0, obs.size-self.slice_len*2+1, self.overlap*2))
+        obs = [obs[i:i+self.slice_len*2] for i in slice_ixs]
+        return np.asarray(obs)
+    
+    def retrieve_obs_ota(self, noisy_sig, obs_info):
+        obs = noisy_sig[obs_info['sample_ix']:obs_info['sample_ix'] + (self.overlap*(self.seq_len-1) + self.slice_len)*2, 0]
         slice_ixs = list(range(0, obs.size-self.slice_len*2+1, self.overlap*2))
         obs = [obs[i:i+self.slice_len*2] for i in slice_ixs]
         return np.asarray(obs)
