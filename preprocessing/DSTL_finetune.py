@@ -49,9 +49,6 @@ def train(model, criterion, optimizer, dataloader):
             print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
     total_loss /= size
     correct /= size
-    print(f"Train Error: \n "
-          f"Accuracy: {(100 * correct):>0.1f}%, "
-          )
     return correct, total_loss
 
 def validate(model, criterion, dataloader, nclasses):
@@ -71,12 +68,6 @@ def validate(model, criterion, dataloader, nclasses):
             conf_matrix += conf_mat(y_cpu, pred_cpu.argmax(1), labels=list(range(nclasses)))
     test_loss /= size
     correct /= size
-    print(
-        f"Test Error: \n "
-        f"Accuracy: {(100 * correct):>0.1f}%, "
-        f"Avg loss: {test_loss:>8f} \n"
-    )
-
     return correct, test_loss, conf_matrix
 
 def finetune(model, config):
@@ -92,6 +83,7 @@ def finetune(model, config):
     train_acc = []
     test_acc = []
     best_acc = 0
+    best_cm = 0 # best confusion matrix
     # Training loop
     for epoch in range(config['epochs']):
         acc, loss = train(model, criterion, optimizer, train_dataloader)
@@ -108,6 +100,10 @@ def finetune(model, config):
                     'optimizer_state_dict': optimizer.state_dict(),
                     'loss': loss,
                 }, os.path.join(PATH, MODEL_NAME + '_ft.pt'))
+            best_cm = conf_matrix
+    print('------------------- Best confusion matrix (%) -------------------')
+    print(best_cm)
+    print('-----------------------------------------------------------------')
     return
 
 if __name__ == "__main__":
@@ -139,9 +135,9 @@ if __name__ == "__main__":
     if args.transformer == 'CNN':
         global_model = Baseline_CNN1D
         model = global_model(classes=len(PROTOCOLS), numChannels=2, slice_len=512)
-        ds_train = DSTLDataset(PROTOCOLS, ds_path=args.ds_path, ds_type='train', snr_dbs=args.snr_db, slice_len=512, slice_overlap_ratio=0,
-                           raw_data_ratio=args.dataset_ratio, file_postfix='', override_gen_map=True, ota=True, apply_wchannel=None, apply_noise=False)
-        ds_test = DSTLDataset(PROTOCOLS, ds_path=args.ds_path, ds_type='test', snr_dbs=args.snr_db, slice_len=args.slicelen, slice_overlap_ratio=0, 
+        ds_train = DSTLDataset(PROTOCOLS, ds_path=args.ds_path, ds_type='train', slice_len=512, slice_overlap_ratio=0,
+                           raw_data_ratio=args.dataset_ratio, file_postfix='', override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False)
+        ds_test = DSTLDataset(PROTOCOLS, ds_path=args.ds_path, ds_type='test', slice_len=args.slicelen, slice_overlap_ratio=0, 
                             raw_data_ratio=args.dataset_ratio, file_postfix='', override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False)
     else:
         # choose correct version
@@ -153,15 +149,15 @@ if __name__ == "__main__":
         if args.transformer == "sm":
             model = global_model(classes=len(PROTOCOLS), d_model=64*2, seq_len=24, nlayers=2, use_pos=False)
             # Load over the air dataset
-            ds_train = DSTLDataset_Transformer(protocols=PROTOCOLS, ds_path=args.ds_path, ds_type='train', snr_dbs=args.snr_db, seq_len=24, slice_len=64, slice_overlap_ratio=0, 
-                                               raw_data_ratio=args.dataset_ratio, override_gen_map=True, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence)
-            ds_test = DSTLDataset_Transformer(protocols=PROTOCOLS, ds_path=args.ds_path, ds_type='test', snr_dbs=args.snr_db, seq_len=24, slice_len=64, slice_overlap_ratio=0, 
+            ds_train = DSTLDataset_Transformer(protocols=PROTOCOLS, ds_path=args.ds_path, ds_type='train', seq_len=24, slice_len=64, slice_overlap_ratio=0, 
+                                               raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence)
+            ds_test = DSTLDataset_Transformer(protocols=PROTOCOLS, ds_path=args.ds_path, ds_type='test', seq_len=24, slice_len=64, slice_overlap_ratio=0, 
                                               raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence)
         else: # lg
             model = global_model(classes=len(PROTOCOLS), d_model=128*2, seq_len=64, nlayers=2, use_pos=False)
-            ds_train = DSTLDataset_Transformer(protocols=PROTOCOLS, ds_path=args.ds_path, ds_type='train', snr_dbs=args.snr_db, seq_len=64, slice_len=128, slice_overlap_ratio=0, 
-                                               raw_data_ratio=args.dataset_ratio, override_gen_map=True, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence)
-            ds_test = DSTLDataset_Transformer(protocols=PROTOCOLS, ds_path=args.ds_path, ds_type='test', snr_dbs=args.snr_db, seq_len=64, slice_len=128, slice_overlap_ratio=0, 
+            ds_train = DSTLDataset_Transformer(protocols=PROTOCOLS, ds_path=args.ds_path, ds_type='train', seq_len=64, slice_len=128, slice_overlap_ratio=0, 
+                                               raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence)
+            ds_test = DSTLDataset_Transformer(protocols=PROTOCOLS, ds_path=args.ds_path, ds_type='test', seq_len=64, slice_len=128, slice_overlap_ratio=0, 
                                               raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence)
     
     device = torch.device("cuda" if torch.cuda.is_available() and args.use_gpu else "cpu")
@@ -212,7 +208,7 @@ if __name__ == "__main__":
         plt.clf()
         print('-------------------------------------------')
         print('-------------------------------------------')
-        print('Global confusion matrix (%) (all trials)')
+        print('Global confusion matrix (%)')
         print(conf_matrix)
         
     else:
