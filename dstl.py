@@ -14,7 +14,7 @@ from queue import Queue
 
 
 N = 12900 # number of complex samples needed
-q = Queue(1000)
+q = Queue(2000)
 freq = 2.457e9  # LO tuning frequency in Hz
 exitFlag = 0
 
@@ -100,9 +100,8 @@ if __name__ == '__main__':
     ml.start()
 
     # gracefully end program
-    # TODO - how do we gracefully kill this?
-    time.sleep(15)
-    exitFlag = 1 # this doesn't seem to work
+    time.sleep(60)
+    exitFlag = 1
 
     rec.join()
     ml.join()
