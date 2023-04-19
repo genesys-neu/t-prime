@@ -92,10 +92,10 @@ def machinelearning(exitFlag):
 
 
 if __name__ == '__main__':
-    rec = threading.Thread(target=receiver)
+    rec = threading.Thread(target=receiver, kwargs={freq=freq, N=N, exitFlag=exitFlag})
     rec.start()
 
-    ml = threading.Thread(target=machinelearning)
+    ml = threading.Thread(target=machinelearning, kwargs={exitFlag=exitFlag})
     ml.start()
 
     # gracefully end program
