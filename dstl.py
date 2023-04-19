@@ -77,9 +77,9 @@ def machinelearning():
             ############################################################################################
             # Convert interleaved shorts (received signal) to numpy.complex64 normalized between [-1, 1]
             s0 = item.astype(float) / np.power(2.0, rx_bits - 1)
-            # print('s0 {}'.format(s0.size))
+            print('s0 {}'.format(s0.size))
             s = (s0[::2] + 1j * s0[1::2])
-            # print('s {}'.format(s.size))
+            print('s {}'.format(s.size))
 
             # Low-Pass Filter
             taps = firwin(numtaps=101, cutoff=10e6, fs=fs)
@@ -90,6 +90,7 @@ def machinelearning():
             resampled_samples = resample_poly(lpf_samples, 16, 25)
             # 16*31.25=500,20*25=500(need LCM because input needs to be an int).
             # So we go up by factor of 16, then down by factor of 25 to reach final samp_rate of 20e6
+            print('resampled_samples {}'.format(resampled_samples.size))
 
 
 if __name__ == '__main__':
@@ -101,7 +102,7 @@ if __name__ == '__main__':
 
     # gracefully end program
     # TODO - how do we gracefully kill this?
-    time.sleep(30)
+    time.sleep(15)
     exitFlag = 1 # this doesn't seem to work
 
     rec.join()
