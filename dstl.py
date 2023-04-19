@@ -65,6 +65,7 @@ def receiver(freq, N):
 
 def machinelearning():
     rx_bits = 16  # The AIR-T's ADC is 16 bits
+    fs = 31.25e6  # Radio sample Rate
 
     while not exitFlag:
         if not q.empty():
