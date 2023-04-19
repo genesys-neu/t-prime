@@ -16,7 +16,7 @@ import logging
 
 logging.basicConfig(level=logging.DEBUG, format='(%(threadName)-9s) %(message)s',)
 buffer_size = 12900*1e6
-q = Queue.Queue(buffer_size)
+q = Queue(buffer_size)
 
 
 class ReceiverThread(threading.Thread):
