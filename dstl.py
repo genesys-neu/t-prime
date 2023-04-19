@@ -21,7 +21,7 @@ exitFlag = 0
 
 
 # producer task
-def receiver(q, freq, N):
+def receiver(freq, N):
     rx_chan = 0  # RX1 = 0, RX2 = 1
     fs = 31.25e6  # Radio sample Rate
 
@@ -52,13 +52,13 @@ def receiver(q, freq, N):
             print('restarting the stream took {} s'.format(t2 - t1))
         if not q.full():
             q.put(rx_buff)
-            print('Putting ' + str(item) + ' : ' + str(q.qsize()) + ' items in queue')
+            print('Putting ' + str(rx_buff) + ' : ' + str(q.qsize()) + ' items in queue')
 
     sdr.deactivateStream(rx_stream)
     sdr.closeStream(rx_stream)
 
 
-def machinelearning(q):
+def machinelearning():
     while not exitFlag:
         if not q.empty():
             item = q.get()
@@ -66,10 +66,10 @@ def machinelearning(q):
 
 
 if __name__ == '__main__':
-    rec = threading.Thread(target=receiver, args=(q,freq,N))
+    rec = threading.Thread(target=receiver, args=(freq,N))
     rec.start()
 
-    ml = threading.Thread(target=machinelearning, args=(q))
+    ml = threading.Thread(target=machinelearning)
     ml.start()
 
     time.sleep(180)
