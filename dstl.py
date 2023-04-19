@@ -14,7 +14,8 @@ from queue import Queue
 
 
 N = 12900 # number of complex samples needed
-q = Queue(2000)
+q = Queue(500) # this will ensure the buffer always has enough to recover from a restart
+# our decisions will also be delayed by 206 ms once the buffer is full
 freq = 2.457e9  # LO tuning frequency in Hz
 exitFlag = 0
 
@@ -100,7 +101,7 @@ if __name__ == '__main__':
     ml.start()
 
     # gracefully end program
-    time.sleep(60)
+    time.sleep(120)
     exitFlag = 1
 
     rec.join()
