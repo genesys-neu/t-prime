@@ -28,7 +28,6 @@ def receiver(freq, N):
 
     use_agc = True  # Use or don't use the AGC
     timeout_us = int(5e6)
-    rx_bits = 16  # The AIR-T's ADC is 16 bits
 
     #  Initialize the AIR-T receiver using SoapyAIRT
     sdr = SoapySDR.Device(dict(driver="SoapyAIRT"))  # Create AIR-T instance
@@ -65,6 +64,8 @@ def receiver(freq, N):
 
 
 def machinelearning():
+    rx_bits = 16  # The AIR-T's ADC is 16 bits
+    
     while not exitFlag:
         if not q.empty():
             item = q.get()
