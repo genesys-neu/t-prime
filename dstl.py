@@ -22,7 +22,7 @@ exitFlag = 0
 
 
 # producer task
-def receiver(freq, N, exitFlag):
+def receiver(freq, N):
     rx_chan = 0  # RX1 = 0, RX2 = 1
     fs = 31.25e6  # Radio sample Rate
 
@@ -63,7 +63,7 @@ def receiver(freq, N, exitFlag):
     print('Restarted {} times'.format(restart_cntr))
 
 
-def machinelearning(exitFlag):
+def machinelearning():
     rx_bits = 16  # The AIR-T's ADC is 16 bits
 
     while not exitFlag:
@@ -92,10 +92,10 @@ def machinelearning(exitFlag):
 
 
 if __name__ == '__main__':
-    rec = threading.Thread(target=receiver, kwargs={freq=freq, N=N, exitFlag=exitFlag})
+    rec = threading.Thread(target=receiver, args=(freq, N))
     rec.start()
 
-    ml = threading.Thread(target=machinelearning, kwargs={exitFlag=exitFlag})
+    ml = threading.Thread(target=machinelearning)
     ml.start()
 
     # gracefully end program
