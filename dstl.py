@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import time
 import argparse
 import threading
-import Queue
+from queue import Queue
 import logging
 
 
