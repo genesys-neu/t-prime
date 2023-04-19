@@ -21,7 +21,7 @@ q = Queue(buffer_size)
 
 class ReceiverThread(threading.Thread):
     def __init__(self, name=None, target=None, freq=2.457e9):
-        super(ProducerThread,self).__init__()
+        super(ReceiverThread, self).__init__()
         self.target = target
         self.name = name
         self.freq = freq
@@ -64,7 +64,7 @@ class ReceiverThread(threading.Thread):
 
 class MLThread(threading.Thread):
     def __init__(self, name=None, target=None):
-        super(ConsumerThread,self).__init__()
+        super(MLThread, self).__init__()
         self.target = target
         self.name = name
 
