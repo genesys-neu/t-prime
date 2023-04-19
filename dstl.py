@@ -14,8 +14,7 @@ from queue import Queue
 
 
 N = 12900 # number of complex samples needed
-buffer_size = N*2*1000
-q = Queue(buffer_size)
+q = Queue(1000)
 freq = 2.457e9  # LO tuning frequency in Hz
 exitFlag = 0
 
@@ -56,7 +55,7 @@ def receiver(freq, N):
             restart_cntr = restart_cntr + 1
         if not q.full():
             q.put(rx_buff)
-            print('Putting ' + str(rx_buff) + ' : ' + str(q.qsize()) + ' items in queue')
+            # print('Putting ' + str(rx_buff) + ' : ' + str(q.qsize()) + ' items in queue')
 
     sdr.deactivateStream(rx_stream)
     sdr.closeStream(rx_stream)
@@ -70,16 +69,16 @@ def machinelearning():
     while not exitFlag:
         if not q.empty():
             item = q.get()
-            print('Getting ' + str(item) + ' : ' + str(q.qsize()) + ' items in queue')
+            print(str(q.qsize()) + ' items in queue')
 
             ############################################################################################
             # Process Signal
             ############################################################################################
             # Convert interleaved shorts (received signal) to numpy.complex64 normalized between [-1, 1]
             s0 = item.astype(float) / np.power(2.0, rx_bits - 1)
-            print('s0 {}'.format(s0.size))
+            # print('s0 {}'.format(s0.size))
             s = (s0[::2] + 1j * s0[1::2])
-            print('s {}'.format(s.size))
+            # print('s {}'.format(s.size))
 
             # Low-Pass Filter
             taps = firwin(numtaps=101, cutoff=10e6, fs=fs)
@@ -90,7 +89,7 @@ def machinelearning():
             resampled_samples = resample_poly(lpf_samples, 16, 25)
             # 16*31.25=500,20*25=500(need LCM because input needs to be an int).
             # So we go up by factor of 16, then down by factor of 25 to reach final samp_rate of 20e6
-            print('resampled_samples {}'.format(resampled_samples.size))
+            # print('resampled_samples {}'.format(resampled_samples.size))
 
 
 if __name__ == '__main__':
