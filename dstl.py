@@ -14,10 +14,11 @@ from queue import Queue
 
 
 N = 12900 # number of complex samples needed
-buffer_size = N*2*1e6
+buffer_size = N*2*1000
 q = Queue(buffer_size)
 freq = 2.457e9  # LO tuning frequency in Hz
 exitFlag = 0
+
 
 
 # producer task
@@ -39,9 +40,11 @@ def receiver(freq, N):
     rx_buff = np.empty(2 * N, np.int16)  # Create memory buffer for data stream
     rx_stream = sdr.setupStream(SOAPY_SDR_RX, SOAPY_SDR_CS16, [rx_chan])  # Setup data stream
     sdr.activateStream(rx_stream)  # this turns the radio on
+    file_cntr = 0
 
     while not exitFlag:
         sr = sdr.readStream(rx_stream, [rx_buff], N, timeoutUs=timeout_us)
+        file_cntr = file_cntr + 1
         rc = sr.ret  # number of samples read or the error code
         if rc != N:
             print('Error {} after {} attempts at reading the buffer'.format(sr.ret, file_cntr))
