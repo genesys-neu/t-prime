@@ -14,7 +14,8 @@ from queue import Queue
 
 
 N = 12900 # number of complex samples needed
-q = Queue(500) # this will ensure the buffer always has enough to recover from a restart
+q = Queue(5)
+q2 = Queue(5)
 # our decisions will also be delayed by 206 ms once the buffer is full
 freq = 2.457e9  # LO tuning frequency in Hz
 exitFlag = 0
@@ -63,7 +64,7 @@ def receiver(freq, N):
     print('Restarted {} times'.format(restart_cntr))
 
 
-def machinelearning():
+def signalprocessing():
     rx_bits = 16  # The AIR-T's ADC is 16 bits
     fs = 31.25e6  # Radio sample Rate
 
@@ -91,11 +92,24 @@ def machinelearning():
             # 16*31.25=500,20*25=500(need LCM because input needs to be an int).
             # So we go up by factor of 16, then down by factor of 25 to reach final samp_rate of 20e6
             # print('resampled_samples {}'.format(resampled_samples.size))
+            if not q2.full():
+                q2.put(resampled_samples)
+                # print('Putting ' + str(rx_buff) + ' : ' + str(q.qsize()) + ' items in queue')
+
+
+def machinelearning():
+    while not exitFlag:
+        if not q2.empty():
+            input = q2.get()
+            print(str(q2.qsize()) + ' items in queue 2')
 
 
 if __name__ == '__main__':
     rec = threading.Thread(target=receiver, args=(freq, N))
     rec.start()
+
+    sp = threading.Thread(target=signalprocessing)
+    sp.start()
 
     ml = threading.Thread(target=machinelearning)
     ml.start()
@@ -105,4 +119,6 @@ if __name__ == '__main__':
     exitFlag = 1
 
     rec.join()
+    sp.join()
     ml.join()
+
