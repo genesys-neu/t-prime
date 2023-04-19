@@ -94,7 +94,7 @@ def signalprocessing():
             # print('resampled_samples {}'.format(resampled_samples.size))
             if not q2.full():
                 q2.put(resampled_samples)
-                # print('Putting ' + str(rx_buff) + ' : ' + str(q.qsize()) + ' items in queue')
+                print(str(q2.qsize()) + ' items in queue')
 
 
 def machinelearning():
