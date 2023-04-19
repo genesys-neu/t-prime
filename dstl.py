@@ -22,7 +22,7 @@ exitFlag = 0
 
 
 # producer task
-def receiver(freq, N):
+def receiver(freq, N, exitFlag):
     rx_chan = 0  # RX1 = 0, RX2 = 1
     fs = 31.25e6  # Radio sample Rate
 
@@ -63,9 +63,9 @@ def receiver(freq, N):
     print('Restarted {} times'.format(restart_cntr))
 
 
-def machinelearning():
+def machinelearning(exitFlag):
     rx_bits = 16  # The AIR-T's ADC is 16 bits
-    
+
     while not exitFlag:
         if not q.empty():
             item = q.get()
@@ -92,15 +92,15 @@ def machinelearning():
 
 
 if __name__ == '__main__':
-    rec = threading.Thread(target=receiver, args=(freq,N))
+    rec = threading.Thread(target=receiver, args=(freq,N, exitFlag))
     rec.start()
 
-    ml = threading.Thread(target=machinelearning)
+    ml = threading.Thread(target=machinelearning, args=(exitFlag))
     ml.start()
 
     # gracefully end program
     # TODO - how do we gracefully kill this?
-    time.sleep(120)
+    time.sleep(30)
     exitFlag = 1 # this doesn't seem to work
 
     rec.join()
