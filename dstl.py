@@ -14,8 +14,8 @@ from queue import Queue
 
 
 N = 12900 # number of complex samples needed
-q = Queue(5)
-q2 = Queue(5)
+q = Queue(3)
+q2 = Queue(3)
 # our decisions will also be delayed by 206 ms once the buffer is full
 freq = 2.457e9  # LO tuning frequency in Hz
 exitFlag = 0
@@ -94,14 +94,14 @@ def signalprocessing():
             # print('resampled_samples {}'.format(resampled_samples.size))
             if not q2.full():
                 q2.put(resampled_samples)
-                print(str(q2.qsize()) + ' items in queue')
+                #print(str(q2.qsize()) + ' items in queue 2')
 
 
 def machinelearning():
     while not exitFlag:
         if not q2.empty():
             input = q2.get()
-            print(str(q2.qsize()) + ' items in queue 2')
+            #print(str(q2.qsize()) + ' items in queue 2')
 
 
 if __name__ == '__main__':
@@ -115,7 +115,7 @@ if __name__ == '__main__':
     ml.start()
 
     # gracefully end program
-    time.sleep(120)
+    time.sleep(60)
     exitFlag = 1
 
     rec.join()
