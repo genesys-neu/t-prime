@@ -24,7 +24,7 @@ fs = 31.25e6  # Radio sample Rate
 
 
 # producer task
-def receiver(freq):
+def receiver():
     rx_chan = 0  # RX1 = 0, RX2 = 1
 
     use_agc = True  # Use or don't use the AGC
@@ -113,7 +113,9 @@ def machinelearning():
 
 
 if __name__ == '__main__':
-    rec = threading.Thread(target=receiver, args=(freq))
+    # TODO add argparsing here
+        
+    rec = threading.Thread(target=receiver)
     rec.start()
 
     sp = threading.Thread(target=signalprocessing)
