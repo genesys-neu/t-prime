@@ -14,8 +14,8 @@ from queue import Queue
 
 
 N = 12900 # number of complex samples needed
-q = Queue(3)
-q2 = Queue(3)
+q = Queue(2)
+q2 = Queue(2)
 # our decisions will also be delayed by 206 ms once the buffer is full
 freq = 2.457e9  # LO tuning frequency in Hz
 exitFlag = 0
@@ -53,7 +53,7 @@ def receiver():
             sdr.deactivateStream(rx_stream)  # turn off the stream
             sdr.activateStream(rx_stream)  # turn on the stream again
             t2 = time.perf_counter()
-            print('restarting the stream took {} s'.format(t2 - t1))
+            print('restarting the stream took {} ms'.format(1000*(t2 - t1)))
             restart_cntr = restart_cntr + 1
         if not q.full():
             q.put(rx_buff)
@@ -70,9 +70,9 @@ def signalprocessing():
     while not exitFlag:
         if not q.empty():
             t1 = time.perf_counter()
-            s_final = np.empty(1,16384)
+            s_final = np.empty(16384)
             item = q.get()
-            print(str(q.qsize()) + ' items in queue')
+            # print(str(q.qsize()) + ' items in queue')
 
             ############################################################################################
             # Process Signal
@@ -92,18 +92,20 @@ def signalprocessing():
             resampled_samples = resample_poly(lpf_samples, 16, 25)
             # 16*31.25=500,20*25=500(need LCM because input needs to be an int).
             # So we go up by factor of 16, then down by factor of 25 to reach final samp_rate of 20e6
-            print('resampled_samples {}, # {}'.format(resampled_samples, resampled_samples.size))
+            # print('resampled_samples {}, # {}'.format(resampled_samples, resampled_samples.size))
 
             # convert to ML input
             s_final[::2] = resampled_samples.real
             s_final[1::2] = resampled_samples.imag
-            print('final s {}, # {}'.format(s_final, s_final.size))
+            # print('final s {}, # {}'.format(s_final, s_final.size))
 
             if not q2.full():
                 q2.put(s_final)
                 #print(str(q2.qsize()) + ' items in queue 2')
             t2 = time.perf_counter()
             print("signal processing took {} ms".format(1000*(t2-t1)))
+        else:
+            print('q is empty!')
 
 
 def machinelearning():
