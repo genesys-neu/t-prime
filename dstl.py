@@ -70,6 +70,7 @@ def signalprocessing():
     while not exitFlag:
         if not q.empty():
             t1 = time.perf_counter()
+            s_final = np.empty(1,16384)
             item = q.get()
             print(str(q.qsize()) + ' items in queue')
 
@@ -99,7 +100,7 @@ def signalprocessing():
             print('final s {}, # {}'.format(s_final, s_final.size))
 
             if not q2.full():
-                q2.put(resampled_samples)
+                q2.put(s_final)
                 #print(str(q2.qsize()) + ' items in queue 2')
             t2 = time.perf_counter()
             print("signal processing took {} ms".format(1000*(t2-t1)))
@@ -114,7 +115,7 @@ def machinelearning():
 
 if __name__ == '__main__':
     # TODO add argparsing here
-        
+
     rec = threading.Thread(target=receiver)
     rec.start()
 
