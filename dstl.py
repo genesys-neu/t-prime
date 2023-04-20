@@ -19,13 +19,13 @@ q2 = Queue(3)
 # our decisions will also be delayed by 206 ms once the buffer is full
 freq = 2.457e9  # LO tuning frequency in Hz
 exitFlag = 0
+fs = 31.25e6  # Radio sample Rate
 
 
 
 # producer task
-def receiver(freq, N):
+def receiver(freq):
     rx_chan = 0  # RX1 = 0, RX2 = 1
-    fs = 31.25e6  # Radio sample Rate
 
     use_agc = True  # Use or don't use the AGC
     timeout_us = int(5e6)
@@ -66,10 +66,10 @@ def receiver(freq, N):
 
 def signalprocessing():
     rx_bits = 16  # The AIR-T's ADC is 16 bits
-    fs = 31.25e6  # Radio sample Rate
 
     while not exitFlag:
         if not q.empty():
+            t1 = time.perf_counter()
             item = q.get()
             print(str(q.qsize()) + ' items in queue')
 
@@ -91,10 +91,18 @@ def signalprocessing():
             resampled_samples = resample_poly(lpf_samples, 16, 25)
             # 16*31.25=500,20*25=500(need LCM because input needs to be an int).
             # So we go up by factor of 16, then down by factor of 25 to reach final samp_rate of 20e6
-            # print('resampled_samples {}'.format(resampled_samples.size))
+            print('resampled_samples {}, # {}'.format(resampled_samples, resampled_samples.size))
+
+            # convert to ML input
+            s_final[::2] = resampled_samples.real
+            s_final[1::2] = resampled_samples.imag
+            print('final s {}, # {}'.format(s_final, s_final.size))
+
             if not q2.full():
                 q2.put(resampled_samples)
                 #print(str(q2.qsize()) + ' items in queue 2')
+            t2 = time.perf_counter()
+            print("signal processing took {} ms".format(1000*(t2-t1)))
 
 
 def machinelearning():
@@ -105,7 +113,7 @@ def machinelearning():
 
 
 if __name__ == '__main__':
-    rec = threading.Thread(target=receiver, args=(freq, N))
+    rec = threading.Thread(target=receiver, args=(freq))
     rec.start()
 
     sp = threading.Thread(target=signalprocessing)
