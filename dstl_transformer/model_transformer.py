@@ -89,3 +89,54 @@ class PositionalEncoding(nn.Module):
         # x = x + self.pe[:x.size(0)]
         x = x + self.pe[:, :x.size(1)]
         return self.dropout(x)
+
+class TransformerModel_v2(nn.Module):
+
+    def __init__(self, d_model: int = 512, seq_len: int = 64, nhead: int = 8, nlayers: int = 2,
+                 dropout: float = 0.1, classes: int = 4, use_pos: bool = False):
+        super(TransformerModel_v2, self).__init__()
+        self.model_type = 'Transformer'
+
+        self.norm = nn.LayerNorm(d_model)
+        # create the positional encoder
+        self.use_positional_enc = use_pos
+        self.pos_encoder = PositionalEncoding(d_model, dropout)
+        # define [CLS] token to be used for classification
+        self.cls_token = torch.nn.Parameter(torch.randn(1, 1, d_model))
+        # define the encoder layers
+        encoder_layers = TransformerEncoderLayer(d_model, nhead, batch_first=True)
+        self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
+        self.d_model = d_model
+
+        # we will not use the decoder
+        # instead we will add a linear layer, another scaled dropout layer, and finally a classifier layer
+        self.pre_classifier = torch.nn.Linear(d_model, d_model)
+        self.dropout = torch.nn.Dropout(0.2)
+        self.classifier = torch.nn.Linear(d_model, classes)
+        self.logSoftmax = nn.LogSoftmax(dim=1)
+
+
+    def forward(self, src: Tensor) -> Tensor:
+        """
+        Args:
+            src: Tensor, shape [batch_size, seq_len, features]
+        Returns:
+            output classifier label
+        """
+
+        # We normalize the input weights 
+        cls_tokens = self.cls_token.repeat(src.size(0),1,1)
+        src = torch.column_stack((cls_tokens, src))
+        src = self.norm(src)
+        # ToDo: The positional encoder is changing the dimensions in a way I don't understand
+        if self.use_positional_enc:
+            src = self.pos_encoder(src).squeeze()
+        t_out = self.transformer_encoder(src)
+        # get hidden state of the [CLS] token
+        t_out = t_out[:,0,:].squeeze()
+        pooler = self.pre_classifier(t_out)
+        pooler = torch.nn.ReLU()(pooler)
+        pooler = self.dropout(pooler)
+        output = self.classifier(pooler)
+        output = self.logSoftmax(output)
+        return output

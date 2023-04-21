@@ -9,6 +9,7 @@ proj_root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.
 import sys
 sys.path.append(proj_root_dir)
 sys.path.insert(0, '../')
+import argparse
 from dstl_transformer.model_transformer import TransformerModel
 from cnn_baseline.model_cnn1d import Baseline_CNN1D
 from tqdm import tqdm
@@ -146,7 +147,6 @@ def validate(model, class_map, input_shape, seq_len, sli_len, channel, cnn=False
                         pred = dnn.output_buff.host.reshape((batch_size,4))
                         # add correct ones
                         correct[i] += (pred.argmax(1) == y).sum().item()
-
                 if i == 0:
                     total_samples += len(idxs)
 
@@ -155,6 +155,7 @@ def validate(model, class_map, input_shape, seq_len, sli_len, channel, cnn=False
     return correct/total_samples*100
 
 if __name__ == "__main__":
+
     y_trans_lg, y_trans_sm, y_cnn = [], [], []
     models = ['trans_lg', 'trans_sm', 'cnn']
     #models = ['cnn']
@@ -247,10 +248,7 @@ if __name__ == "__main__":
                 print(f'Accuracy values for channel {channel} and small architecture are: ', y_trans_sm[-1])
 
 
-
     
-    with open('test_results_uniformdist.txt', 'w') as f:
-        f.write(str(y_trans_lg) + '%' + str(y_trans_sm) + '%' + str(y_cnn))
     fig, ax = plt.subplots(2, 2, figsize = (12, 6))
 
     for i in range(2):
@@ -266,4 +264,10 @@ if __name__ == "__main__":
     plt.suptitle('Results comparison between different architectures')
     fig.legend(MODELS, bbox_to_anchor=(0.87, 0.02), ncols=3, labelspacing=1)
     plt.tight_layout() 
-    plt.savefig('TESTING.png')
+    if args.experiment == '1':
+        img_name = 'Testing_noiseandchannel.png'
+    elif args.experiment == '2':
+        img_name = 'Testing_modelperchannel.png'
+    else: # experiment 3
+        img_name = 'Testing_onemodel.png'
+    plt.savefig(img_name) 

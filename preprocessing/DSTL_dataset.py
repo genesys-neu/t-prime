@@ -46,12 +46,14 @@ class DSTLDataset(Dataset):
                  slice_overlap_ratio=0.5,   # this is the overlap ratio for each slice generated from a signal
                                             # this value will affect the number of slices that is possible to create from each signal
                  raw_data_ratio=1.0,        # ratio of the whole raw signal dataset to consider for generation
+                 test_ratio=0.2,
                  ds_path='/home/miquelsirera/Desktop/dstl/data/DSTL_DATASET_1_1',
                  file_postfix='',
                  noise_model='AWGN', snr_dbs=[30], seed=4389,
                  apply_noise=True, apply_wchannel=None,
                  override_gen_map=False,
                  normalize=False,
+                 ota=False, # OVER THE AIR
                  transform=None, target_transform=None):
 
         self.protocols = protocols
@@ -61,18 +63,25 @@ class DSTLDataset(Dataset):
         self.raw_data_ratio = raw_data_ratio
         self.n_sig_per_class = {} # this will be filled in the generate_ds_map() function
         self.noise_model = noise_model
+        self.ota = ota
         self.snr_dbs = snr_dbs
         self.seed = seed
         self.ds_path = ds_path
+        self.test_ratio = test_ratio
         if not (self.seed is None):
             np.random.seed(self.seed)
 
+        if ota:
+            assert(apply_wchannel is None)
 
         assert(ds_type in ['train', 'test'])
         self.ds_type = ds_type
         if file_postfix != '' and file_postfix[-1] != '_':
             file_postfix += '__'
-        info_filename = 'ds_info__'+file_postfix+'slice'+str(slice_len)+'_'+str(len(protocols))+'class.pkl'
+        if not ota:
+            info_filename = 'ds_info__'+file_postfix+'slice'+str(slice_len)+'_'+str(len(protocols))+'class.pkl'
+        else: # over the air
+            info_filename = 'ds_info__'+file_postfix+'slice'+str(slice_len)+'_'+str(len(protocols))+'class_ota.pkl'
         ds_info_path = os.path.join(self.ds_path, info_filename)
         do_gen_info = True
         if os.path.exists(ds_info_path) and (not override_gen_map):
@@ -81,7 +90,7 @@ class DSTLDataset(Dataset):
             do_gen_info = False
 
         if do_gen_info:
-            self.ds_info = self.generate_ds_map(ds_path, info_filename)
+            self.ds_info = self.generate_ds_map(ds_path, info_filename, test_ratio)
         else:
             self.ds_info = pickle.load(open(ds_info_path, 'rb'))
 
@@ -134,7 +143,7 @@ class DSTLDataset(Dataset):
         for i, p in enumerate(self.protocols):
             path = os.path.join(ds_path, p)
             if os.path.isdir(path):
-                mat_list = sorted(glob(os.path.join(path, '*.mat')))
+                mat_list = sorted(glob(os.path.join(path, '*.bin'))) if self.ota else sorted(glob(os.path.join(path, '*.mat')))
                 self.n_sig_per_class[p] = int(
                     len(mat_list) * self.raw_data_ratio)  # for each protocol, we save the amount of raw signals to retain
 
@@ -160,8 +169,13 @@ class DSTLDataset(Dataset):
         ixs_count = 0
         for c in tqdm(examples_map.keys(), desc='Analyzing signal dataset...'):
             for ix, path in examples_map[c].items():
-                sig = sio.loadmat(path)
-                len_sig = sig['waveform'].shape[0]
+                if not self.ota: # simulation files
+                    sig = sio.loadmat(path)
+                    len_sig = sig['waveform'].shape[0]
+                else:
+                    # read binary files and get length
+                    sig = np.fromfile(path, dtype=np.complex128)
+                    len_sig = sig.shape[0]
                 window_ixs = self.generate_windows(len_sig)
                 n_windows = len(window_ixs)
                 examples_map[c][ix] = {'sample': window_ixs, # sample is slice for CNN or sequence for Transformer
@@ -240,10 +254,15 @@ class DSTLDataset(Dataset):
                 dataset['data'][s_idx]['path'] = os.path.join(self.ds_path, dirname, filename)
                 # re-obtain the observation info dict
                 obs_info = dataset['data'][s_idx]
+            if not self.ota:
+                mat_dict = sio.loadmat(obs_info['path'])
+                self.signal_cache.put(obs_info['path'], {'np': mat_dict['waveform'], \
+                            'mat': self.mateng.py2mat_array(mat_dict['waveform']) if not (self.apply_wchannel is None) else ''})
+            else:
+                mat_dict = np.fromfile(obs_info['path'])
+                mat_dict = np.expand_dims(mat_dict, axis=1)
+                self.signal_cache.put(obs_info['path'], {'np': mat_dict, 'mat': ''}) # WCHANNEL SHOULD ALWAYS BE NONE WITH OTA SAMPLES
 
-            mat_dict = sio.loadmat(obs_info['path'])
-            self.signal_cache.put(obs_info['path'], {'np': mat_dict['waveform'], \
-                        'mat': self.mateng.py2mat_array(mat_dict['waveform']) if not (self.apply_wchannel is None) else ''})
             sig_dict = self.signal_cache.get(obs_info['path'])
 
         label = dataset['labels'][s_idx]
@@ -252,7 +271,6 @@ class DSTLDataset(Dataset):
         noisy_sig = self.apply_AWGN(chan_sig) if self.apply_noise else chan_sig
 
         # then, retrieve the relative slice of the requested dataset sample
-        
         obs = self.retrieve_obs(noisy_sig, obs_info)
         if self.target_transform:
             label = self.target_transform(label)
@@ -308,7 +326,9 @@ class DSTLDataset(Dataset):
             assert(not ('802_11b' in self.protocols))
             if self.apply_wchannel == 'random':
                 # It is important that the protocols are in the following order 802_11ax, 802_11b_upsampled, 802_11n, 802_11g
-                chan_ix = np.random.randint(3)
+                chan_ix = np.random.randint(4)
+                if chan_ix == 3: # no channel applied
+                    return np.array(mat_sig)
             else:
                 chan_ix = self.channel_map[self.apply_wchannel]
             channel = self.chan_models[chan_ix]
@@ -349,8 +369,8 @@ class DSTLDataset_Transformer(DSTLDataset):
         obs = [obs[i:i+self.slice_len*2] for i in slice_ixs]
         return np.asarray(obs)
     
+    
 if __name__ == "__main__":
-
 
     import argparse
 
