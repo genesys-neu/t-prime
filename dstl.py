@@ -138,6 +138,7 @@ if __name__ == '__main__':
     parser.add_argument('-fq', '--frequency', help='center frequency, default is 2.457e9', type=float)
     parser.add_argument('-t', '--timeout', help='amount of time (in seconds) to run before graceful exit, '
                                                 'default is 60s', type=int)
+    args = parser.parse_args()
 
     if args.frequency:
         freq = args.frequency
