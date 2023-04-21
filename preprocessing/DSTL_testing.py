@@ -12,16 +12,31 @@ sys.path.insert(0, '../')
 import argparse
 from dstl_transformer.model_transformer import TransformerModel
 from cnn_baseline.model_cnn1d import Baseline_CNN1D
-
+from tqdm import tqdm
 # CONFIG
 TEST_DATA_PATH = '/home/miquelsirera/Desktop/dstl/data/DSTL_DATASET_1_1_TEST'
 TRANS_PATH = '/home/miquelsirera/Desktop/dstl/dstl_transformer/model_cp'
 CNN_PATH = '/home/miquelsirera/Desktop/dstl/cnn_baseline/results_slice512'
 MODELS = ["Trans. (64 x 128) [6.8M params]", "Trans. (24 x 64) [1.6M params]", "CNN (1 x 512) [4.1M params]"]
 PROTOCOLS = ['802_11ax', '802_11b_upsampled', '802_11n', '802_11g']
-CHANNELS = ['None', 'TGn', 'TGax', 'Rayleigh']
+#CHANNELS = ['None', 'TGn', 'TGax', 'Rayleigh']
 SNR = [-30.0, -25.0, -20.0, -15.0, -10.0, -5.0, 0.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0]
+CHANNELS = ['None']
+MODE = 'TensorRT' # choices=['pytorch', 'TensorRT']
+if MODE == 'TensorRT':
+    TEST_DATA_PATH = '/home/deepwave/Research/DSTL/dstl/data/DSTL_DATASET_1_1_TEST'
+    TRANS_PATH = '/home/deepwave/Research/DSTL/dstl/dstl_transformer/model_cp'
+    CNN_PATH = '/home/deepwave/Research/DSTL/dstl/cnn_baseline/results_slice512'
+    import tensorrt as trt
+    from inference.onnx2plan import onnx2plan
+    from inference.plan_bench import plan_bench
+    import inference.trt_utils as trt_utils
+
+INPUT_NODE_NAME = 'input_buffer'  # (for TensorRT) User defined name of input node
+OUTPUT_NODE_NAME = 'output_buffer'  # User defined name of output node
+ONNX_VERSION = 10  # the ONNX version to export the model to
 np.random.seed(4389) # for reproducibility
+
 
 def apply_AWGN(snr_dbs, sig):
     # apply AWGN noise based on the levels specified when instantiating the dataset object
@@ -57,14 +72,20 @@ def chan2sequence(obs):
     seq[1::2] = obs[1]
     return seq
 
-def validate(model, class_map, seq_len, sli_len, channel, cnn=False):
+def validate(model, class_map, input_shape, seq_len, sli_len, channel, cnn=False, mode='pytorch', plan_file_name='', input_dtype=np.float32, max_samples_p_protocol=99999):
+    assert((mode == 'pytorch') or (mode == 'TensorRT'))
     correct = np.zeros(len(SNR))
     total_samples = 0
     prev_time = time.time()
+    if mode == 'TensorRT':
+        # Setup the pyCUDA context
+        trt_utils.make_cuda_context()
+
     for p in PROTOCOLS:
+        print('Protocol ',p)
         path = os.path.join(TEST_DATA_PATH, p) if channel == 'None' else os.path.join(TEST_DATA_PATH, p, channel)
         mat_list = sorted(glob(os.path.join(path, '*.mat'))) if channel == 'None' else sorted(glob(os.path.join(path, '*.npy')))
-        for signal_path in mat_list:
+        for signal_path in tqdm(mat_list[:max_samples_p_protocol], desc=f"TEST signal dataset, protocol {p}..."):
             sig = sio.loadmat(signal_path) if channel == 'None' else np.load(signal_path)
             if channel == 'None':
                 sig = sig['waveform']
@@ -79,7 +100,7 @@ def validate(model, class_map, seq_len, sli_len, channel, cnn=False):
                 if not cnn: # Transformer architecture
                     obs = chan2sequence(obs)
                     # generate idxs for split
-                    idxs = list(range(seq_len*sli_len*2, len_sig, seq_len*sli_len*2)) # *2 because I and Q are already zipped
+                    idxs = list(range(seq_len*sli_len, len_sig, seq_len*sli_len))
                     # split stream in sequences
                     obs = np.split(obs, idxs)[:-1]
                     # split each sequence in slices
@@ -89,117 +110,144 @@ def validate(model, class_map, seq_len, sli_len, channel, cnn=False):
                     # generate idxs for split
                     idxs = list(range(sli_len, len_sig, sli_len))
                     obs = np.split(obs, idxs, axis=1)[:-1]
-                # create batch of sequences
-                X = np.asarray(obs)
-                # predict
-                X = torch.from_numpy(X)
-                X = X.to(device)
-                y = np.empty(len(idxs))
-                y.fill(class_map[p])
-                y = torch.from_numpy(y)
-                y = y.to(device)
-                pred = model(X.float())
-                # add correct ones
-                correct[i] += (pred.argmax(1) == y).type(torch.float).sum().item()
+
+                if mode == 'pytorch':
+                    # create batch of sequences
+                    X = np.asarray(obs)
+                    # predict
+                    X = torch.from_numpy(X)
+                    y = np.empty(len(idxs))
+                    y.fill(class_map[p])
+                    y = torch.from_numpy(y)
+                    X = X.to(model.device.type)
+                    y = y.to(model.device.type)
+                    pred = model(X.float())
+                    # add correct ones
+                    correct[i] += (pred.argmax(1) == y).type(torch.float).sum().item()
+
+                elif mode == 'TensorRT':
+                    # Use pyCUDA to create a shared memory buffer that will receive samples from the
+                    # AIR-T to be fed into the neural network.
+                    batch_size, seq_len, cplx_samples = input_shape
+                    buff_len = seq_len * cplx_samples * batch_size
+                    sample_buffer = trt_utils.MappedBuffer(buff_len, input_dtype)
+
+                    # Set up the inference engine. Note that the output buffers are created for
+                    # us when we create the inference object.
+                    dnn = trt_utils.TrtInferFromPlan(plan_file_name, batch_size,
+                                                     sample_buffer, verbose=False)
+
+                    # Populate input buffer with test data
+                    for bix in range(0,len(obs),batch_size):
+                        X = np.asarray(obs[bix:bix+batch_size])
+                        dnn.input_buff.host[:] = X.flatten().astype(input_dtype)
+                        y = np.empty(batch_size)
+                        y.fill(class_map[p])
+                        dnn.feed_forward()
+                        pred = dnn.output_buff.host.reshape((batch_size,4))
+                        # add correct ones
+                        correct[i] += (pred.argmax(1) == y).sum().item()
                 if i == 0:
                     total_samples += len(idxs)
-        print("--- %s seconds for protocol ---" % (time.time() - prev_time))
+
+        print("\n --- %s seconds for protocol ---" % (time.time() - prev_time))
         prev_time = time.time()
     return correct/total_samples*100
 
-
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--experiment", default='3', choices=['1', '2', '3'], help="Decide which models to test, 1 is for specific model per \
-                        noise and channel, 2 is for specific model per channel and 3 is for single model for all channel and noise conditions")
-    parser.add_argument("--use_gpu", action='store_true', default=False, help="Use gpu for inference")
-    args, _ = parser.parse_known_args()
+
+    y_trans_lg, y_trans_sm, y_cnn = [], [], []
+    models = ['trans_lg', 'trans_sm', 'cnn']
+    #models = ['cnn']
     class_map = dict(zip(PROTOCOLS, range(len(PROTOCOLS))))
+    batch_size = 1
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    for channel in CHANNELS:
+        for m in models:
 
-    device = torch.device("cuda" if torch.cuda.is_available() and args.use_gpu else "cpu")
+            if m == 'cnn':
+                cnn = Baseline_CNN1D(classes=len(PROTOCOLS), numChannels=2, slice_len=512)
+                cnn.load_state_dict(torch.load(f"{CNN_PATH}/model.cnn.{channel}.pt", map_location=torch.device('cpu'))['model_state_dict'])
+                cnn.eval()
+                seq_len = 1
+                sli_len = 512
+                isCNN = True
+                ONNX_FILE_NAME = os.path.join(CNN_PATH, f"model.cnn.{channel}.onnx")
+                slice_in = np.random.random((batch_size, 2, sli_len))
+                model = cnn
 
-    if args.experiment == '1': # Evaluate the models trained for a specific noise and channel condition - we took 10.0 dBs as fixed noise during training
-        for channel in CHANNELS:
-            # Load the three models for each channel evaluation
-            model_lg = TransformerModel(classes=len(PROTOCOLS), d_model=128*2, seq_len=64, nlayers=2, use_pos=False)
-            model_lg.load_state_dict(torch.load(f"{TRANS_PATH}/model{channel}_10_lg.pt", map_location=device)['model_state_dict'])
-            model_lg.eval()
-            model_sm = TransformerModel(classes=len(PROTOCOLS), d_model=64*2, seq_len=24, nlayers=2, use_pos=False)
-            model_sm.load_state_dict(torch.load(f"{TRANS_PATH}/model{channel}_10_sm.pt", map_location=device)['model_state_dict'])
-            model_sm.eval()
-            cnn = Baseline_CNN1D(classes=len(PROTOCOLS), numChannels=2, slice_len=512)
-            cnn.load_state_dict(torch.load(f"{CNN_PATH}/model.cnn.{channel}.10.pt", map_location=device)['model_state_dict'])
-            cnn.eval()
-            if args.use_gpu:
-                model_lg.cuda()
-                model_sm.cuda()
-                cnn.cuda()
-            y_trans_lg, y_trans_sm, y_cnn = [], [], []
-            for test_channel in CHANNELS:
-                y_trans_lg.append(validate(model_lg, class_map, seq_len=64, sli_len=128, channel=test_channel))
-                print(f'Accuracy values for channel {test_channel} and large architecture trained for {channel} and 10 dBs are: ', y_trans_lg[-1])
-                y_trans_sm.append(validate(model_sm, class_map, seq_len=24, sli_len=64, channel=test_channel))
-                print(f'Accuracy values for channel {test_channel} and small architecture trained for {channel} and 10 dBs are: ', y_trans_sm[-1])
-                y_cnn.append(validate(cnn, class_map, seq_len=1, sli_len=512, channel=test_channel, cnn=True))
-                print(f'Accuracy values for channel {test_channel} and cnn architecture trained for {channel} and 10 dBs are: ', y_cnn[-1])
-        
-            with open(f'test_results_10dBs_{channel}.txt', 'w') as f:
-                f.write(str(y_trans_lg) + '%' + str(y_trans_sm) + '%' + str(y_cnn))
+            elif m == 'trans_lg':
+                model_lg = TransformerModel(classes=len(PROTOCOLS), d_model=128*2, seq_len=64, nlayers=2, use_pos=False)
+                model_lg.load_state_dict(torch.load(f"{TRANS_PATH}/model{channel}_lg.pt", map_location=torch.device('cpu'))['model_state_dict'])
+                model_lg.eval()
+                seq_len = 64
+                sli_len = 128*2
+                isCNN = False
+                ONNX_FILE_NAME = os.path.join(TRANS_PATH, f"model{channel}_lg.onnx")
+                slice_in = np.random.random((batch_size, seq_len, sli_len))
+                model = model_lg
 
-    elif args.experiment == '2': # Evaluate the models trained for a specific channel condition and variable noise conditions 
-        for channel in CHANNELS:
-            # Load the three models for each channel evaluation
-            model_lg = TransformerModel(classes=len(PROTOCOLS), d_model=128*2, seq_len=64, nlayers=2, use_pos=False)
-            model_lg.load_state_dict(torch.load(f"{TRANS_PATH}/model{channel}_lg.pt", map_location=device)['model_state_dict'])
-            model_lg.eval()
-            model_sm = TransformerModel(classes=len(PROTOCOLS), d_model=64*2, seq_len=24, nlayers=2, use_pos=False)
-            model_sm.load_state_dict(torch.load(f"{TRANS_PATH}/model{channel}_sm.pt", map_location=device)['model_state_dict'])
-            model_sm.eval()
-            cnn = Baseline_CNN1D(classes=len(PROTOCOLS), numChannels=2, slice_len=512)
-            cnn.load_state_dict(torch.load(f"{CNN_PATH}/model.cnn.{channel}.pt", map_location=device)['model_state_dict'])
-            cnn.eval()
-            if args.use_gpu:
-                model_lg.cuda()
-                model_sm.cuda()
-                cnn.cuda()
-            y_trans_lg, y_trans_sm, y_cnn = [], [], []
-            for test_channel in CHANNELS:
-                y_trans_lg.append(validate(model_lg, class_map, seq_len=64, sli_len=128, channel=test_channel))
-                print(f'Accuracy values for channel {test_channel} and large architecture trained for {channel} are: ', y_trans_lg[-1])
-                y_trans_sm.append(validate(model_sm, class_map, seq_len=24, sli_len=64, channel=test_channel))
-                print(f'Accuracy values for channel {test_channel} and small architecture trained for {channel} are: ', y_trans_sm[-1])
-                y_cnn.append(validate(cnn, class_map, seq_len=1, sli_len=512, channel=test_channel, cnn=True))
-                print(f'Accuracy values for channel {test_channel} and cnn architecture trained for {channel} are: ', y_cnn[-1])
-        
-            with open(f'test_results_uniformdist_{channel}.txt', 'w') as f:
-                f.write(str(y_trans_lg) + '%' + str(y_trans_sm) + '%' + str(y_cnn))
-    
-    else: # Experiment 3: # Evaluate the models trained for general noise and channel conditions
-        # Load the three models only one time
-        model_lg = TransformerModel(classes=len(PROTOCOLS), d_model=128*2, seq_len=64, nlayers=2, use_pos=False)
-        model_lg.load_state_dict(torch.load(f"{TRANS_PATH}/modelrandom_lg.pt", map_location=device)['model_state_dict'])
-        model_lg.eval()
-        model_sm = TransformerModel(classes=len(PROTOCOLS), d_model=64*2, seq_len=24, nlayers=2, use_pos=False)
-        model_sm.load_state_dict(torch.load(f"{TRANS_PATH}/modelrandom_sm.pt", map_location=device)['model_state_dict'])
-        model_sm.eval()
-        cnn = Baseline_CNN1D(classes=len(PROTOCOLS), numChannels=2, slice_len=512)
-        cnn.load_state_dict(torch.load(f"{CNN_PATH}/model.cnn.random.pt", map_location=device)['model_state_dict'])
-        cnn.eval()
-        if args.use_gpu:
-            model_lg.cuda()
-            model_sm.cuda()
-            cnn.cuda()
-        y_trans_lg, y_trans_sm, y_cnn = [], [], []
-        for channel in CHANNELS:
-            y_trans_lg.append(validate(model_lg, class_map, seq_len=64, sli_len=128, channel=channel))
-            print(f'Accuracy values for channel {channel} and large architecture are: ', y_trans_lg[-1])
-            y_trans_sm.append(validate(model_sm, class_map, seq_len=24, sli_len=64, channel=channel))
-            print(f'Accuracy values for channel {channel} and small architecture are: ', y_trans_sm[-1])
-            y_cnn.append(validate(cnn, class_map, seq_len=1, sli_len=512, channel=channel, cnn=True))
-            print(f'Accuracy values for channel {channel} and cnn architecture are: ', y_cnn[-1])
-        
-        with open('test_results_uniformdist_onemodel.txt', 'w') as f:
-            f.write(str(y_trans_lg) + '%' + str(y_trans_sm) + '%' + str(y_cnn))
+            elif m == 'trans_sm':
+                model_sm = TransformerModel(classes=len(PROTOCOLS), d_model=64*2, seq_len=24, nlayers=2, use_pos=False)
+                model_sm.load_state_dict(torch.load(f"{TRANS_PATH}/model{channel}_sm.pt", map_location=torch.device('cpu'))['model_state_dict'])
+                model_sm.eval()
+                seq_len = 24
+                sli_len = 64*2
+                isCNN = False
+                ONNX_FILE_NAME = os.path.join(TRANS_PATH, f"model{channel}_sm.onnx")
+                slice_in = np.random.random((batch_size, seq_len, sli_len))
+                model = model_sm
+
+            model.to(device)
+
+            if MODE == 'TensorRT':
+                slice_t = torch.Tensor(slice_in)
+                slice_t = slice_t.to(model.device.type)
+                # Let's produce the ONNX schema of the current model
+                torch.onnx.export(model, slice_t, ONNX_FILE_NAME, export_params=True,
+                                  opset_version=ONNX_VERSION, do_constant_folding=True,
+                                  input_names=[INPUT_NODE_NAME], output_names=[OUTPUT_NODE_NAME],
+                                  dynamic_axes={INPUT_NODE_NAME: {0: 'batch_size'},
+                                                OUTPUT_NODE_NAME: {0: 'batch_size'}})
+                # Then create the relative plan file using TensorRT
+                MAX_WORKSPACE_SIZE = 1073741824  # 1 GB for example
+                onnx2plan(onnx_file_name=ONNX_FILE_NAME, nchan=slice_in.shape[1],
+                          input_len=slice_in.shape[2],  logger=trt.Logger(trt.Logger.WARNING),
+                          MAX_BATCH_SIZE=slice_in.shape[0], MAX_WORKSPACE_SIZE=MAX_WORKSPACE_SIZE,
+                          BENCHMARK=True)
+                print('Running Inference Benchmark')
+                plan_file = ONNX_FILE_NAME.replace('.onnx', '.plan')
+                plan_bench(plan_file_name=plan_file, cplx_samples=slice_in.shape[2], num_chans=slice_in.shape[1],
+                           batch_size=slice_in.shape[0], num_batches=512, input_dtype=np.float32)
+            else:
+                plan_file = ''
+
+
+            y = validate(model,
+                         class_map,
+                         input_shape=slice_in.shape,
+                         seq_len=seq_len,
+                         sli_len=sli_len,
+                         channel=channel,
+                         cnn=isCNN,
+                         mode=MODE,
+                         plan_file_name=plan_file,
+                         max_samples_p_protocol=50)
+
+            if m == 'cnn':
+                y_cnn.append(y)
+                print(f'Accuracy values for channel {channel} and cnn architecture are: ', y_cnn[-1])
+
+
+            elif m == 'trans_lg':
+                y_trans_lg.append(y)
+                print(f'Accuracy values for channel {channel} and large architecture are: ', y_trans_lg[-1])
+
+            elif m == 'trans_sm':
+                y_trans_sm.append(y)
+                print(f'Accuracy values for channel {channel} and small architecture are: ', y_trans_sm[-1])
+
+
     
     fig, ax = plt.subplots(2, 2, figsize = (12, 6))
 

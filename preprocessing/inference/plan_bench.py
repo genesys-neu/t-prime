@@ -9,7 +9,7 @@ Utility script to benchmark the data rate that a neural network will support.
 
 import numpy as np
 import time
-import trt_utils
+import inference.trt_utils as trt_utils
 import argparse
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--plan', help='Indicate the source ONNX file to convert')
