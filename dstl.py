@@ -22,7 +22,7 @@ q2 = Queue(2)
 freq = 2.457e9  # LO tuning frequency in Hz
 exitFlag = 0
 fs = 31.25e6  # Radio sample Rate
-
+t_out = 60
 
 
 # producer task
@@ -119,7 +119,6 @@ def signalprocessing():
 
 def machinelearning():
     # Model configuration and loading
-    # TODO: Adapt for small architecture
     PROTOCOLS = ['802_11ax', '802_11b_upsampled', '802_11n', '802_11g']
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if MODEL_SIZE == 'sm':
@@ -152,14 +151,24 @@ def machinelearning():
             #print(str(q2.qsize()) + ' items in queue 2')
 
 
+# TODO add GUI interface - will this require another threadsafe queue?
 if __name__ == '__main__':
-    # TODO add argparsing here
     parser = argparse.ArgumentParser()
+    parser.add_argument('-fq', '--frequency', help='center frequency, default is 2.457e9', type=float)
+    parser.add_argument('-t', '--timeout', help='amount of time (in seconds) to run before graceful exit, '
+                                                'default is 60s', type=int)
     parser.add_argument("--model_path", default='./', help='Path to the checkpoint to load the model for inference.')
     parser.add_argument("--model_size", default="lg", choices=["sm", "lg"], help="Define the use of the large or the small transformer.")
     args, _ = parser.parse_known_args()
     MODEL_PATH = args.model_path
     MODEL_SIZE = args.model_size
+
+    if args.frequency:
+        freq = args.frequency
+
+    if args.timeout:
+        t_out = args.timeout
+
     rec = threading.Thread(target=receiver)
     rec.start()
 
@@ -170,10 +179,9 @@ if __name__ == '__main__':
     ml.start()
 
     # gracefully end program
-    time.sleep(60)
+    time.sleep(t_out)
     exitFlag = 1
 
     rec.join()
     sp.join()
     ml.join()
-
