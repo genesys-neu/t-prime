@@ -46,6 +46,7 @@ class DSTLDataset(Dataset):
                  slice_overlap_ratio=0.5,   # this is the overlap ratio for each slice generated from a signal
                                             # this value will affect the number of slices that is possible to create from each signal
                  raw_data_ratio=1.0,        # ratio of the whole raw signal dataset to consider for generation
+                 test_ratio=0.2,
                  ds_path='/home/miquelsirera/Desktop/dstl/data/DSTL_DATASET_1_1',
                  file_postfix='',
                  noise_model='AWGN', snr_dbs=[30], seed=4389,
@@ -66,6 +67,7 @@ class DSTLDataset(Dataset):
         self.snr_dbs = snr_dbs
         self.seed = seed
         self.ds_path = ds_path
+        self.test_ratio = test_ratio
         if not (self.seed is None):
             np.random.seed(self.seed)
 
@@ -88,7 +90,7 @@ class DSTLDataset(Dataset):
             do_gen_info = False
 
         if do_gen_info:
-            self.ds_info = self.generate_ds_map(ds_path, info_filename)
+            self.ds_info = self.generate_ds_map(ds_path, info_filename, test_ratio)
         else:
             self.ds_info = pickle.load(open(ds_info_path, 'rb'))
 

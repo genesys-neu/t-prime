@@ -139,10 +139,10 @@ if __name__ == "__main__":
     if args.transformer == 'CNN':
         global_model = Baseline_CNN1D
         model = global_model(classes=len(PROTOCOLS), numChannels=2, slice_len=512)
-        ds_train = DSTLDataset(PROTOCOLS, ds_path=args.ds_path, ds_type='train', slice_len=512, slice_overlap_ratio=0,
+        ds_train = DSTLDataset(PROTOCOLS, ds_path=args.ds_path, ds_type='train', slice_len=512, slice_overlap_ratio=0, test_ratio=0.0,
                            raw_data_ratio=args.dataset_ratio, file_postfix='', override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False)
-        ds_test = DSTLDataset(PROTOCOLS, ds_path=args.ds_path, ds_type='test', slice_len=args.slicelen, slice_overlap_ratio=0, 
-                            raw_data_ratio=args.dataset_ratio, file_postfix='', override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False)
+        ds_test = DSTLDataset(PROTOCOLS, ds_path=args.ds_path, ds_type='train', slice_len=512, slice_overlap_ratio=0, test_ratio=0.0,
+                            raw_data_ratio=args.dataset_ratio + '_TEST', file_postfix='', override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False)
     else:
         # choose correct version
         if args.transformer_version == 'v1':
@@ -153,16 +153,16 @@ if __name__ == "__main__":
         if args.transformer == "sm":
             model = global_model(classes=len(PROTOCOLS), d_model=64*2, seq_len=24, nlayers=2, use_pos=False)
             # Load over the air dataset
-            ds_train = DSTLDataset_Transformer(protocols=PROTOCOLS, ds_path=args.ds_path, ds_type='train', seq_len=24, slice_len=64, slice_overlap_ratio=0, 
+            ds_train = DSTLDataset_Transformer(protocols=PROTOCOLS, ds_path=args.ds_path, ds_type='train', seq_len=24, slice_len=64, slice_overlap_ratio=0, test_ratio=0.0,
                                                raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence)
-            ds_test = DSTLDataset_Transformer(protocols=PROTOCOLS, ds_path=args.ds_path, ds_type='test', seq_len=24, slice_len=64, slice_overlap_ratio=0, 
-                                              raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence)
+            ds_test = DSTLDataset_Transformer(protocols=PROTOCOLS, ds_path=args.ds_path, ds_type='train', seq_len=24, slice_len=64, slice_overlap_ratio=0, test_ratio=0.0,
+                                              raw_data_ratio=args.dataset_ratio + '_TEST', override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence)
         else: # lg
             model = global_model(classes=len(PROTOCOLS), d_model=128*2, seq_len=64, nlayers=2, use_pos=False)
-            ds_train = DSTLDataset_Transformer(protocols=PROTOCOLS, ds_path=args.ds_path, ds_type='train', seq_len=64, slice_len=128, slice_overlap_ratio=0, 
+            ds_train = DSTLDataset_Transformer(protocols=PROTOCOLS, ds_path=args.ds_path, ds_type='train', seq_len=64, slice_len=128, slice_overlap_ratio=0, test_ratio=0.0,
                                                raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence)
-            ds_test = DSTLDataset_Transformer(protocols=PROTOCOLS, ds_path=args.ds_path, ds_type='test', seq_len=64, slice_len=128, slice_overlap_ratio=0, 
-                                              raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence)
+            ds_test = DSTLDataset_Transformer(protocols=PROTOCOLS, ds_path=args.ds_path, ds_type='train', seq_len=64, slice_len=128, slice_overlap_ratio=0, test_ratio=0.0,
+                                              raw_data_ratio=args.dataset_ratio + '_TEST', override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence)
     
     device = torch.device("cuda" if torch.cuda.is_available() and args.use_gpu else "cpu")
     try:
