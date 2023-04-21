@@ -2,6 +2,7 @@
 
 # Import Packages
 import numpy as np
+import torch
 import os
 import SoapySDR
 from SoapySDR import SOAPY_SDR_RX, SOAPY_SDR_CS16
@@ -10,6 +11,7 @@ import matplotlib.pyplot as plt
 import time
 import argparse
 import threading
+from dstl_transformer.model_transformer import TransformerModel
 from queue import Queue
 
 
@@ -116,15 +118,48 @@ def signalprocessing():
 
 
 def machinelearning():
+    # Model configuration and loading
+    # TODO: Adapt for small architecture
+    PROTOCOLS = ['802_11ax', '802_11b_upsampled', '802_11n', '802_11g']
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if MODEL_SIZE == 'sm':
+        seq_len = 24
+        model = TransformerModel(classes=len(PROTOCOLS), d_model=64*2, seq_len=seq_len, nlayers=2, use_pos=False)
+    else: # lg architecture
+        seq_len = 64
+        model = TransformerModel(classes=len(PROTOCOLS), d_model=128*2, seq_len=seq_len, nlayers=2, use_pos=False)
+    try:
+        model.load_state_dict(torch.load(MODEL_PATH)['model_state_dict'])
+    except:
+        raise Exception("The model you provided does not correspond with the selected architecture. Please revise the path and try again.")
+    model.eval()
+    model.to(device)
+
+    preds = [] # list to keep track of model predictions
     while not exitFlag:
         if not q2.empty():
             input = q2.get()
+            # split sequence into words
+            input = np.split(input, seq_len)
+            input = torch.from_numpy(input)
+            # create empty batch dimension
+            input = torch.unsqueeze(input, 0) 
+            input.to(device)
+            # predict class
+            pred = model(input).argmax(1)
+            print(PROTOCOLS[pred])
+            preds.append(pred) # This will need to be sent to GUI 
             #print(str(q2.qsize()) + ' items in queue 2')
 
 
 if __name__ == '__main__':
     # TODO add argparsing here
-
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model_path", default='./', help='Path to the checkpoint to load the model for inference.')
+    parser.add_argument("--model_size", default="lg", choices=["sm", "lg"], help="Define the use of the large or the small transformer.")
+    args, _ = parser.parse_known_args()
+    MODEL_PATH = args.model_path
+    MODEL_SIZE = args.model_size
     rec = threading.Thread(target=receiver)
     rec.start()
 
