@@ -49,7 +49,7 @@ def train(model, criterion, optimizer, dataloader):
             print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
     total_loss /= size
     correct /= size
-    return correct, total_loss
+    return correct*100.0, total_loss
 
 def validate(model, criterion, dataloader, nclasses):
     size = len(dataloader.dataset)
@@ -68,7 +68,7 @@ def validate(model, criterion, dataloader, nclasses):
             conf_matrix += conf_mat(y_cpu, pred_cpu.argmax(1), labels=list(range(nclasses)))
     test_loss /= size
     correct /= size
-    return correct, test_loss, conf_matrix
+    return correct*100.0, test_loss, conf_matrix
 
 def finetune(model, config):
     # Create data loaders
@@ -101,6 +101,10 @@ def finetune(model, config):
                     'loss': loss,
                 }, os.path.join(PATH, MODEL_NAME + '_ft.pt'))
             best_cm = conf_matrix
+    best_cm = best_cm.astype('float')
+    for r in range(best_cm.shape[0]):  # for each row in the confusion matrix
+        sum_row = np.sum(best_cm[r, :])
+        best_cm[r, :] = best_cm[r, :] / sum_row  * 100.0 # compute in percentage
     print('------------------- Best confusion matrix (%) -------------------')
     print(best_cm)
     print('-----------------------------------------------------------------')
@@ -127,7 +131,7 @@ if __name__ == "__main__":
     train_config = {
         'batchSize': 122,
         'lr': 0.00002,
-        'epochs': 5,
+        'epochs': 40,
         'nClasses': 4
     }
 
@@ -199,11 +203,14 @@ if __name__ == "__main__":
         conf_matrix = conf_matrix.astype('float')
         for r in range(conf_matrix.shape[0]):  # for each row in the confusion matrix
             sum_row = np.sum(conf_matrix[r, :])
-            conf_matrix[r, :] = float(conf_matrix[r, :]) / float(sum_row)  * 100.0# compute in percentage
+            conf_matrix[r, :] = conf_matrix[r, :] / sum_row  * 100.0# compute in percentage
 
         # plt.figure(figsize=(10,7))
-        disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=PROTOCOLS)
+        prot_display = PROTOCOLS
+        prot_display[1] = '802_11b'
+        disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=prot_display)
         disp.plot()
+        plt.clim(0, 100)
         plt.savefig(f"Results_finetune_{MODEL_NAME}.{train_config['lr']}.pdf")
         plt.clf()
         print('-------------------------------------------')
