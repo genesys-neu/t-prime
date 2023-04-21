@@ -66,6 +66,7 @@ def receiver():
 
 def signalprocessing():
     rx_bits = 16  # The AIR-T's ADC is 16 bits
+    taps = firwin(numtaps=101, cutoff=10e6, fs=fs)
 
     while not exitFlag:
         if not q.empty():
@@ -82,10 +83,13 @@ def signalprocessing():
             # print('s0 {}'.format(s0.size))
             s = (s0[::2] + 1j * s0[1::2])
             # print('s {}'.format(s.size))
+            t2 = time.perf_counter()
+            print('reading queue and converting to complex float took {} ms'.format(1000*(t2-t1)))
 
             # Low-Pass Filter
-            taps = firwin(numtaps=101, cutoff=10e6, fs=fs)
             lpf_samples = np.convolve(s, taps, 'valid')
+            t3 = time.perf_counter()
+            print('lpf took {} ms'.format(1000*(t3-t2)))
 
             # rational resample
             # Resample to 20e6
@@ -93,6 +97,8 @@ def signalprocessing():
             # 16*31.25=500,20*25=500(need LCM because input needs to be an int).
             # So we go up by factor of 16, then down by factor of 25 to reach final samp_rate of 20e6
             # print('resampled_samples {}, # {}'.format(resampled_samples, resampled_samples.size))
+            t4 = time.perf_counter()
+            print('resampling took {} ms'.format(1000*(t4-t3)))
 
             # convert to ML input
             s_final[::2] = resampled_samples.real
@@ -102,8 +108,9 @@ def signalprocessing():
             if not q2.full():
                 q2.put(s_final)
                 #print(str(q2.qsize()) + ' items in queue 2')
-            t2 = time.perf_counter()
-            print("signal processing took {} ms".format(1000*(t2-t1)))
+            t5 = time.perf_counter()
+            print('final format converstion took {} ms'.format(1000*(t5-t4)))
+            # print("signal processing took {} ms".format(1000*(t5-t1)))
         else:
             print('q is empty!')
 
