@@ -29,6 +29,7 @@ def receiver():
 
     use_agc = True  # Use or don't use the AGC
     timeout_us = int(5e6)
+    time_avg = 0
 
     #  Initialize the AIR-T receiver using SoapyAIRT
     sdr = SoapySDR.Device(dict(driver="SoapyAIRT"))  # Create AIR-T instance
@@ -44,29 +45,33 @@ def receiver():
     restart_cntr = 0
 
     while not exitFlag:
+        t1 = time.perf_counter()
         sr = sdr.readStream(rx_stream, [rx_buff], N, timeoutUs=timeout_us)
         file_cntr = file_cntr + 1
         rc = sr.ret  # number of samples read or the error code
         if rc != N:
-            print('Error {} after {} attempts at reading the buffer'.format(sr.ret, file_cntr))
-            t1 = time.perf_counter()
+            # print('Error {} after {} attempts at reading the buffer'.format(sr.ret, file_cntr))
             sdr.deactivateStream(rx_stream)  # turn off the stream
             sdr.activateStream(rx_stream)  # turn on the stream again
-            t2 = time.perf_counter()
-            print('restarting the stream took {} ms'.format(1000*(t2 - t1)))
+            # print('restarting the stream took {} ms'.format(1000*(t2 - t1)))
             restart_cntr = restart_cntr + 1
         if not q.full():
             q.put(rx_buff)
             # print('Putting ' + str(rx_buff) + ' : ' + str(q.qsize()) + ' items in queue')
+        t2 = time.perf_counter()
+        time_avg = time_avg + (t2-t1)
 
     sdr.deactivateStream(rx_stream)
     sdr.closeStream(rx_stream)
     print('Restarted {} times'.format(restart_cntr))
+    print('Reciever takes {} ms on average to complete {} cycles'.format(1000*time_avg/file_cntr,file_cntr))
 
 
 def signalprocessing():
     rx_bits = 16  # The AIR-T's ADC is 16 bits
     taps = firwin(numtaps=101, cutoff=10e6, fs=fs)
+    time_avg = 0
+    cntr = 0
 
     while not exitFlag:
         if not q.empty():
@@ -81,15 +86,15 @@ def signalprocessing():
             # Convert interleaved shorts (received signal) to numpy.complex64 normalized between [-1, 1]
             s0 = item.astype(float) / np.power(2.0, rx_bits - 1)
             # print('s0 {}'.format(s0.size))
-            s = (s0[::2] + 1j * s0[1::2])
+            s = s0[::2] + 1j * s0[1::2]
             # print('s {}'.format(s.size))
             t2 = time.perf_counter()
-            print('reading queue and converting to complex float took {} ms'.format(1000*(t2-t1)))
+            # print('reading queue and converting to complex float took {} ms'.format(1000*(t2-t1)))
 
             # Low-Pass Filter
             lpf_samples = np.convolve(s, taps, 'valid')
             t3 = time.perf_counter()
-            print('lpf took {} ms'.format(1000*(t3-t2)))
+            # print('lpf took {} ms'.format(1000*(t3-t2)))
 
             # rational resample
             # Resample to 20e6
@@ -98,7 +103,7 @@ def signalprocessing():
             # So we go up by factor of 16, then down by factor of 25 to reach final samp_rate of 20e6
             # print('resampled_samples {}, # {}'.format(resampled_samples, resampled_samples.size))
             t4 = time.perf_counter()
-            print('resampling took {} ms'.format(1000*(t4-t3)))
+            # print('resampling took {} ms'.format(1000*(t4-t3)))
 
             # convert to ML input
             s_final[::2] = resampled_samples.real
@@ -109,11 +114,14 @@ def signalprocessing():
                 q2.put(s_final)
                 #print(str(q2.qsize()) + ' items in queue 2')
             t5 = time.perf_counter()
-            print('final format converstion took {} ms'.format(1000*(t5-t4)))
+            # print('final format converstion took {} ms'.format(1000*(t5-t4)))
             # print("signal processing took {} ms".format(1000*(t5-t1)))
-        else:
-            print('q is empty!')
-
+            time_avg = time_avg + (t5-t1)
+            cntr = cntr + 1
+        # else:
+            # print('q is empty!')
+    
+    print('Signal processor takes {} ms on average to complete {} cycles'.format(1000*time_avg/cntr,cntr))
 
 def machinelearning():
     while not exitFlag:
