@@ -20,6 +20,7 @@ q2 = Queue(2)
 freq = 2.457e9  # LO tuning frequency in Hz
 exitFlag = 0
 fs = 31.25e6  # Radio sample Rate
+t_out = 60
 
 
 
@@ -127,11 +128,22 @@ def machinelearning():
     while not exitFlag:
         if not q2.empty():
             input = q2.get()
-            #print(str(q2.qsize()) + ' items in queue 2')
+            # print(str(q2.qsize()) + ' items in queue 2')
+            # TODO add ML inference code here
 
 
+# TODO add GUI interface - will this require another threadsafe queue?
 if __name__ == '__main__':
-    # TODO add argparsing here
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-fq', '--frequency', help='center frequency, default is 2.457e9', type=float)
+    parser.add_argument('-t', '--timeout', help='amount of time (in seconds) to run before graceful exit, '
+                                                'default is 60s', type=int)
+
+    if args.frequency:
+        freq = args.frequency
+
+    if args.timeout:
+        t_out = args.timeout
 
     rec = threading.Thread(target=receiver)
     rec.start()
@@ -143,7 +155,7 @@ if __name__ == '__main__':
     ml.start()
 
     # gracefully end program
-    time.sleep(60)
+    time.sleep(t_out)
     exitFlag = 1
 
     rec.join()
