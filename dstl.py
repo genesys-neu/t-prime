@@ -83,6 +83,9 @@ def signalprocessing():
         if not q.empty():
             t1 = time.perf_counter()
             s_final = np.empty(16384)
+            if MODEL_SIZE == 'sm':
+                s_final = np.empty(3072)
+
             item = q.get()
             # print(str(q.qsize()) + ' items in queue')
 
@@ -199,6 +202,9 @@ if __name__ == '__main__':
     MODEL_PATH = args.model_path
     MODEL_SIZE = args.model_size
     
+    if MODEL_SIZE == 'sm':
+        N = 2500
+
     rec = threading.Thread(target=receiver)
     rec.start()
 
