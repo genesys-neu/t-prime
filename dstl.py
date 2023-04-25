@@ -63,6 +63,7 @@ def receiver():
             # print('Putting ' + str(rx_buff) + ' : ' + str(q.qsize()) + ' items in queue')
         t2 = time.perf_counter()
         time_avg = time_avg + (t2-t1)
+        # print('Reciver took {} ms'.format(1000*(t2-t1)))
 
     sdr.deactivateStream(rx_stream)
     sdr.closeStream(rx_stream)
@@ -130,6 +131,8 @@ def machinelearning():
     # Model configuration and loading
     PROTOCOLS = ['802_11ax', '802_11b_upsampled', '802_11n', '802_11g']
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # print('Device is {}'.format(device))
+
     if MODEL_SIZE == 'sm':
         seq_len = 24
         model = TransformerModel(classes=len(PROTOCOLS), d_model=64*2, seq_len=seq_len, nlayers=2, use_pos=False)
@@ -137,27 +140,39 @@ def machinelearning():
         seq_len = 64
         model = TransformerModel(classes=len(PROTOCOLS), d_model=128*2, seq_len=seq_len, nlayers=2, use_pos=False)
     try:
-        model.load_state_dict(torch.load(MODEL_PATH)['model_state_dict'])
+        model.load_state_dict(torch.load(MODEL_PATH,map_location=device)['model_state_dict'])
     except:
         raise Exception("The model you provided does not correspond with the selected architecture. Please revise the path and try again.")
-    model.eval()
+    # model.eval()
+    model = model.float()
     model.to(device)
+    model.eval()
 
     preds = [] # list to keep track of model predictions
+    pred_cntr = 0
+    time_avg = 0
     while not exitFlag:
         if not q2.empty():
+            t1 = time.perf_counter()
             input = q2.get()
+            # print('ML input recieved')
             # split sequence into words
             input = np.split(input, seq_len)
+            # print('words are now {}'.format(input))
+            input = np.array(input)
             input = torch.from_numpy(input)
             # create empty batch dimension
             input = torch.unsqueeze(input, 0) 
-            input.to(device)
+            input = input.to(device)
             # predict class
-            pred = model(input).argmax(1)
+            pred = model(input.float()).argmax(1)
             print(PROTOCOLS[pred])
             preds.append(pred) # This will need to be sent to GUI 
             #print(str(q2.qsize()) + ' items in queue 2')
+            t2 = time.perf_counter()
+            pred_cntr = pred_cntr + 1
+            time_avg = time_avg + (t2-t1)
+    print("ML predictions takes {} ms on average to complete {} cycles".format(1000*time_avg/pred_cntr,pred_cntr)) 
 
 
 # TODO add GUI interface - will this require another threadsafe queue?
