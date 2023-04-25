@@ -97,6 +97,9 @@ def signalprocessing():
             # print('s0 {}'.format(s0.size))
             s = s0[::2] + 1j * s0[1::2]
             # print('s {}'.format(s.size))
+            if MODEL_SIZE == 'sm':
+                s = s[:2500:]
+
             t2 = time.perf_counter()
             # print('reading queue and converting to complex float took {} ms'.format(1000*(t2-t1)))
 
@@ -135,7 +138,7 @@ def signalprocessing():
 
 def machinelearning():
     # Model configuration and loading
-    PROTOCOLS = ['802_11ax', '802_11b_upsampled', '802_11n', '802_11g']
+    PROTOCOLS = ['802_11ax', '802_11b', '802_11n', '802_11g']
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # print('Device is {}'.format(device))
 
@@ -202,8 +205,8 @@ if __name__ == '__main__':
     MODEL_PATH = args.model_path
     MODEL_SIZE = args.model_size
     
-    if MODEL_SIZE == 'sm':
-        N = 2500
+    # if MODEL_SIZE == 'sm':
+        # N = 2500
 
     rec = threading.Thread(target=receiver)
     rec.start()
