@@ -67,6 +67,8 @@ def receiver():
 
     sdr.deactivateStream(rx_stream)
     sdr.closeStream(rx_stream)
+    
+    time.sleep(1)
     print('Restarted {} times'.format(restart_cntr))
     print('Reciever takes {} ms on average to complete {} cycles'.format(1000*time_avg/file_cntr,file_cntr))
 
@@ -125,6 +127,7 @@ def signalprocessing():
         # else:
             # print('q is empty!')
     
+    time.sleep(1)
     print('Signal processor takes {} ms on average to complete {} cycles'.format(1000*time_avg/cntr,cntr))
 
 def machinelearning():
@@ -172,6 +175,8 @@ def machinelearning():
             t2 = time.perf_counter()
             pred_cntr = pred_cntr + 1
             time_avg = time_avg + (t2-t1)
+    
+    time.sleep(1)
     print("ML predictions takes {} ms on average to complete {} cycles".format(1000*time_avg/pred_cntr,pred_cntr)) 
 
 
@@ -206,6 +211,7 @@ if __name__ == '__main__':
     # gracefully end program
     time.sleep(t_out)
     exitFlag = 1
+    time.sleep(1)
 
     rec.join()
     sp.join()
