@@ -161,26 +161,27 @@ def machinelearning():
     pred_cntr = 0
     time_avg = 0
     while not exitFlag:
-        if not q2.empty():
-            t1 = time.perf_counter()
-            input = q2.get()
-            # print('ML input recieved')
-            # split sequence into words
-            input = np.split(input, seq_len)
-            # print('words are now {}'.format(input))
-            input = np.array(input)
-            input = torch.from_numpy(input)
-            # create empty batch dimension
-            input = torch.unsqueeze(input, 0) 
-            input = input.to(device)
-            # predict class
-            pred = model(input.float()).argmax(1)
-            print(PROTOCOLS[pred])
-            preds.append(pred) # This will need to be sent to GUI 
-            #print(str(q2.qsize()) + ' items in queue 2')
-            t2 = time.perf_counter()
-            pred_cntr = pred_cntr + 1
-            time_avg = time_avg + (t2-t1)
+        with torch.no_grad():
+            if not q2.empty():
+                t1 = time.perf_counter()
+                input = q2.get()
+                # print('ML input recieved')
+                # split sequence into words
+                input = np.split(input, seq_len)
+                # print('words are now {}'.format(input))
+                input = np.array(input)
+                input = torch.from_numpy(input)
+                # create empty batch dimension
+                input = torch.unsqueeze(input, 0) 
+                input = input.to(device)
+                # predict class
+                pred = model(input.float()).argmax(1)
+                print(PROTOCOLS[pred])
+                preds.append(pred) # This will need to be sent to GUI 
+                #print(str(q2.qsize()) + ' items in queue 2')
+                t2 = time.perf_counter()
+                pred_cntr = pred_cntr + 1
+                time_avg = time_avg + (t2-t1)
     
     time.sleep(1)
     print("ML predictions takes {} ms on average to complete {} cycles".format(1000*time_avg/pred_cntr,pred_cntr)) 
