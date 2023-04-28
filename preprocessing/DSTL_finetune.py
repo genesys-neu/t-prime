@@ -119,7 +119,8 @@ def finetune(model, config):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_path", default='./model_cp', help='Path to the trained model.')
+    parser.add_argument("--model_path", default='./model_cp', help='Path to the trained model or where to save the trained from scratched version \
+                        and under which name.')
     parser.add_argument("--ds_path", default='', help='Path to the over the air dataset.')
     parser.add_argument("--dataset_ratio", default=1.0, type=float, help="Portion of the dataset used for training and validation.")
     parser.add_argument("--use_gpu", action='store_true', default=False, help="Use gpu for fine-tuning and inference")
@@ -127,6 +128,8 @@ if __name__ == "__main__":
                         finetuned. Options are v1 and v2. These refer to the two Transformer-based architectures available, without or with [CLS] token.')
     parser.add_argument("--transformer", default="CNN", choices=["sm", "lg"], help="Size of transformer to use, options available are small and \
                         large. If not defined CNN architecture will be used.")
+    parser.add_argument("--retrain", action='store_true', default=False, help="Do not load any model and just train from scratch. Model name will be \
+                        taken from the model_path given.")
     parser.add_argument("--test", default=False, action='store_true', help="If present, we just test the provided model on OTA data.")
     args, _ = parser.parse_known_args()
 
@@ -172,14 +175,15 @@ if __name__ == "__main__":
                                               raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence)
     
     device = torch.device("cuda" if torch.cuda.is_available() and args.use_gpu else "cpu")
-    try:
-        model.load_state_dict(torch.load(args.model_path, map_location=device)['model_state_dict'])
-        if args.use_gpu:
-            model.cuda()
-    except:
-        raise Exception("The model you provided does not correspond with the selected architecture. Please revise and try again.")
+    if not args.retrain: # Load pretrained model
+        try:
+            model.load_state_dict(torch.load(args.model_path, map_location=device)['model_state_dict'])
+            if args.use_gpu:
+                model.cuda()
+        except:
+            raise Exception("The model you provided does not correspond with the selected architecture. Please revise and try again.")
     
-    if args.test:
+    if args.test and not args.retrain:
         # Use the loaded model to do inference over the OTA dataset
         model.to(device)
         model.eval()
