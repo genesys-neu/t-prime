@@ -178,11 +178,11 @@ if __name__ == "__main__":
     if not args.retrain: # Load pretrained model
         try:
             model.load_state_dict(torch.load(args.model_path, map_location=device)['model_state_dict'])
-            if args.use_gpu:
-                model.cuda()
         except:
             raise Exception("The model you provided does not correspond with the selected architecture. Please revise and try again.")
-    
+    if args.use_gpu:
+        model.cuda()
+
     if args.test and not args.retrain:
         # Use the loaded model to do inference over the OTA dataset
         model.to(device)
