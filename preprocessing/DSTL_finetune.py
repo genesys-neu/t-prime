@@ -107,6 +107,13 @@ def finetune(model, config):
         best_cm[r, :] = best_cm[r, :] / sum_row  * 100.0 # compute in percentage
     print('------------------- Best confusion matrix (%) -------------------')
     print(best_cm)
+    prot_display = PROTOCOLS
+    prot_display[1] = '802_11b'
+    disp = ConfusionMatrixDisplay(confusion_matrix=best_cm, display_labels=prot_display)
+    disp.plot()
+    disp.ax_.get_images()[0].set_clim(0, 100)
+    plt.savefig(f"Results_finetune_{MODEL_NAME}_ft.{config['lr']}.pdf")
+    plt.clf()
     print('-----------------------------------------------------------------')
     return
 
@@ -131,7 +138,7 @@ if __name__ == "__main__":
     train_config = {
         'batchSize': 122,
         'lr': 0.00002,
-        'epochs': 40,
+        'epochs': 100,
         'nClasses': 4
     }
 
@@ -141,8 +148,8 @@ if __name__ == "__main__":
         model = global_model(classes=len(PROTOCOLS), numChannels=2, slice_len=512)
         ds_train = DSTLDataset(PROTOCOLS, ds_path=args.ds_path, ds_type='train', slice_len=512, slice_overlap_ratio=0, test_ratio=0.0,
                            raw_data_ratio=args.dataset_ratio, file_postfix='', override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False)
-        ds_test = DSTLDataset(PROTOCOLS, ds_path=args.ds_path, ds_type='train', slice_len=512, slice_overlap_ratio=0, test_ratio=0.0,
-                            raw_data_ratio=args.dataset_ratio + '_TEST', file_postfix='', override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False)
+        ds_test = DSTLDataset(PROTOCOLS, ds_path=args.ds_path + '_TEST', ds_type='train', slice_len=512, slice_overlap_ratio=0, test_ratio=0.0,
+                            raw_data_ratio=args.dataset_ratio, file_postfix='', override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False)
     else:
         # choose correct version
         if args.transformer_version == 'v1':
@@ -155,14 +162,14 @@ if __name__ == "__main__":
             # Load over the air dataset
             ds_train = DSTLDataset_Transformer(protocols=PROTOCOLS, ds_path=args.ds_path, ds_type='train', seq_len=24, slice_len=64, slice_overlap_ratio=0, test_ratio=0.0,
                                                raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence)
-            ds_test = DSTLDataset_Transformer(protocols=PROTOCOLS, ds_path=args.ds_path, ds_type='train', seq_len=24, slice_len=64, slice_overlap_ratio=0, test_ratio=0.0,
-                                              raw_data_ratio=args.dataset_ratio + '_TEST', override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence)
+            ds_test = DSTLDataset_Transformer(protocols=PROTOCOLS, ds_path=args.ds_path + '_TEST', ds_type='train', seq_len=24, slice_len=64, slice_overlap_ratio=0, test_ratio=0.0,
+                                              raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence)
         else: # lg
             model = global_model(classes=len(PROTOCOLS), d_model=128*2, seq_len=64, nlayers=2, use_pos=False)
             ds_train = DSTLDataset_Transformer(protocols=PROTOCOLS, ds_path=args.ds_path, ds_type='train', seq_len=64, slice_len=128, slice_overlap_ratio=0, test_ratio=0.0,
                                                raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence)
-            ds_test = DSTLDataset_Transformer(protocols=PROTOCOLS, ds_path=args.ds_path, ds_type='train', seq_len=64, slice_len=128, slice_overlap_ratio=0, test_ratio=0.0,
-                                              raw_data_ratio=args.dataset_ratio + '_TEST', override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence)
+            ds_test = DSTLDataset_Transformer(protocols=PROTOCOLS, ds_path=args.ds_path + '_TEST', ds_type='train', seq_len=64, slice_len=128, slice_overlap_ratio=0, test_ratio=0.0,
+                                              raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence)
     
     device = torch.device("cuda" if torch.cuda.is_available() and args.use_gpu else "cpu")
     try:
@@ -210,7 +217,7 @@ if __name__ == "__main__":
         prot_display[1] = '802_11b'
         disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=prot_display)
         disp.plot()
-        plt.clim(0, 100)
+        disp.ax_.get_images()[0].set_clim(0, 100)
         plt.savefig(f"Results_finetune_{MODEL_NAME}.{train_config['lr']}.pdf")
         plt.clf()
         print('-------------------------------------------')
