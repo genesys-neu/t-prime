@@ -93,7 +93,7 @@ while True:
         # Get new data
         label = int(get_data())
         st.session_state.labels.append(label)
-        time.sleep(0.5)
+        time.sleep(0.015)
         # Display new data
         with placeholder.container():
             st.markdown(f'<nobr class="extreme-font"> {EMOJIS[label]}  </nobr> <nobr class="big-font">{PROTOCOLS[label]}</nobr>', unsafe_allow_html=True)

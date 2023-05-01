@@ -177,7 +177,14 @@ def machinelearning():
                 # predict class
                 pred = model(input.float()).argmax(1)
                 print(PROTOCOLS[pred])
-                preds.append(pred) # This will need to be sent to GUI 
+                # Write it in output file to pass it to the GUI
+                file_flag = 'a'
+                # Every 500 predictions flush output content 
+                if pred_cntr%500 == 0:
+                    file_flag = 'w'
+                with open('output.txt', file_flag) as file:
+                    file.write(f'{pred}\n') 
+                preds.append(pred)
                 #print(str(q2.qsize()) + ' items in queue 2')
                 t2 = time.perf_counter()
                 pred_cntr = pred_cntr + 1
