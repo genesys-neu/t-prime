@@ -88,10 +88,10 @@ with c4:
 # Real time updated dashboard
 st.header('Real time prediction')
 placeholder = st.empty()
-try:
-    while True:
+while True:
+    try:
         # Get new data
-        label = get_data()
+        label = int(get_data())
         st.session_state.labels.append(label)
         time.sleep(0.5)
         # Display new data
@@ -100,8 +100,8 @@ try:
 
             st.header('Prediction history')
             ## TODO: Display historic visualization of last predictions
-except KeyboardInterrupt:
-    # When interrupting the infinite loop, close connections
-    scp.close()
-    ssh_ob.close()
-    print('Connection closed, program terminated')
+    except KeyboardInterrupt:
+        # When interrupting the infinite loop, close connections
+        scp.close()
+        ssh_ob.close()
+        print('Connection closed, program terminated')
