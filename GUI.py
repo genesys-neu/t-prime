@@ -1,20 +1,45 @@
 import ast
 import time
 import os
+import json
 import pandas as pd
 #import plotly.express as px
 import matplotlib
 import matplotlib.pyplot as plt
 import streamlit as st
-from queue import Queue
-#from streamlit_autorefresh import st_autorefresh
+from paramiko import SSHClient
+from scp import SCPClient
 
+#####################################################
+############### DISPLAY CONFIGURATION ###############
+#####################################################
+# Index Colors by label
+PROTOCOLS_MAP = {'0':'802_11ax', '1':'802_11b', '2':'802_11n', '3':'802_11g'}
 PROTOCOLS = ['802_11ax', '802_11b', '802_11n', '802_11g']
-COLORS = {'802_11ax': "#D81B60", '802_11b': "#FFC107", '802_11n': "#1E88E5", '802_11g': "#004D40"}
-EMOJIS = {'802_11ax': '🟥', '802_11b': '🟦', '802_11n': '🟨', '802_11g': '🟩'}
+COLORS = ["#D81B60", "#FFC107", "#1E88E5", "#004D40"]
+EMOJIS = ['🟥', '🟦', '🟨', '🟩'] 
 
+##############################################
+############### SSH CONNECTION ###############
+##############################################
+# Load connection credentials
+with open('credentials.json') as f: 
+    creds = json.load(f)
+# Open ssh and scp connections
+ssh_ob = SSHClient()
+ssh_ob.load_system_host_keys()
+ssh_ob.connect(creds['host'], username=creds['username'], password=creds['password'])
+scp = SCPClient(ssh_ob.get_transport())
+# Define the name of the file to extract and where to save
+filename = 'output.txt'
+cwd = os.getcwd()
+
+##############################################
+############### DATA RETRIEVAL ###############
+##############################################
 def get_data():
-    with open('output.txt', 'rb') as f:
+    scp.get(f'/home/miquelsirera/Desktop/dstl/{filename}', cwd)
+    with open(filename, 'rb') as f:
         try:  # catch OSError in case of a one line file 
             f.seek(-2, os.SEEK_END)
             while f.read(1) != b'\n':
@@ -25,14 +50,14 @@ def get_data():
         last_line = last_line.replace('\n', '')
     return last_line
 
+###########################################
+############### WEBPAGE GUI ###############
+###########################################
+# Session state to save predictions history
 if "labels" not in st.session_state:
-    st.session_state['labels'] = Queue(20) 
-st.set_page_config(layout="wide", page_title="Real-Time ML Inference", page_icon=":wolf:",)
-st.title('Transmitted protocol display')
-st.write('In this dashboard, we will display the result of the real time classification from our ML module. This will be detecting \
-          the protocol being transmitted among the following classes: 802_11ax, 802_11b, 802_11n, 802_11g.')
-st.header('Protocols')
-
+    st.session_state['labels'] = []
+# Page config
+st.set_page_config(layout="wide", page_title="Real-Time ML Inference", page_icon=":wolf:")
 st.markdown("""
 <style>
 .big-font {
@@ -45,27 +70,38 @@ st.markdown("""
 }
 </style>
 """, unsafe_allow_html=True)
-
+# Main header and explanation
+st.title('Transmitted protocol display')
+st.write('In this dashboard, we will display the result of the real time classification from our ML module. This will be detecting \
+          the protocol being transmitted among the following classes: 802_11ax, 802_11b, 802_11n, 802_11g.')
+# Protocols legend
+st.header('Protocols')
 c1, c2, c3, c4 = st.columns(4)
 with c1:
-    st.subheader(f"{PROTOCOLS[0]}  {EMOJIS['802_11ax']}")
+    st.subheader(f"{PROTOCOLS[0]}  {EMOJIS[0]}")
 with c2:
-    st.subheader(f"{PROTOCOLS[1]}  {EMOJIS['802_11b']}")
+    st.subheader(f"{PROTOCOLS[1]}  {EMOJIS[1]}")
 with c3:
-    st.subheader(f"{PROTOCOLS[2]}  {EMOJIS['802_11n']}")
+    st.subheader(f"{PROTOCOLS[2]}  {EMOJIS[2]}")
 with c4:
-    st.subheader(f"{PROTOCOLS[3]}  {EMOJIS['802_11g']}")
-
+    st.subheader(f"{PROTOCOLS[3]}  {EMOJIS[3]}")
+# Real time updated dashboard
 st.header('Real time prediction')
-
 placeholder = st.empty()
+try:
+    while True:
+        # Get new data
+        label = get_data()
+        st.session_state.labels.append(label)
+        time.sleep(0.5)
+        # Display new data
+        with placeholder.container():
+            st.markdown(f'<nobr class="extreme-font"> {EMOJIS[label]}  </nobr> <nobr class="big-font">{PROTOCOLS[label]}</nobr>', unsafe_allow_html=True)
 
-while True:
-    label = get_data()
-    st.session_state.labels.put(label)
-    time.sleep(0.5)
-    with placeholder.container():
-        st.markdown(f'<nobr class="extreme-font"> {EMOJIS[label]}  </nobr> <nobr class="big-font">{label}</nobr>', unsafe_allow_html=True)
-
-        st.header('Prediction history')
-
+            st.header('Prediction history')
+            ## TODO: Display historic visualization of last predictions
+except KeyboardInterrupt:
+    # When interrupting the infinite loop, close connections
+    scp.close()
+    ssh_ob.close()
+    print('Connection closed, program terminated')
