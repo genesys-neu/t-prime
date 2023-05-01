@@ -23,22 +23,25 @@ EMOJIS = ['🟥', '🟦', '🟨', '🟩']
 ############### SSH CONNECTION ###############
 ##############################################
 # Load connection credentials
-with open('credentials.json') as f: 
-    creds = json.load(f)
+try:
+    with open('credentials.json') as f: 
+        creds = json.load(f)
+except FileNotFoundError:
+    print('File credentials.json not found! Please make sure to define it before calling this program.')
 # Open ssh and scp connections
 ssh_ob = SSHClient()
 ssh_ob.load_system_host_keys()
 ssh_ob.connect(creds['host'], username=creds['username'], password=creds['password'])
 scp = SCPClient(ssh_ob.get_transport())
 # Define the name of the file to extract and where to save
-filename = 'output.txt'
+filename = creds['output_filename']
 cwd = os.getcwd()
 
 ##############################################
 ############### DATA RETRIEVAL ###############
 ##############################################
 def get_data():
-    scp.get(f'/home/miquelsirera/Desktop/dstl/{filename}', cwd)
+    scp.get(os.path.join(creds['path_to_file'], filename), cwd)
     with open(filename, 'rb') as f:
         try:  # catch OSError in case of a one line file 
             f.seek(-2, os.SEEK_END)
@@ -53,9 +56,8 @@ def get_data():
 ###########################################
 ############### WEBPAGE GUI ###############
 ###########################################
-# Session state to save predictions history
-if "labels" not in st.session_state:
-    st.session_state['labels'] = []
+# Save predictions history
+labels = []
 # Page config
 st.set_page_config(layout="wide", page_title="Real-Time ML Inference", page_icon=":wolf:")
 st.markdown("""
@@ -92,7 +94,7 @@ while True:
     try:
         # Get new data
         label = int(get_data())
-        st.session_state.labels.append(label)
+        labels.append(label)
         time.sleep(0.015)
         # Display new data
         with placeholder.container():
