@@ -2,9 +2,8 @@ import ast
 import time
 import os
 import json
-import pandas as pd
-#import plotly.express as px
-import matplotlib
+import seaborn as sns
+from matplotlib.colors import ListedColormap
 import matplotlib.pyplot as plt
 import streamlit as st
 from paramiko import SSHClient
@@ -16,8 +15,9 @@ from scp import SCPClient
 # Index Colors by label
 PROTOCOLS_MAP = {'0':'802_11ax', '1':'802_11b', '2':'802_11n', '3':'802_11g'}
 PROTOCOLS = ['802_11ax', '802_11b', '802_11n', '802_11g']
-COLORS = ["#D81B60", "#FFC107", "#1E88E5", "#004D40"]
+COLORS = ["#F20505", "#056CF2", "#FFCF00", "#0ABF04"]
 EMOJIS = ['🟥', '🟦', '🟨', '🟩'] 
+sns.set(font_scale=2)
 
 ##############################################
 ############### SSH CONNECTION ###############
@@ -92,16 +92,29 @@ st.header('Real time prediction')
 placeholder = st.empty()
 while True:
     try:
+        num_preds = 0
         # Get new data
+        plt.close()
         label = int(get_data())
         labels.append(label)
+        num_preds += 1
         time.sleep(0.015)
         # Display new data
         with placeholder.container():
             st.markdown(f'<nobr class="extreme-font"> {EMOJIS[label]}  </nobr> <nobr class="big-font">{PROTOCOLS[label]}</nobr>', unsafe_allow_html=True)
 
             st.header('Prediction history')
-            ## TODO: Display historic visualization of last predictions
+            #Display historic visualization of last predictions
+            fig, ax = plt.subplots(figsize = (20, 2))
+            if num_preds > 200: 
+                # Display only last 200
+                ax = sns.heatmap([labels[-200:]], xticklabels=False, yticklabels=False, 
+                                 cmap=COLORS, cbar=False, vmin=0, vmax=3)
+            else:
+                ax = sns.heatmap([labels], xticklabels=False, yticklabels=False, 
+                                 cmap=COLORS, cbar=False, vmin=0, vmax=3)
+            ax.set_xlabel('Time')
+            st.pyplot(fig)
     except KeyboardInterrupt:
         # When interrupting the infinite loop, close connections
         scp.close()
