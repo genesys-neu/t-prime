@@ -183,7 +183,7 @@ def machinelearning():
                 if pred_cntr%500 == 0:
                     file_flag = 'w'
                 with open('output.txt', file_flag) as file:
-                    file.write(f'{pred}\n') 
+                    file.write(f'{pred.item()} {time.time()}\n') 
                 preds.append(pred)
                 #print(str(q2.qsize()) + ' items in queue 2')
                 t2 = time.perf_counter()
