@@ -47,6 +47,7 @@ class DSTLDataset(Dataset):
                                             # this value will affect the number of slices that is possible to create from each signal
                  raw_data_ratio=1.0,        # ratio of the whole raw signal dataset to consider for generation
                  test_ratio=0.2,
+                 testing_mode='random_sampling',
                  ds_path='/home/miquelsirera/Desktop/dstl/data/DSTL_DATASET_1_1',
                  file_postfix='',
                  noise_model='AWGN', snr_dbs=[30], seed=4389,
@@ -62,6 +63,7 @@ class DSTLDataset(Dataset):
         self.overlap = self.slice_len - int(self.slice_len * self.slice_overlap_ratio)
         self.raw_data_ratio = raw_data_ratio
         self.n_sig_per_class = {} # this will be filled in the generate_ds_map() function
+        self.testing_mode = testing_mode
         self.noise_model = noise_model
         self.ota = ota
         self.snr_dbs = snr_dbs
@@ -79,9 +81,9 @@ class DSTLDataset(Dataset):
         if file_postfix != '' and file_postfix[-1] != '_':
             file_postfix += '__'
         if not ota:
-            info_filename = 'ds_info__'+file_postfix+'slice'+str(slice_len)+'_'+str(len(protocols))+'class.pkl'
+            info_filename = 'ds_info__'+file_postfix+'slice'+str(slice_len)+'_'+str(len(protocols))+testing_mode+'class.pkl'
         else: # over the air
-            info_filename = 'ds_info__'+file_postfix+'slice'+str(slice_len)+'_'+str(len(protocols))+'class_ota.pkl'
+            info_filename = 'ds_info__'+file_postfix+'slice'+str(slice_len)+'_'+str(len(protocols))+testing_mode+'class_ota.pkl'
         ds_info_path = os.path.join(self.ds_path, info_filename)
         do_gen_info = True
         if os.path.exists(ds_info_path) and (not override_gen_map):
@@ -189,7 +191,11 @@ class DSTLDataset(Dataset):
         # lastly, we separate the training and testing dataset by randomly sampling a certain % of data samples indexes
         test_data_ixs = {}
         test_labels_ixs = {}
-        test_ixs = np.random.choice(ixs_count, size=int(ixs_count*test_ratio), replace=False)
+        if self.testing_mode == 'random_sampling':
+            test_ixs = np.random.choice(ixs_count, size=int(ixs_count*test_ratio), replace=False)
+        else: # testing mode is inference
+            # select just last indexes
+            test_ixs = np.arange(int(ixs_count*(1 - test_ratio)), ixs_count)
         for i in test_ixs.tolist():
             i_data = data_ixs.pop(i)
             test_data_ixs[i] = i_data

@@ -99,7 +99,7 @@ def finetune(model, config):
                     'model_state_dict': model.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
                     'loss': loss,
-                }, os.path.join(PATH, MODEL_NAME + '_ft.pt'))
+                }, os.path.join(PATH, MODEL_NAME + '_' + OTA_DATASET + '_' + TEST_FLAG + '_ft.pt'))
             best_cm = conf_matrix
     best_cm = best_cm.astype('float')
     for r in range(best_cm.shape[0]):  # for each row in the confusion matrix
@@ -112,14 +112,14 @@ def finetune(model, config):
     disp = ConfusionMatrixDisplay(confusion_matrix=best_cm, display_labels=prot_display)
     disp.plot()
     disp.ax_.get_images()[0].set_clim(0, 100)
-    plt.savefig(f"Results_finetune_{MODEL_NAME}_ft.{config['lr']}.pdf")
+    plt.savefig(f"Results_finetune_{MODEL_NAME}_ft.{OTA_DATASET}.{TEST_FLAG}.{config['lr']}.pdf")
     plt.clf()
     print('-----------------------------------------------------------------')
     return
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_path", default='./model_cp', help='Path to the trained model or where to save the trained from scratched version \
+    parser.add_argument("--model_path", default='./model_cp', help='Path to the trained model or where to save the trained from scratch version \
                         and under which name.')
     parser.add_argument("--ds_path", default='', help='Path to the over the air dataset.')
     parser.add_argument("--dataset_ratio", default=1.0, type=float, help="Portion of the dataset used for training and validation.")
@@ -128,8 +128,11 @@ if __name__ == "__main__":
                         finetuned. Options are v1 and v2. These refer to the two Transformer-based architectures available, without or with [CLS] token.')
     parser.add_argument("--transformer", default="CNN", choices=["sm", "lg"], help="Size of transformer to use, options available are small and \
                         large. If not defined CNN architecture will be used.")
+    parser.add_argument("--test_mode", default="random_sampling", choices=["random_sampling", "inference"], help="Get test from separate files (inference) or \
+                        a random sampling of dataset indexes (random_sampling).")
     parser.add_argument("--retrain", action='store_true', default=False, help="Do not load any model and just train from scratch. Model name will be \
                         taken from the model_path given.")
+    parser.add_argument("--ota_dataset", default='', help="Flag to add in results name to identify experiment.")
     parser.add_argument("--test", default=False, action='store_true', help="If present, we just test the provided model on OTA data.")
     args, _ = parser.parse_known_args()
 
@@ -138,6 +141,8 @@ if __name__ == "__main__":
     PATH = '/'.join(args.model_path.split('/')[0:-1])
     PROTOCOLS = ['802_11ax', '802_11b_upsampled', '802_11n', '802_11g']
     CHANNELS = ['None', 'TGn', 'TGax', 'Rayleigh']
+    TEST_FLAG = 'rsg' if args.test_mode == 'random_sampling' else 'inf'
+    OTA_DATASET = args.ota_dataset
     train_config = {
         'batchSize': 122,
         'lr': 0.00002,
@@ -149,9 +154,9 @@ if __name__ == "__main__":
     if args.transformer == 'CNN':
         global_model = Baseline_CNN1D
         model = global_model(classes=len(PROTOCOLS), numChannels=2, slice_len=512)
-        ds_train = DSTLDataset(PROTOCOLS, ds_path=args.ds_path, ds_type='train', slice_len=512, slice_overlap_ratio=0, test_ratio=0.0,
+        ds_train = DSTLDataset(PROTOCOLS, ds_path=args.ds_path, ds_type='train', slice_len=512, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
                            raw_data_ratio=args.dataset_ratio, file_postfix='', override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False)
-        ds_test = DSTLDataset(PROTOCOLS, ds_path=args.ds_path + '_TEST', ds_type='train', slice_len=512, slice_overlap_ratio=0, test_ratio=0.0,
+        ds_test = DSTLDataset(PROTOCOLS, ds_path=args.ds_path, ds_type='test', slice_len=512, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
                             raw_data_ratio=args.dataset_ratio, file_postfix='', override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False)
     else:
         # choose correct version
@@ -163,15 +168,15 @@ if __name__ == "__main__":
         if args.transformer == "sm":
             model = global_model(classes=len(PROTOCOLS), d_model=64*2, seq_len=24, nlayers=2, use_pos=False)
             # Load over the air dataset
-            ds_train = DSTLDataset_Transformer(protocols=PROTOCOLS, ds_path=args.ds_path, ds_type='train', seq_len=24, slice_len=64, slice_overlap_ratio=0, test_ratio=0.0,
+            ds_train = DSTLDataset_Transformer(protocols=PROTOCOLS, ds_path=args.ds_path, ds_type='train', seq_len=24, slice_len=64, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
                                                raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence)
-            ds_test = DSTLDataset_Transformer(protocols=PROTOCOLS, ds_path=args.ds_path + '_TEST', ds_type='train', seq_len=24, slice_len=64, slice_overlap_ratio=0, test_ratio=0.0,
+            ds_test = DSTLDataset_Transformer(protocols=PROTOCOLS, ds_path=args.ds_path, ds_type='test', seq_len=24, slice_len=64, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
                                               raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence)
         else: # lg
             model = global_model(classes=len(PROTOCOLS), d_model=128*2, seq_len=64, nlayers=2, use_pos=False)
-            ds_train = DSTLDataset_Transformer(protocols=PROTOCOLS, ds_path=args.ds_path, ds_type='train', seq_len=64, slice_len=128, slice_overlap_ratio=0, test_ratio=0.0,
+            ds_train = DSTLDataset_Transformer(protocols=PROTOCOLS, ds_path=args.ds_path, ds_type='train', seq_len=64, slice_len=128, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
                                                raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence)
-            ds_test = DSTLDataset_Transformer(protocols=PROTOCOLS, ds_path=args.ds_path + '_TEST', ds_type='train', seq_len=64, slice_len=128, slice_overlap_ratio=0, test_ratio=0.0,
+            ds_test = DSTLDataset_Transformer(protocols=PROTOCOLS, ds_path=args.ds_path, ds_type='test', seq_len=64, slice_len=128, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
                                               raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence)
     
     device = torch.device("cuda" if torch.cuda.is_available() and args.use_gpu else "cpu")
@@ -222,7 +227,7 @@ if __name__ == "__main__":
         disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=prot_display)
         disp.plot()
         disp.ax_.get_images()[0].set_clim(0, 100)
-        plt.savefig(f"Results_finetune_{MODEL_NAME}.{train_config['lr']}.pdf")
+        plt.savefig(f"Results_finetune_{MODEL_NAME}.{OTA_DATASET}.{TEST_FLAG}.{train_config['lr']}.pdf")
         plt.clf()
         print('-------------------------------------------')
         print('-------------------------------------------')
