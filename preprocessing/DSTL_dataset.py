@@ -141,17 +141,22 @@ class DSTLDataset(Dataset):
     def generate_ds_map(self, ds_path, filename, test_ratio=0.2):
         examples_map = {}
         class_map = dict(zip(self.protocols, range(len(self.protocols))))
+        # check if folders are names with _ or .
+        if os.path.isdir(os.path.join(ds_path, self.protocols[0])):
+            protocols = self.protocols
+        elif os.path.isdir(os.path.join(ds_path, '802.11ax')):
+            protocols = ['802.11ax', '802.11b', '802.11n', '802.11g'] 
         # retrieve the list of signals (.mat) from every folder/protocol specified
-        for i, p in enumerate(self.protocols):
+        for i, p in enumerate(protocols):
             path = os.path.join(ds_path, p)
             if os.path.isdir(path):
                 mat_list = sorted(glob(os.path.join(path, '*.bin'))) if self.ota else sorted(glob(os.path.join(path, '*.mat')))
-                self.n_sig_per_class[p] = int(
+                self.n_sig_per_class[self.protocols[i]] = int(
                     len(mat_list) * self.raw_data_ratio)  # for each protocol, we save the amount of raw signals to retain
 
-                mat_list = mat_list[:self.n_sig_per_class[p]] # then we just clip the list
+                mat_list = mat_list[:self.n_sig_per_class[self.protocols[i]]] # then we just clip the list
                 num_mat = len(mat_list)                     # and store the new list value length
-                examples_map[p] = dict(
+                examples_map[self.protocols[i]] = dict(
                     zip(
                         list(range(num_mat)),
                         mat_list
@@ -166,10 +171,20 @@ class DSTLDataset(Dataset):
 
         # also, we need to assign a unique slice index to each possible slice to be used with __getitem__ function
         # and assign the corresponding label
+        # TRAINING DATA
         data_ixs = {}
         labels_ixs = {}
         ixs_count = 0
+        # TEST DATA
+        test_data_ixs = {}
+        test_labels_ixs = {}
+        test_ixs_count = 0
         for c in tqdm(examples_map.keys(), desc='Analyzing signal dataset...'):
+            nsamples = len(examples_map[c].items())
+            if self.testing_mode == 'inference':
+                test_threshold = int(nsamples * self.test_ratio)
+            else:
+                test_threshold = nsamples
             for ix, path in examples_map[c].items():
                 if not self.ota: # simulation files
                     sig = sio.loadmat(path)
@@ -182,25 +197,26 @@ class DSTLDataset(Dataset):
                 n_windows = len(window_ixs)
                 examples_map[c][ix] = {'sample': window_ixs, # sample is slice for CNN or sequence for Transformer
                                        'path': examples_map[c][ix]}  # here we modify the original content
-                for w in window_ixs:
-                    data_ixs[ixs_count] = {'path': path, 'sample_ix': w}
-                    labels_ixs[ixs_count] = class_map[c]
-                    ixs_count += 1
+                if ix <= test_threshold:
+                    for w in window_ixs:
+                        data_ixs[ixs_count] = {'path': path, 'sample_ix': w}
+                        labels_ixs[ixs_count] = class_map[c]
+                        ixs_count += 1
+                else:
+                    for w in window_ixs:
+                        test_data_ixs[ixs_count] = {'path': path, 'sample_ix': w}
+                        test_labels_ixs[ixs_count] = class_map[c]
+                        test_ixs_count += 1
 
 
         # lastly, we separate the training and testing dataset by randomly sampling a certain % of data samples indexes
-        test_data_ixs = {}
-        test_labels_ixs = {}
         if self.testing_mode == 'random_sampling':
             test_ixs = np.random.choice(ixs_count, size=int(ixs_count*test_ratio), replace=False)
-        else: # testing mode is inference
-            # select just last indexes
-            test_ixs = np.arange(int(ixs_count*(1 - test_ratio)), ixs_count)
-        for i in test_ixs.tolist():
-            i_data = data_ixs.pop(i)
-            test_data_ixs[i] = i_data
-            i_label = labels_ixs.pop(i)
-            test_labels_ixs[i] = i_label
+            for i in test_ixs.tolist():
+                i_data = data_ixs.pop(i)
+                test_data_ixs[i] = i_data
+                i_label = labels_ixs.pop(i)
+                test_labels_ixs[i] = i_label
         # we also need to store a map from linear indexes (used by ray when retrieving data from dataset)
         train_ixs = dict(zip(range(len(data_ixs.keys())), list(data_ixs.keys())))
         test_ixs = dict(zip(range(len(test_data_ixs.keys())), list(test_data_ixs.keys())))
