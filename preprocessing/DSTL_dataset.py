@@ -281,7 +281,7 @@ class DSTLDataset(Dataset):
                 self.signal_cache.put(obs_info['path'], {'np': mat_dict['waveform'], \
                             'mat': self.mateng.py2mat_array(mat_dict['waveform']) if not (self.apply_wchannel is None) else ''})
             else:
-                mat_dict = np.fromfile(obs_info['path'])
+                mat_dict = np.fromfile(obs_info['path'], dtype=np.complex128)
                 mat_dict = np.expand_dims(mat_dict, axis=1)
                 self.signal_cache.put(obs_info['path'], {'np': mat_dict, 'mat': ''}) # WCHANNEL SHOULD ALWAYS BE NONE WITH OTA SAMPLES
 
