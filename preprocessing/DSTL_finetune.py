@@ -13,6 +13,7 @@ from tqdm import tqdm
 from DSTL_dataset import DSTLDataset, DSTLDataset_Transformer
 from dstl_transformer.model_transformer import TransformerModel, TransformerModel_v2
 from cnn_baseline.model_cnn1d import Baseline_CNN1D
+from preprocessing.model_rmsnorm import RMSNorm
 
 # Function to change the shape of obs
 # the input is obs with shape (channel, slice)
@@ -26,7 +27,7 @@ def get_model_name(name):
     name = name.split("/")[-1]
     return '.'.join(name.split(".")[0:-1])
 
-def train(model, criterion, optimizer, dataloader):
+def train(model, criterion, optimizer, dataloader, RMSnorm_layer=None):
     size = len(dataloader.dataset)
     model.train()
     correct = 0
@@ -35,6 +36,8 @@ def train(model, criterion, optimizer, dataloader):
         X = X.to(device)
         y = y.to(device)
         # Compute prediction error
+        if not(RMSnorm_layer is None):
+            X = RMSnorm_layer(X)
         pred = model(X.float())
         loss = criterion(pred, y)
         correct += (pred.argmax(1) == y).type(torch.float).sum().item()
@@ -51,7 +54,7 @@ def train(model, criterion, optimizer, dataloader):
     correct /= size
     return correct*100.0, total_loss
 
-def validate(model, criterion, dataloader, nclasses):
+def validate(model, criterion, dataloader, nclasses, RMSnorm_layer=None):
     size = len(dataloader.dataset)
     model.eval()
     test_loss, correct = 0, 0
@@ -60,6 +63,8 @@ def validate(model, criterion, dataloader, nclasses):
         for X, y in dataloader:
             X = X.to(device)
             y = y.to(device)
+            if not (RMSnorm_layer is None):
+                X = RMSnorm_layer(X)
             pred = model(X.float())
             test_loss += criterion(pred, y).item()
             correct += (pred.argmax(1) == y).type(torch.float).sum().item()
@@ -84,12 +89,18 @@ def finetune(model, config):
     test_acc = []
     best_acc = 0
     best_cm = 0 # best confusion matrix
+
+    if config['RMSNorm']:
+        RMSNorm_l = RMSNorm(model='Transformer')
+    else:
+        RMSNorm_l = None
+
     # Training loop
     for epoch in range(config['epochs']):
-        acc, loss = train(model, criterion, optimizer, train_dataloader)
+        acc, loss = train(model, criterion, optimizer, train_dataloader, RMSnorm_layer=RMSNorm_l)
         train_acc.append(acc)
         print(f'| epoch {epoch:03d} | train accuracy={acc:.1f}%, train loss={loss:.2f}')
-        acc, loss, conf_matrix = validate(model, criterion, test_dataloader, config['nClasses'])
+        acc, loss, conf_matrix = validate(model, criterion, test_dataloader, config['nClasses'], RMSnorm_layer=RMSNorm_l)
         test_acc.append(acc)
         print(f'| epoch {epoch:03d} | valid accuracy={acc:.1f}%, valid loss={loss:.2f} (test)')
         if acc > best_acc:
@@ -134,6 +145,7 @@ if __name__ == "__main__":
                         taken from the model_path given.")
     parser.add_argument("--ota_dataset", default='', help="Flag to add in results name to identify experiment.")
     parser.add_argument("--test", default=False, action='store_true', help="If present, we just test the provided model on OTA data.")
+    parser.add_argument("--RMSNorm", default=False, action='store_true', help="If present, we apply RMS normalization on input signals while training and testing")
     args, _ = parser.parse_known_args()
 
     # Config
@@ -147,7 +159,8 @@ if __name__ == "__main__":
         'batchSize': 122,
         'lr': 0.00002,
         'epochs': 100,
-        'nClasses': 4
+        'nClasses': 4,
+        'RMSNorm': args.RMSNorm
     }
 
     # Load model
