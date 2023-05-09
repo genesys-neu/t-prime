@@ -226,7 +226,7 @@ if __name__ == "__main__":
     train_config['device'] = device
     train_config['cp_path'] = args.cp_path
     train_config['class_labels'] = protocols
-    train_config['wchannel'] = args.channel
+    train_config['wchannel'] = args.channel if args.channel is not None else 'nochan'
     train_config['postfix'] = args.postfix
     train_config['snr_dB'] = args.snr_db[0]
 
