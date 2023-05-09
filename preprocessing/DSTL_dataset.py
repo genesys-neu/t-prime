@@ -48,7 +48,8 @@ class DSTLDataset(Dataset):
                  raw_data_ratio=1.0,        # ratio of the whole raw signal dataset to consider for generation
                  test_ratio=0.2,
                  testing_mode='random_sampling',
-                 ds_path='/home/miquelsirera/Desktop/dstl/data/DSTL_DATASET_1_1',
+                 ds_path='/home/miquelsirera/Desktop/dstl/data/',
+                 datasets=['DSTL_DATASET_1_1'],
                  file_postfix='',
                  noise_model='AWGN', snr_dbs=[30], seed=4389,
                  apply_noise=True, apply_wchannel=None,
@@ -69,6 +70,7 @@ class DSTLDataset(Dataset):
         self.snr_dbs = snr_dbs
         self.seed = seed
         self.ds_path = ds_path
+        self.datasets = datasets
         self.test_ratio = test_ratio
         if not (self.seed is None):
             np.random.seed(self.seed)
@@ -92,7 +94,7 @@ class DSTLDataset(Dataset):
             do_gen_info = False
 
         if do_gen_info:
-            self.ds_info = self.generate_ds_map(ds_path, info_filename, test_ratio)
+            self.ds_info = self.generate_ds_map(ds_path, datasets, info_filename, test_ratio)
         else:
             self.ds_info = pickle.load(open(ds_info_path, 'rb'))
 
@@ -138,33 +140,34 @@ class DSTLDataset(Dataset):
     def generate_windows(self, len_sig):
         return list(range(0, len_sig-self.slice_len, self.overlap))
 
-    def generate_ds_map(self, ds_path, filename, test_ratio=0.2):
+    def generate_ds_map(self, ds_path, datasets, filename, test_ratio=0.2):
         examples_map = {}
         class_map = dict(zip(self.protocols, range(len(self.protocols))))
-        # check if folders are names with _ or .
-        if os.path.isdir(os.path.join(ds_path, self.protocols[0])):
-            protocols = self.protocols
-        elif os.path.isdir(os.path.join(ds_path, '802.11ax')):
-            protocols = ['802.11ax', '802.11b', '802.11n', '802.11g'] 
-        # retrieve the list of signals (.mat) from every folder/protocol specified
-        for i, p in enumerate(protocols):
-            path = os.path.join(ds_path, p)
-            if os.path.isdir(path):
-                mat_list = sorted(glob(os.path.join(path, '*.bin'))) if self.ota else sorted(glob(os.path.join(path, '*.mat')))
-                self.n_sig_per_class[self.protocols[i]] = int(
-                    len(mat_list) * self.raw_data_ratio)  # for each protocol, we save the amount of raw signals to retain
+        for ds_folder in datasets:
+            # check if folders are names with _ or .
+            if os.path.isdir(os.path.join(ds_path, ds_folder, self.protocols[0])):
+                protocols = self.protocols
+            elif os.path.isdir(os.path.join(ds_path, ds_folder, '802.11ax')):
+                protocols = ['802.11ax', '802.11b', '802.11n', '802.11g'] 
+            # retrieve the list of signals (.mat) from every folder/protocol specified
+            for i, p in enumerate(protocols):
+                path = os.path.join(ds_path, ds_folder, p)
+                if os.path.isdir(path):
+                    mat_list = sorted(glob(os.path.join(path, '*.bin'))) if self.ota else sorted(glob(os.path.join(path, '*.mat')))
+                    self.n_sig_per_class[self.protocols[i]] = int(
+                        len(mat_list) * self.raw_data_ratio)  # for each protocol, we save the amount of raw signals to retain
 
-                mat_list = mat_list[:self.n_sig_per_class[self.protocols[i]]] # then we just clip the list
-                num_mat = len(mat_list)                     # and store the new list value length
-                examples_map[self.protocols[i]] = dict(
-                    zip(
-                        list(range(num_mat)),
-                        mat_list
+                    mat_list = mat_list[:self.n_sig_per_class[self.protocols[i]]] # then we just clip the list
+                    num_mat = len(mat_list)                     # and store the new list value length
+                    examples_map[self.protocols[i]] = dict(
+                        zip(
+                            list(range(num_mat)),
+                            mat_list
+                        )
                     )
-                )
 
-            else:
-                sys.exit('[DSTLDataset] folder ' + path + ' not found. Aborting...')
+                else:
+                    sys.exit('[DSTLDataset] folder ' + path + ' not found. Aborting...')
 
         # now let's go through each class examples and assign a global sample index
         # based on the slice len and overlap configuration
