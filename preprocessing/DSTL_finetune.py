@@ -110,7 +110,7 @@ def finetune(model, config):
                     'model_state_dict': model.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
                     'loss': loss,
-                }, os.path.join(PATH, MODEL_NAME + '_' + OTA_DATASET + '_' + TEST_FLAG + '_ft.pt'))
+                }, os.path.join(PATH, MODEL_NAME + '_' + OTA_DATASET + '_' + TEST_FLAG + '_' + RMS_FLAG + '_ft.pt'))
             best_cm = conf_matrix
     best_cm = best_cm.astype('float')
     for r in range(best_cm.shape[0]):  # for each row in the confusion matrix
@@ -123,7 +123,7 @@ def finetune(model, config):
     disp = ConfusionMatrixDisplay(confusion_matrix=best_cm, display_labels=prot_display)
     disp.plot()
     disp.ax_.get_images()[0].set_clim(0, 100)
-    plt.savefig(f"Results_finetune_{MODEL_NAME}_ft.{OTA_DATASET}.{TEST_FLAG}.{config['lr']}.pdf")
+    plt.savefig(f"Results_finetune_{MODEL_NAME}_ft.{OTA_DATASET}.{TEST_FLAG}.{RMS_FLAG}.pdf")
     plt.clf()
     print('-----------------------------------------------------------------')
     return
@@ -154,6 +154,7 @@ if __name__ == "__main__":
     PROTOCOLS = ['802_11ax', '802_11b_upsampled', '802_11n', '802_11g']
     CHANNELS = ['None', 'TGn', 'TGax', 'Rayleigh']
     TEST_FLAG = 'rsg' if args.test_mode == 'random_sampling' else 'inf'
+    RMS_FLAG = 'RMSn' if args.RMSNorm else ''
     OTA_DATASET = args.ota_dataset
     train_config = {
         'batchSize': 122,
@@ -246,7 +247,7 @@ if __name__ == "__main__":
         disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=prot_display)
         disp.plot()
         disp.ax_.get_images()[0].set_clim(0, 100)
-        plt.savefig(f"Results_finetune_{MODEL_NAME}.{OTA_DATASET}.{TEST_FLAG}.{train_config['lr']}.pdf")
+        plt.savefig(f"Results_finetune_{MODEL_NAME}.{OTA_DATASET}.{TEST_FLAG}.{RMS_FLAG}.pdf")
         plt.clf()
         print('-------------------------------------------')
         print('-------------------------------------------')
