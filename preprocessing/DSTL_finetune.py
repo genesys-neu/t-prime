@@ -203,6 +203,10 @@ if __name__ == "__main__":
 
     if args.test and not args.retrain:
         # Use the loaded model to do inference over the OTA dataset
+        if train_config['RMSNorm']:
+            RMSNorm_l = RMSNorm(model='Transformer')
+        else:
+            RMSNorm_l = None
         model.to(device)
         model.eval()
         # validation loop through test data
@@ -215,6 +219,8 @@ if __name__ == "__main__":
             for X, y in test_dataloader:
                 X = X.to(device)
                 y = y.to(device)
+                if not (RMSNorm_l is None):
+                    X = RMSNorm_l(X)
                 pred = model(X.float())
                 test_loss += criterion(pred, y).item()
                 correct += (pred.argmax(1) == y).type(torch.float).sum().item()

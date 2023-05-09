@@ -13,6 +13,7 @@ import argparse
 import threading
 from dstl_transformer.model_transformer import TransformerModel
 from queue import Queue
+from preprocessing.model_rmsnorm import RMSNorm
 
 
 N = 12900 # number of complex samples needed
@@ -141,6 +142,11 @@ def machinelearning():
     PROTOCOLS = ['802_11ax', '802_11b', '802_11n', '802_11g']
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # print('Device is {}'.format(device))
+    # RMS layer
+    if RMSNORM:
+        RMSNorm_layer = RMSNorm(model='Transformer')
+    else:
+        RMSNorm_layer = None
 
     if MODEL_SIZE == 'sm':
         seq_len = 24
@@ -175,6 +181,8 @@ def machinelearning():
                 input = torch.unsqueeze(input, 0) 
                 input = input.to(device)
                 # predict class
+                if RMSNorm_layer is not None:
+                    input = RMSNorm_layer(input)
                 pred = model(input.float()).argmax(1)
                 print(PROTOCOLS[pred])
                 # Write it in output file to pass it to the GUI
@@ -202,6 +210,7 @@ if __name__ == '__main__':
                                                 'default is 60s', type=int)
     parser.add_argument("--model_path", default='./', help='Path to the checkpoint to load the model for inference.')
     parser.add_argument("--model_size", default="lg", choices=["sm", "lg"], help="Define the use of the large or the small transformer.")
+    parser.add_argument("--RMSNorm", default=False, action='store_true', help="If present, we apply RMS normalization on input signals while training and testing")
     args = parser.parse_args()
 
     if args.frequency:
@@ -212,6 +221,7 @@ if __name__ == '__main__':
 
     MODEL_PATH = args.model_path
     MODEL_SIZE = args.model_size
+    RMSNORM = args.RMSNorm
     
     # if MODEL_SIZE == 'sm':
         # N = 2500
