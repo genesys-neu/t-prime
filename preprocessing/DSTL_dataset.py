@@ -182,7 +182,7 @@ class DSTLDataset(Dataset):
         for c in tqdm(examples_map.keys(), desc='Analyzing signal dataset...'):
             nsamples = len(examples_map[c].items())
             if self.testing_mode == 'inference':
-                test_threshold = int(nsamples * self.test_ratio)
+                test_threshold = int(nsamples *(1-self.test_ratio))
             else:
                 test_threshold = nsamples
             for ix, path in examples_map[c].items():
@@ -204,8 +204,8 @@ class DSTLDataset(Dataset):
                         ixs_count += 1
                 else:
                     for w in window_ixs:
-                        test_data_ixs[ixs_count] = {'path': path, 'sample_ix': w}
-                        test_labels_ixs[ixs_count] = class_map[c]
+                        test_data_ixs[test_ixs_count] = {'path': path, 'sample_ix': w}
+                        test_labels_ixs[test_ixs_count] = class_map[c]
                         test_ixs_count += 1
 
 
