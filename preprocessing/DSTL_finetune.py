@@ -123,6 +123,7 @@ def finetune(model, config):
     disp = ConfusionMatrixDisplay(confusion_matrix=best_cm, display_labels=prot_display)
     disp.plot()
     disp.ax_.get_images()[0].set_clim(0, 100)
+    plt.title(f'Confusion Matrix (%): Total Accuracy {(100 * correct):>0.1f}%')
     plt.savefig(f"Results_finetune_{MODEL_NAME}_ft.{OTA_DATASET}.{TEST_FLAG}.{RMS_FLAG}.pdf")
     plt.clf()
     print('-----------------------------------------------------------------')
@@ -164,6 +165,8 @@ if __name__ == "__main__":
         'nClasses': 4,
         'RMSNorm': args.RMSNorm
     }
+    font = {'size': 22}
+    plt.rc('font', **font)
 
     datasets = args.datasets
     ds_train = []
@@ -201,7 +204,8 @@ if __name__ == "__main__":
                                               raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence))
     # concat all loaded datasets
     ds_train = torch.utils.data.ConcatDataset(ds_train)
-    ds_test = torch.utils.data.ConcatDataset(ds_test)
+    if not args.test:
+        ds_test = torch.utils.data.ConcatDataset(ds_test)
 
     device = torch.device("cuda" if torch.cuda.is_available() and args.use_gpu else "cpu")
     if not args.retrain: # Load pretrained model
@@ -214,56 +218,77 @@ if __name__ == "__main__":
 
     if args.test and not args.retrain:
         # Use the loaded model to do inference over the OTA dataset
-        if train_config['RMSNorm']:
-            RMSNorm_l = RMSNorm(model='Transformer')
-        else:
-            RMSNorm_l = None
-        model.to(device)
-        model.eval()
-        # validation loop through test data
-        test_dataloader = DataLoader(ds_test, batch_size=train_config['batchSize'], shuffle=True)
-        size = len(test_dataloader.dataset)
-        criterion = nn.NLLLoss()
-        test_loss, correct = 0, 0
-        conf_matrix = np.zeros((train_config['nClasses'], train_config['nClasses']))
-        with torch.no_grad():
-            for X, y in test_dataloader:
-                X = X.to(device)
-                y = y.to(device)
-                if not (RMSNorm_l is None):
-                    X = RMSNorm_l(X)
-                pred = model(X.float())
-                test_loss += criterion(pred, y).item()
-                correct += (pred.argmax(1) == y).type(torch.float).sum().item()
-                y_cpu = y.to('cpu')
-                pred_cpu = pred.to('cpu')
-                conf_matrix += conf_mat(y_cpu, pred_cpu.argmax(1), labels=list(range(train_config['nClasses'])))
-        test_loss /= size
-        correct /= size
-        # report accuracy and save confusion matrix
-        print(
-            f"Test Error: \n "
-            f"Accuracy: {(100 * correct):>0.1f}%, "
-            f"Avg loss: {test_loss:>8f} \n"
-        )
-        conf_matrix = conf_matrix.astype('float')
-        for r in range(conf_matrix.shape[0]):  # for each row in the confusion matrix
-            sum_row = np.sum(conf_matrix[r, :])
-            conf_matrix[r, :] = conf_matrix[r, :] / sum_row  * 100.0# compute in percentage
+        global_conf_matrix = np.zeros((train_config['nClasses'], train_config['nClasses']))
+        for ds_ix, ds in enumerate(ds_test):
+            # Calcular performance i guardar matriu
+            if train_config['RMSNorm']:
+                RMSNorm_l = RMSNorm(model='Transformer')
+            else:
+                RMSNorm_l = None
+            model.to(device)
+            model.eval()
+            # validation loop through test data
+            test_dataloader = DataLoader(ds, batch_size=train_config['batchSize'], shuffle=True)
+            size = len(test_dataloader.dataset)
+            criterion = nn.NLLLoss()
+            test_loss, correct = 0, 0
+            conf_matrix = np.zeros((train_config['nClasses'], train_config['nClasses']))
+            with torch.no_grad():
+                for X, y in test_dataloader:
+                    X = X.to(device)
+                    y = y.to(device)
+                    if not (RMSNorm_l is None):
+                        X = RMSNorm_l(X)
+                    pred = model(X.float())
+                    test_loss += criterion(pred, y).item()
+                    correct += (pred.argmax(1) == y).type(torch.float).sum().item()
+                    y_cpu = y.to('cpu')
+                    pred_cpu = pred.to('cpu')
+                    conf_matrix += conf_mat(y_cpu, pred_cpu.argmax(1), labels=list(range(train_config['nClasses'])))
+                    global_conf_matrix += conf_mat(y_cpu, pred_cpu.argmax(1), labels=list(range(train_config['nClasses'])))
+            test_loss /= size
+            correct /= size
+            # report accuracy and save confusion matrix
+            print(
+                f"Test Error for dataset {args.datasets[ds_ix]}: \n "
+                f"Accuracy: {(100 * correct):>0.1f}%, "
+                f"Avg loss: {test_loss:>8f} \n"
+            )
+            conf_matrix = conf_matrix.astype('float')
+            for r in range(conf_matrix.shape[0]):  # for each row in the confusion matrix
+                sum_row = np.sum(conf_matrix[r, :])
+                conf_matrix[r, :] = conf_matrix[r, :] / sum_row  * 100.0 # compute in percentage
 
-        # plt.figure(figsize=(10,7))
-        prot_display = PROTOCOLS
-        prot_display[1] = '802_11b'
-        disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=prot_display)
-        disp.plot()
-        disp.ax_.get_images()[0].set_clim(0, 100)
-        plt.savefig(f"Results_finetune_{MODEL_NAME}.{OTA_DATASET}.{TEST_FLAG}.{RMS_FLAG}.pdf")
-        plt.clf()
-        print('-------------------------------------------')
-        print('-------------------------------------------')
-        print('Global confusion matrix (%)')
-        print(conf_matrix)
+            # plt.figure(figsize=(10,7))
+            prot_display = PROTOCOLS
+            prot_display[1] = '802_11b'
+            disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=prot_display)
+            disp.plot()
+            disp.ax_.get_images()[0].set_clim(0, 100)
+            plt.title(f'Confusion matrix (%): Total Accuracy {(100 * correct):>0.1f}%')
+            plt.savefig(f"Results_finetune_{MODEL_NAME}.{args.datasets[ds_ix]}.{TEST_FLAG}.{RMS_FLAG}.pdf")
+            plt.clf()
+            print('-------------------------------------------')
+            print('-------------------------------------------')
+            print(f'Confusion matrix (%) for {args.datasets[ds_ix]}')
+            print(conf_matrix)
         
+        # Global confusion matrix for all test datasets if more than one provided
+        if len(args.datasets) > 1:
+            global_conf_matrix = global_conf_matrix.astype('float')
+            for r in range(global_conf_matrix.shape[0]):  # for each row in the confusion matrix
+                sum_row = np.sum(global_conf_matrix[r, :])
+                global_conf_matrix[r, :] = global_conf_matrix[r, :] / sum_row  * 100.0 # compute in percentage
+            disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=prot_display)
+            disp.plot()
+            disp.ax_.get_images()[0].set_clim(0, 100)
+            plt.title(f'Global Confusion Matrix (%): Total Accuracy {(100 * correct):>0.1f}%')
+            plt.savefig(f"Results_finetune_{MODEL_NAME}.{OTA_DATASET}.{TEST_FLAG}.{RMS_FLAG}.pdf")
+            plt.clf()
+            print('-------------------------------------------')
+            print('-------------------------------------------')
+            print(f'Global Confusion Matrix (%) for {args.datasets[ds_ix]}')
+            print(conf_matrix)
     else:
         # Fine-tune the provided model with the new data
         finetune(model, train_config)
