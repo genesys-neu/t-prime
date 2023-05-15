@@ -117,13 +117,13 @@ def finetune(model, config):
         sum_row = np.sum(best_cm[r, :])
         best_cm[r, :] = best_cm[r, :] / sum_row  * 100.0 # compute in percentage
     print('------------------- Best confusion matrix (%) -------------------')
-    print(best_cm)
-    prot_display = PROTOCOLS
-    prot_display[1] = '802_11b'
+    print(np.around(best_cm, decimals=2))
+    prot_display = ['ax', 'b', 'n', 'g'] #PROTOCOLS
+    #prot_display[1] = '802_11b'
     disp = ConfusionMatrixDisplay(confusion_matrix=best_cm, display_labels=prot_display)
-    disp.plot()
+    disp.plot(cmap="Blues", values_format='.2f')
     disp.ax_.get_images()[0].set_clim(0, 100)
-    plt.title(f'Confusion Matrix (%): Total Accuracy {(100 * correct):>0.1f}%')
+    plt.title(f'Conf. Matrix (%): Total Acc. {(100 * correct):>0.1f}%')
     plt.savefig(f"Results_finetune_{MODEL_NAME}_ft.{OTA_DATASET}.{TEST_FLAG}.{RMS_FLAG}.pdf")
     plt.clf()
     print('-----------------------------------------------------------------')
@@ -165,7 +165,7 @@ if __name__ == "__main__":
         'nClasses': 4,
         'RMSNorm': args.RMSNorm
     }
-    font = {'size': 22}
+    font = {'size': 15}
     plt.rc('font', **font)
 
     datasets = args.datasets
@@ -264,12 +264,12 @@ if __name__ == "__main__":
                 conf_matrix[r, :] = conf_matrix[r, :] / sum_row  * 100.0 # compute in percentage
 
             # plt.figure(figsize=(10,7))
-            prot_display = PROTOCOLS
-            prot_display[1] = '802_11b'
+            prot_display = ['ax', 'b', 'n', 'g']#PROTOCOLS
+            #prot_display[1] = '802_11b'
             disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=prot_display)
             disp.plot(cmap="Blues", values_format='.2f')
             disp.ax_.get_images()[0].set_clim(0, 100)
-            plt.title(f'Confusion matrix (%): Total Accuracy {(100 * correct):>0.1f}%')
+            plt.title(f'Conf. Matrix (%): Total Acc. {(100 * correct):>0.1f}%')
             plt.savefig(f"Results_finetune_{MODEL_NAME}.{args.datasets[ds_ix]}.{TEST_FLAG}.{RMS_FLAG}.pdf")
             plt.clf()
             print(f'Confusion matrix (%) for {args.datasets[ds_ix]}')
@@ -291,7 +291,7 @@ if __name__ == "__main__":
             disp = ConfusionMatrixDisplay(confusion_matrix=global_conf_matrix, display_labels=prot_display)
             disp.plot(cmap="Blues", values_format='.2f')
             disp.ax_.get_images()[0].set_clim(0, 100)
-            plt.title(f'Global Confusion Matrix (%): Total Accuracy {(100 * global_correct):>0.1f}%')
+            plt.title(f'Global Conf. Matrix (%): Total Acc. {(100 * global_correct):>0.1f}%')
             plt.savefig(f"Results_finetune_{MODEL_NAME}.{OTA_DATASET}.{TEST_FLAG}.{RMS_FLAG}.pdf")
             plt.clf()
             print(f'Global Confusion Matrix (%) for {OTA_DATASET}')
