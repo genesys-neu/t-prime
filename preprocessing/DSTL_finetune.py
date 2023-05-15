@@ -250,7 +250,7 @@ if __name__ == "__main__":
             correct /= size
             # report accuracy and save confusion matrix
             print(
-                f"Test Error for dataset {args.datasets[ds_ix]}: \n "
+                f"\n\nTest Error for dataset {args.datasets[ds_ix]}: \n "
                 f"Accuracy: {(100 * correct):>0.1f}%, "
                 f"Avg loss: {test_loss:>8f} \n"
             )
@@ -268,10 +268,10 @@ if __name__ == "__main__":
             plt.title(f'Confusion matrix (%): Total Accuracy {(100 * correct):>0.1f}%')
             plt.savefig(f"Results_finetune_{MODEL_NAME}.{args.datasets[ds_ix]}.{TEST_FLAG}.{RMS_FLAG}.pdf")
             plt.clf()
-            print('-------------------------------------------')
-            print('-------------------------------------------')
             print(f'Confusion matrix (%) for {args.datasets[ds_ix]}')
-            print(conf_matrix)
+            print(np.around(conf_matrix, decimals=2))
+            print('-------------------------------------------')
+            print('-------------------------------------------')
         
         # Global confusion matrix for all test datasets if more than one provided
         if len(args.datasets) > 1:
@@ -279,16 +279,15 @@ if __name__ == "__main__":
             for r in range(global_conf_matrix.shape[0]):  # for each row in the confusion matrix
                 sum_row = np.sum(global_conf_matrix[r, :])
                 global_conf_matrix[r, :] = global_conf_matrix[r, :] / sum_row  * 100.0 # compute in percentage
-            disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=prot_display)
+            disp = ConfusionMatrixDisplay(confusion_matrix=global_conf_matrix, display_labels=prot_display)
             disp.plot(cmap="Blues", values_format='.2f')
             disp.ax_.get_images()[0].set_clim(0, 100)
             plt.title(f'Global Confusion Matrix (%): Total Accuracy {(100 * correct):>0.1f}%')
             plt.savefig(f"Results_finetune_{MODEL_NAME}.{OTA_DATASET}.{TEST_FLAG}.{RMS_FLAG}.pdf")
             plt.clf()
+            print(f'\n\nGlobal Confusion Matrix (%) for {OTA_DATASET}')
+            print(np.around(global_conf_matrix, decimals=2))
             print('-------------------------------------------')
-            print('-------------------------------------------')
-            print(f'Global Confusion Matrix (%) for {OTA_DATASET}')
-            print(conf_matrix)
     else:
         # Fine-tune the provided model with the new data
         finetune(model, train_config)
