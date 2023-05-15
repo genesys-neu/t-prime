@@ -257,7 +257,7 @@ if __name__ == "__main__":
             conf_matrix = conf_matrix.astype('float')
             for r in range(conf_matrix.shape[0]):  # for each row in the confusion matrix
                 sum_row = np.sum(conf_matrix[r, :])
-                conf_matrix[r, :] = conf_matrix[r, :] / sum_row  * 100.0 # compute in percentage
+                conf_matrix[r, :] = round(conf_matrix[r, :] / sum_row  * 100.0, 2) # compute in percentage
 
             # plt.figure(figsize=(10,7))
             prot_display = PROTOCOLS
@@ -278,7 +278,7 @@ if __name__ == "__main__":
             global_conf_matrix = global_conf_matrix.astype('float')
             for r in range(global_conf_matrix.shape[0]):  # for each row in the confusion matrix
                 sum_row = np.sum(global_conf_matrix[r, :])
-                global_conf_matrix[r, :] = global_conf_matrix[r, :] / sum_row  * 100.0 # compute in percentage
+                global_conf_matrix[r, :] = round(global_conf_matrix[r, :] / sum_row  * 100.0, 2) # compute in percentage
             disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=prot_display)
             disp.plot()
             disp.ax_.get_images()[0].set_clim(0, 100)
@@ -287,7 +287,7 @@ if __name__ == "__main__":
             plt.clf()
             print('-------------------------------------------')
             print('-------------------------------------------')
-            print(f'Global Confusion Matrix (%) for {args.datasets[ds_ix]}')
+            print(f'Global Confusion Matrix (%) for {OTA_DATASET}')
             print(conf_matrix)
     else:
         # Fine-tune the provided model with the new data
