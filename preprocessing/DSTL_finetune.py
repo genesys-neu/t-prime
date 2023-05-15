@@ -219,6 +219,8 @@ if __name__ == "__main__":
     if args.test and not args.retrain:
         # Use the loaded model to do inference over the OTA dataset
         global_conf_matrix = np.zeros((train_config['nClasses'], train_config['nClasses']))
+        global_correct = 0
+        global_size = 0
         for ds_ix, ds in enumerate(ds_test):
             # Calculate performance and save matrix
             if train_config['RMSNorm']:
@@ -230,6 +232,7 @@ if __name__ == "__main__":
             # validation loop through test data
             test_dataloader = DataLoader(ds, batch_size=train_config['batchSize'], shuffle=True)
             size = len(test_dataloader.dataset)
+            global_size += size
             criterion = nn.NLLLoss()
             test_loss, correct = 0, 0
             conf_matrix = np.zeros((train_config['nClasses'], train_config['nClasses']))
@@ -242,6 +245,7 @@ if __name__ == "__main__":
                     pred = model(X.float())
                     test_loss += criterion(pred, y).item()
                     correct += (pred.argmax(1) == y).type(torch.float).sum().item()
+                    global_correct += correct
                     y_cpu = y.to('cpu')
                     pred_cpu = pred.to('cpu')
                     conf_matrix += conf_mat(y_cpu, pred_cpu.argmax(1), labels=list(range(train_config['nClasses'])))
@@ -276,16 +280,21 @@ if __name__ == "__main__":
         # Global confusion matrix for all test datasets if more than one provided
         if len(args.datasets) > 1:
             global_conf_matrix = global_conf_matrix.astype('float')
+            global_correct /= global_size
+            print(
+                f"\n\nTest Error for dataset {OTA_DATASET}: \n "
+                f"Accuracy: {(100 * global_correct):>0.1f}%\n "
+            )
             for r in range(global_conf_matrix.shape[0]):  # for each row in the confusion matrix
                 sum_row = np.sum(global_conf_matrix[r, :])
                 global_conf_matrix[r, :] = global_conf_matrix[r, :] / sum_row  * 100.0 # compute in percentage
             disp = ConfusionMatrixDisplay(confusion_matrix=global_conf_matrix, display_labels=prot_display)
             disp.plot(cmap="Blues", values_format='.2f')
             disp.ax_.get_images()[0].set_clim(0, 100)
-            plt.title(f'Global Confusion Matrix (%): Total Accuracy {(100 * correct):>0.1f}%')
+            plt.title(f'Global Confusion Matrix (%): Total Accuracy {(100 * global_correct):>0.1f}%')
             plt.savefig(f"Results_finetune_{MODEL_NAME}.{OTA_DATASET}.{TEST_FLAG}.{RMS_FLAG}.pdf")
             plt.clf()
-            print(f'\n\nGlobal Confusion Matrix (%) for {OTA_DATASET}')
+            print(f'Global Confusion Matrix (%) for {OTA_DATASET}')
             print(np.around(global_conf_matrix, decimals=2))
             print('-------------------------------------------')
     else:
