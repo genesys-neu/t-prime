@@ -257,13 +257,13 @@ if __name__ == "__main__":
             conf_matrix = conf_matrix.astype('float')
             for r in range(conf_matrix.shape[0]):  # for each row in the confusion matrix
                 sum_row = np.sum(conf_matrix[r, :])
-                conf_matrix[r, :] = round(conf_matrix[r, :] / sum_row  * 100.0, 2) # compute in percentage
+                conf_matrix[r, :] = conf_matrix[r, :] / sum_row  * 100.0 # compute in percentage
 
             # plt.figure(figsize=(10,7))
             prot_display = PROTOCOLS
             prot_display[1] = '802_11b'
             disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=prot_display)
-            disp.plot()
+            disp.plot(cmap="Blues", values_format='.2f')
             disp.ax_.get_images()[0].set_clim(0, 100)
             plt.title(f'Confusion matrix (%): Total Accuracy {(100 * correct):>0.1f}%')
             plt.savefig(f"Results_finetune_{MODEL_NAME}.{args.datasets[ds_ix]}.{TEST_FLAG}.{RMS_FLAG}.pdf")
@@ -278,9 +278,9 @@ if __name__ == "__main__":
             global_conf_matrix = global_conf_matrix.astype('float')
             for r in range(global_conf_matrix.shape[0]):  # for each row in the confusion matrix
                 sum_row = np.sum(global_conf_matrix[r, :])
-                global_conf_matrix[r, :] = round(global_conf_matrix[r, :] / sum_row  * 100.0, 2) # compute in percentage
+                global_conf_matrix[r, :] = global_conf_matrix[r, :] / sum_row  * 100.0 # compute in percentage
             disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=prot_display)
-            disp.plot()
+            disp.plot(cmap="Blues", values_format='.2f')
             disp.ax_.get_images()[0].set_clim(0, 100)
             plt.title(f'Global Confusion Matrix (%): Total Accuracy {(100 * correct):>0.1f}%')
             plt.savefig(f"Results_finetune_{MODEL_NAME}.{OTA_DATASET}.{TEST_FLAG}.{RMS_FLAG}.pdf")
