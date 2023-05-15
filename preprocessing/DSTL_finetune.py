@@ -220,7 +220,7 @@ if __name__ == "__main__":
         # Use the loaded model to do inference over the OTA dataset
         global_conf_matrix = np.zeros((train_config['nClasses'], train_config['nClasses']))
         for ds_ix, ds in enumerate(ds_test):
-            # Calcular performance i guardar matriu
+            # Calculate performance and save matrix
             if train_config['RMSNorm']:
                 RMSNorm_l = RMSNorm(model='Transformer')
             else:
