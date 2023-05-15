@@ -245,12 +245,12 @@ if __name__ == "__main__":
                     pred = model(X.float())
                     test_loss += criterion(pred, y).item()
                     correct += (pred.argmax(1) == y).type(torch.float).sum().item()
-                    global_correct += correct
                     y_cpu = y.to('cpu')
                     pred_cpu = pred.to('cpu')
                     conf_matrix += conf_mat(y_cpu, pred_cpu.argmax(1), labels=list(range(train_config['nClasses'])))
                     global_conf_matrix += conf_mat(y_cpu, pred_cpu.argmax(1), labels=list(range(train_config['nClasses'])))
             test_loss /= size
+            global_correct += correct
             correct /= size
             # report accuracy and save confusion matrix
             print(
