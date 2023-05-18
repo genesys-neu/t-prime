@@ -215,6 +215,8 @@ def machinelearning_tensorRT():
     ONNX_VERSION = 10  # the ONNX version to export the model to
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     Nclasses = len(PROTOCOLS)
+    # Setup the pyCUDA context
+    trt_utils.make_cuda_context()
     # print('Device is {}'.format(device))
     # RMS layer
     if RMSNORM:
@@ -281,15 +283,14 @@ def machinelearning_tensorRT():
                 # predict class
                 if RMSNorm_layer is not None:
                     input = RMSNorm_layer(input)    # NOTE: this should also be included in the .plan
-
-                X = input.numpy()
+                X = input.cpu().numpy()
                 dnn.input_buff.host[:] = X.flatten().astype(input_dtype)
                 dnn.feed_forward()
                 trt_out = dnn.output_buff.host.reshape((batch_size, Nclasses))
                 pred = trt_out.argmax(1)
 
                 #pred = model(input.float()).argmax(1)
-                print(PROTOCOLS[pred])
+                print(PROTOCOLS[np.squeeze(pred)])
 
                 # Write it in output file to pass it to the GUI
                 file_flag = 'a'
@@ -323,9 +324,10 @@ def generate_model_plan(INPUT_NODE_NAME, ONNX_FILE_NAME, ONNX_VERSION, OUTPUT_NO
               input_len=slice_in.shape[2], logger=trt.Logger(trt.Logger.WARNING),
               MAX_BATCH_SIZE=slice_in.shape[0], MAX_WORKSPACE_SIZE=MAX_WORKSPACE_SIZE,
               BENCHMARK=True)
-    print('Running Inference Benchmark')
+
     plan_file = ONNX_FILE_NAME.replace('.onnx', '.plan')
     if benchmark:
+        print('Running Inference Benchmark')
         plan_bench(plan_file_name=plan_file, cplx_samples=slice_in.shape[2], num_chans=slice_in.shape[1],
                    batch_size=slice_in.shape[0], num_batches=512, input_dtype=np.float32)
     return plan_file
