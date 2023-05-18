@@ -89,6 +89,7 @@ def finetune(model, config):
     test_acc = []
     best_acc = 0
     best_cm = 0 # best confusion matrix
+    epochs_wo_improvement = 0
 
     if config['RMSNorm']:
         RMSNorm_l = RMSNorm(model='Transformer')
@@ -103,15 +104,23 @@ def finetune(model, config):
         acc, loss, conf_matrix = validate(model, criterion, test_dataloader, config['nClasses'], RMSnorm_layer=RMSNorm_l)
         test_acc.append(acc)
         print(f'| epoch {epoch:03d} | valid accuracy={acc:.1f}%, valid loss={loss:.2f} (test)')
+        scheduler.step(loss)
+        epochs_wo_improvement += 1
         if acc > best_acc:
             best_acc = acc
+            epochs_wo_improvement = 0
             # Save model and metrics
             torch.save({
                     'model_state_dict': model.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
                     'loss': loss,
-                }, os.path.join(PATH, MODEL_NAME + '_' + OTA_DATASET + '_' + TEST_FLAG + '_' + RMS_FLAG + '_ft.pt'))
+                }, os.path.join(PATH, MODEL_NAME + '_' + OTA_DATASET + '_' + TEST_FLAG + '_' + RMS_FLAG + NOISE_FLAG + '_ft.pt'))
             best_cm = conf_matrix
+        if epochs_wo_improvement > 12: # early stopping
+            print('------------------------------------')
+            print('Early termination implemented at epoch:', epoch+1)
+            print('------------------------------------')
+            break
     best_cm = best_cm.astype('float')
     for r in range(best_cm.shape[0]):  # for each row in the confusion matrix
         sum_row = np.sum(best_cm[r, :])
@@ -119,12 +128,14 @@ def finetune(model, config):
     print('------------------- Best confusion matrix (%) -------------------')
     print(np.around(best_cm, decimals=2))
     prot_display = ['ax', 'b', 'n', 'g'] #PROTOCOLS
+    if len(PROTOCOLS) > 4: # We need to add noise class
+        prot_display.append('Not known')
     #prot_display[1] = '802_11b'
     disp = ConfusionMatrixDisplay(confusion_matrix=best_cm, display_labels=prot_display)
     disp.plot(cmap="Blues", values_format='.2f')
     disp.ax_.get_images()[0].set_clim(0, 100)
-    plt.title(f'Conf. Matrix (%): Total Acc. {(100 * correct):>0.1f}%')
-    plt.savefig(f"Results_finetune_{MODEL_NAME}_ft.{OTA_DATASET}.{TEST_FLAG}.{RMS_FLAG}.pdf")
+    plt.title(f'Conf. Matrix (%): Total Acc. {(best_acc):>0.1f}%')
+    plt.savefig(f"Results_finetune_{MODEL_NAME}_ft.{OTA_DATASET}.{TEST_FLAG}.{RMS_FLAG}{NOISE_FLAG}.pdf")
     plt.clf()
     print('-----------------------------------------------------------------')
     return
@@ -148,6 +159,7 @@ if __name__ == "__main__":
     parser.add_argument("--ota_dataset", default='', help="Flag to add in results name to identify experiment.")
     parser.add_argument("--test", default=False, action='store_true', help="If present, we just test the provided model on OTA data.")
     parser.add_argument("--RMSNorm", default=False, action='store_true', help="If present, we apply RMS normalization on input signals while training and testing")
+    parser.add_argument("--back_class", default=False, action='store_true', help="Train/Use model with background or noise class.")
     args, _ = parser.parse_known_args()
 
     # Config
@@ -157,12 +169,15 @@ if __name__ == "__main__":
     CHANNELS = ['None', 'TGn', 'TGax', 'Rayleigh']
     TEST_FLAG = 'rsg' if args.test_mode == 'random_sampling' else 'inf'
     RMS_FLAG = 'RMSn' if args.RMSNorm else ''
+    NOISE_FLAG = '_bckg' if args.back_class else ''
+    if args.back_class:
+        PROTOCOLS.append('noise') 
     OTA_DATASET = args.ota_dataset
     train_config = {
         'batchSize': 122,
         'lr': 0.00002,
         'epochs': 100,
-        'nClasses': 4,
+        'nClasses': len(PROTOCOLS),
         'RMSNorm': args.RMSNorm
     }
     font = {'size': 15}
@@ -177,9 +192,9 @@ if __name__ == "__main__":
         model = global_model(classes=len(PROTOCOLS), numChannels=2, slice_len=512)
         for ds in datasets:
             ds_train.append(DSTLDataset(PROTOCOLS, ds_path=os.path.join(args.ds_path, ds), ds_type='train', slice_len=512, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
-                            raw_data_ratio=args.dataset_ratio, file_postfix='', override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False))
+                            raw_data_ratio=args.dataset_ratio, file_postfix='', override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, add_noise=args.back_class))
             ds_test.append(DSTLDataset(PROTOCOLS, ds_path=os.path.join(args.ds_path, ds), ds_type='test', slice_len=512, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
-                                raw_data_ratio=args.dataset_ratio, file_postfix='', override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False))
+                                raw_data_ratio=args.dataset_ratio, file_postfix='', override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, add_noise=args.back_class))
     else:
         # choose correct version
         if args.transformer_version == 'v1':
@@ -265,12 +280,14 @@ if __name__ == "__main__":
 
             # plt.figure(figsize=(10,7))
             prot_display = ['ax', 'b', 'n', 'g']#PROTOCOLS
+            if len(PROTOCOLS) > 4: # We need to add noise class
+                prot_display.append('Not known')
             #prot_display[1] = '802_11b'
             disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=prot_display)
             disp.plot(cmap="Blues", values_format='.2f')
             disp.ax_.get_images()[0].set_clim(0, 100)
             plt.title(f'Conf. Matrix (%): Total Acc. {(100 * correct):>0.1f}%')
-            plt.savefig(f"Results_finetune_{MODEL_NAME}.{args.datasets[ds_ix]}.{TEST_FLAG}.{RMS_FLAG}.pdf")
+            plt.savefig(f"Results_finetune_{MODEL_NAME}.{args.datasets[ds_ix]}.{TEST_FLAG}.{RMS_FLAG}{NOISE_FLAG}.pdf")
             plt.clf()
             print(f'Confusion matrix (%) for {args.datasets[ds_ix]}')
             print(np.around(conf_matrix, decimals=2))
@@ -292,7 +309,7 @@ if __name__ == "__main__":
             disp.plot(cmap="Blues", values_format='.2f')
             disp.ax_.get_images()[0].set_clim(0, 100)
             plt.title(f'Global Conf. Matrix (%): Total Acc. {(100 * global_correct):>0.1f}%')
-            plt.savefig(f"Results_finetune_{MODEL_NAME}.{OTA_DATASET}.{TEST_FLAG}.{RMS_FLAG}.pdf")
+            plt.savefig(f"Results_finetune_{MODEL_NAME}.{OTA_DATASET}.{TEST_FLAG}.{RMS_FLAG}{NOISE_FLAG}.pdf")
             plt.clf()
             print(f'Global Confusion Matrix (%) for {OTA_DATASET}')
             print(np.around(global_conf_matrix, decimals=2))
