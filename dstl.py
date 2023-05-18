@@ -342,6 +342,7 @@ if __name__ == '__main__':
     parser.add_argument("--model_path", default='./', help='Path to the checkpoint to load the model for inference.')
     parser.add_argument("--model_size", default="lg", choices=["sm", "lg"], help="Define the use of the large or the small transformer.")
     parser.add_argument("--RMSNorm", default=False, action='store_true', help="If present, we apply RMS normalization on input signals while training and testing")
+    parser.add_argument("--tensorRT", action="store_true", choices=['pytorch', 'TensorRT'], help='Use TensorRT model' )
     args = parser.parse_args()
 
     if args.frequency:
@@ -353,7 +354,10 @@ if __name__ == '__main__':
     MODEL_PATH = args.model_path
     MODEL_SIZE = args.model_size
     RMSNORM = args.RMSNorm
-    MODE = 'pytorch'  # choices=['pytorch', 'TensorRT']
+    if args.tensorRT:
+        MODE = 'TensorRT'  # choices=['pytorch', 'TensorRT']
+    else:
+        MODE = 'pytorch'
     
     # if MODEL_SIZE == 'sm':
         # N = 2500
