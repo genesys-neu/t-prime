@@ -5,10 +5,9 @@ import matplotlib.pyplot as plt
 import torch
 from glob import glob
 import os
-proj_root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.join(os.pardir, os.pardir)))
+proj_root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
 import sys
 sys.path.append(proj_root_dir)
-sys.path.insert(0, '../')
 import argparse
 from dstl_transformer.model_transformer import TransformerModel
 from cnn_baseline.model_cnn1d import Baseline_CNN1D
@@ -28,9 +27,9 @@ if MODE == 'TensorRT':
     TRANS_PATH = '/home/deepwave/Research/DSTL/dstl/dstl_transformer/model_cp'
     CNN_PATH = '/home/deepwave/Research/DSTL/dstl/cnn_baseline/results_slice512'
     import tensorrt as trt
-    from inference.onnx2plan import onnx2plan
-    from inference.plan_bench import plan_bench
-    import inference.trt_utils as trt_utils
+    from preprocessing.inference.onnx2plan import onnx2plan
+    from preprocessing.inference.plan_bench import plan_bench
+    import preprocessing.inference.trt_utils as trt_utils
 
 INPUT_NODE_NAME = 'input_buffer'  # (for TensorRT) User defined name of input node
 OUTPUT_NODE_NAME = 'output_buffer'  # User defined name of output node
