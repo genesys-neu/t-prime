@@ -117,6 +117,7 @@ while file_cntr < nfiles:
 
     resampled_samples.tofile(file_name)
     # print('Wrote file number {}'.format(file_cntr))
+    # print('final s {}, # {}'.format(resampled_samples, resampled_samples.size))
     file_cntr += 1
    
     # remove the restart code when running live. the stream reader will restart if it crashes

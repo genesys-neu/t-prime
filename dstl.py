@@ -143,7 +143,7 @@ def signalprocessing():
 
 def machinelearning():
     # Model configuration and loading
-    PROTOCOLS = ['802_11ax', '802_11b', '802_11n', '802_11g']
+    PROTOCOLS = ['802_11ax', '802_11b', '802_11n', '802_11g', 'noise']
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # print('Device is {}'.format(device))
     # RMS layer
