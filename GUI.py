@@ -5,6 +5,7 @@ import json
 import seaborn as sns
 from matplotlib.colors import ListedColormap
 import matplotlib.pyplot as plt
+import argparse
 import streamlit as st
 #from paramiko import SSHClient
 #from scp import SCPClient
@@ -12,11 +13,15 @@ import streamlit as st
 #####################################################
 ############### DISPLAY CONFIGURATION ###############
 #####################################################
+# Option to include background class
+parser = argparse.ArgumentParser()
+parser.add_argument("--back_class", action='store_true', default=False, help="Show background class as an option")
+args, _ = parser.parse_known_args()
 # Index Colors by label
-PROTOCOLS_MAP = {'0':'802_11ax', '1':'802_11b', '2':'802_11n', '3':'802_11g'}
-PROTOCOLS = ['802_11ax', '802_11b', '802_11n', '802_11g']
-COLORS = ["#F20505", "#056CF2", "#FFCF00", "#0ABF04"]
-EMOJIS = ['AX', 'B', 'N', 'G'] #['🟥', '🟦', '🟨', '🟩'] 
+PROTOCOLS_MAP = {'0':'802_11ax', '1':'802_11b', '2':'802_11n', '3':'802_11g', '4': 'Not known'}
+PROTOCOLS = ['802_11ax', '802_11b', '802_11n', '802_11g', 'noise']
+COLORS = ["#F20505", "#056CF2", "#FFCF00", "#0ABF04", "#000000"]
+EMOJIS = ['AX', 'B', 'N', 'G', 'Not known'] #['🟥', '🟦', '🟨', '🟩'] 
 sns.set(font_scale=2)
 
 ##############################################
@@ -100,7 +105,10 @@ st.write('In this dashboard, we will display the result of the real time classif
           the protocol being transmitted among the following classes: 802_11ax, 802_11b, 802_11n, 802_11g.')
 # Protocols legend
 st.header('Protocols')
-c1, c2, c3, c4 = st.columns(4)
+if args.back_class: 
+    c1, c2, c3, c4, c5 = st.columns(5)
+else:
+    c1, c2, c3, c4 = st.columns(4)
 with c1:
     st.subheader(f"{PROTOCOLS[0]}    -    {EMOJIS[0]}")
     st.image(f'{PROTOCOLS[0]}.png')
@@ -113,6 +121,10 @@ with c3:
 with c4:
     st.subheader(f"{PROTOCOLS[3]}    -    {EMOJIS[3]}")
     st.image(f'{PROTOCOLS[3]}.png')
+if args.back_class:
+    with c5:
+        st.subheader(f"{EMOJIS[4]}")
+        st.image(f'{PROTOCOLS[4]}.png')
 # Real time updated dashboard
 st.header('Real time prediction')
 placeholder = st.empty()
