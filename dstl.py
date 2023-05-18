@@ -250,7 +250,7 @@ def machinelearning_tensorRT():
     model.eval()
 
     plan_file = generate_model_plan(INPUT_NODE_NAME, ONNX_FILE_NAME, ONNX_VERSION, OUTPUT_NODE_NAME, model, slice_in, benchmark=False)
-    input_dtype = np.float32
+    input_dtype = torch.float32
     # Use pyCUDA to create a shared memory buffer that will receive samples from the
     # AIR-T to be fed into the neural network.
     batch_size, seq_len, cplx_samples = slice_in.shape
@@ -282,7 +282,8 @@ def machinelearning_tensorRT():
                 # predict class
                 if RMSNorm_layer is not None:
                     input = RMSNorm_layer(input)    # NOTE: this should also be included in the .plan
-                X = input.cpu().numpy()
+                #X = input.cpu().numpy()
+                X = input
                 dnn.input_buff.host[:] = X.flatten().astype(input_dtype)
                 dnn.feed_forward()
                 trt_out = dnn.output_buff.host.reshape((batch_size, Nclasses))
