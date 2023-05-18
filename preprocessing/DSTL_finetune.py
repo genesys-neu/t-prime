@@ -129,7 +129,7 @@ def finetune(model, config):
     print(np.around(best_cm, decimals=2))
     prot_display = ['ax', 'b', 'n', 'g'] #PROTOCOLS
     if len(PROTOCOLS) > 4: # We need to add noise class
-        prot_display.append('Not known')
+        prot_display.append('unk.')
     #prot_display[1] = '802_11b'
     disp = ConfusionMatrixDisplay(confusion_matrix=best_cm, display_labels=prot_display)
     disp.plot(cmap="Blues", values_format='.2f')
@@ -281,7 +281,7 @@ if __name__ == "__main__":
             # plt.figure(figsize=(10,7))
             prot_display = ['ax', 'b', 'n', 'g']#PROTOCOLS
             if len(PROTOCOLS) > 4: # We need to add noise class
-                prot_display.append('Not known')
+                prot_display.append('unk.')
             #prot_display[1] = '802_11b'
             disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=prot_display)
             disp.plot(cmap="Blues", values_format='.2f')
