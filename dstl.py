@@ -341,7 +341,7 @@ if __name__ == '__main__':
     parser.add_argument("--model_path", default='./', help='Path to the checkpoint to load the model for inference.')
     parser.add_argument("--model_size", default="lg", choices=["sm", "lg"], help="Define the use of the large or the small transformer.")
     parser.add_argument("--RMSNorm", default=False, action='store_true', help="If present, we apply RMS normalization on input signals while training and testing")
-    parser.add_argument("--tensorRT", action="store_true", default=False, choices=['pytorch', 'TensorRT'], help='Use TensorRT model' )
+    parser.add_argument("--tensorRT", action="store_true", default=False, help='Use TensorRT model' )
     parser.add_argument("--protocols", default=['802_11ax', '802_11b', '802_11n', '802_11g', 'noise'], help="Specify the list of classes")
     args = parser.parse_args()
 
