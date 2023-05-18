@@ -117,7 +117,7 @@ class DSTLDataset(Dataset):
             self.mateng = matutils.MatlabEngine()  # todo check if we need any custom paths
             # initialize each channel object for each protocol used
             self.chan_models = {}
-            for ix, p in enumerate(protocols):
+            for ix, p in enumerate(protocols[0:4]):
                 if p == '802_11n':
                     tgn = self.mateng.eng.wlanTGnChannel('SampleRate', float(20e6), 'DelayProfile', 'Model-B', 'LargeScaleFadingEffect', 'Pathloss', 'PathGainsOutputPort', True)
                     self.chan_models[ix] = tgn
@@ -145,7 +145,9 @@ class DSTLDataset(Dataset):
         if os.path.isdir(os.path.join(ds_path, self.protocols[0])):
             protocols = self.protocols
         elif os.path.isdir(os.path.join(ds_path, '802.11ax')):
-            protocols = ['802.11ax', '802.11b', '802.11n', '802.11g'] 
+            protocols = ['802.11ax', '802.11b', '802.11n', '802.11g']
+            if len(self.protocols) == 5:
+                protocols.append('noise') 
         # retrieve the list of signals (.mat) from every folder/protocol specified
         for i, p in enumerate(protocols):
             path = os.path.join(ds_path, p)
@@ -164,7 +166,8 @@ class DSTLDataset(Dataset):
                 )
 
             else:
-                sys.exit('[DSTLDataset] folder ' + path + ' not found. Aborting...')
+                if p != 'noise': # not all datasets contain noise 
+                    sys.exit('[DSTLDataset] folder ' + path + ' not found. Aborting...')
 
         # now let's go through each class examples and assign a global sample index
         # based on the slice len and overlap configuration

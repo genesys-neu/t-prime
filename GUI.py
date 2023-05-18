@@ -5,19 +5,10 @@ import json
 import seaborn as sns
 from matplotlib.colors import ListedColormap
 import matplotlib.pyplot as plt
+import argparse
 import streamlit as st
 #from paramiko import SSHClient
 #from scp import SCPClient
-
-#####################################################
-############### DISPLAY CONFIGURATION ###############
-#####################################################
-# Index Colors by label
-PROTOCOLS_MAP = {'0':'802_11ax', '1':'802_11b', '2':'802_11n', '3':'802_11g'}
-PROTOCOLS = ['802_11ax', '802_11b', '802_11n', '802_11g']
-COLORS = ["#F20505", "#056CF2", "#FFCF00", "#0ABF04"]
-EMOJIS = ['AX', 'B', 'N', 'G'] #['🟥', '🟦', '🟨', '🟩'] 
-sns.set(font_scale=2)
 
 ##############################################
 ############### SSH CONNECTION ###############
@@ -36,6 +27,19 @@ except FileNotFoundError:
 # Define the name of the file to extract and where to save
 filename = creds['output_filename']
 cwd = os.getcwd()
+
+#####################################################
+############### DISPLAY CONFIGURATION ###############
+#####################################################
+# Option to include background class
+back_class = creds['background_class'] == "True" 
+print(back_class)
+# Index Colors by label
+PROTOCOLS_MAP = {'0':'802_11ax', '1':'802_11b', '2':'802_11n', '3':'802_11g', '4': 'Not known'}
+PROTOCOLS = ['802_11ax', '802_11b', '802_11n', '802_11g', 'noise']
+COLORS = ["#F20505", "#056CF2", "#FFCF00", "#0ABF04", "#000000"]
+EMOJIS = ['AX', 'B', 'N', 'G', 'Not known'] #['🟥', '🟦', '🟨', '🟩'] 
+sns.set(font_scale=2)
 
 ##############################################
 ############### DATA RETRIEVAL ###############
@@ -100,7 +104,10 @@ st.write('In this dashboard, we will display the result of the real time classif
           the protocol being transmitted among the following classes: 802_11ax, 802_11b, 802_11n, 802_11g.')
 # Protocols legend
 st.header('Protocols')
-c1, c2, c3, c4 = st.columns(4)
+if back_class: 
+    c1, c2, c3, c4, c5 = st.columns(5)
+else:
+    c1, c2, c3, c4 = st.columns(4)
 with c1:
     st.subheader(f"{PROTOCOLS[0]}    -    {EMOJIS[0]}")
     st.image(f'{PROTOCOLS[0]}.png')
@@ -113,6 +120,10 @@ with c3:
 with c4:
     st.subheader(f"{PROTOCOLS[3]}    -    {EMOJIS[3]}")
     st.image(f'{PROTOCOLS[3]}.png')
+if back_class:
+    with c5:
+        st.subheader(f"{EMOJIS[4]}")
+        st.image(f'{PROTOCOLS[4]}.png')
 # Real time updated dashboard
 st.header('Real time prediction')
 placeholder = st.empty()
@@ -138,10 +149,10 @@ while True:
             if len(labels) > 300: 
                 # Display only last 200
                 ax = sns.heatmap([labels[-300:]], xticklabels=False, yticklabels=False, 
-                                cmap=COLORS, cbar=False, vmin=0, vmax=3)
+                                cmap=COLORS, cbar=False, vmin=0, vmax=4)
             else:
                 ax = sns.heatmap([labels], xticklabels=False, yticklabels=False, 
-                                cmap=COLORS, cbar=False, vmin=0, vmax=3)
+                                    cmap=COLORS, cbar=False, vmin=0, vmax=4)
             ax.set_xlabel('Time')
             st.pyplot(fig)
         
