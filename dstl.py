@@ -15,9 +15,9 @@ from dstl_transformer.model_transformer import TransformerModel
 from queue import Queue
 from preprocessing.model_rmsnorm import RMSNorm
 import tensorrt as trt
-from inference.onnx2plan import onnx2plan
-from inference.plan_bench import plan_bench
-import inference.trt_utils as trt_utils
+from preprocessing.inference.onnx2plan import onnx2plan
+from preprocessing.inference.plan_bench import plan_bench
+import preprocessing.inference.trt_utils as trt_utils
 
 
 N = 12900 # number of complex samples needed
