@@ -143,7 +143,6 @@ def signalprocessing():
 
 def machinelearning():
     # Model configuration and loading
-    PROTOCOLS = ['802_11ax', '802_11b', '802_11n', '802_11g', 'noise']
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # print('Device is {}'.format(device))
     # RMS layer
@@ -208,7 +207,7 @@ def machinelearning():
 
 def machinelearning_tensorRT():
     # Model configuration and loading
-    PROTOCOLS = ['802_11ax', '802_11b', '802_11n', '802_11g']
+
     batch_size = 1
     INPUT_NODE_NAME = 'input_buffer'  # (for TensorRT) User defined name of input node
     OUTPUT_NODE_NAME = 'output_buffer'  # User defined name of output node
@@ -343,6 +342,7 @@ if __name__ == '__main__':
     parser.add_argument("--model_size", default="lg", choices=["sm", "lg"], help="Define the use of the large or the small transformer.")
     parser.add_argument("--RMSNorm", default=False, action='store_true', help="If present, we apply RMS normalization on input signals while training and testing")
     parser.add_argument("--tensorRT", action="store_true", choices=['pytorch', 'TensorRT'], help='Use TensorRT model' )
+    parser.add_argument("--protocols", default=['802_11ax', '802_11b', '802_11n', '802_11g', 'noise'], help="Specify the list of classes")
     args = parser.parse_args()
 
     if args.frequency:
@@ -358,6 +358,8 @@ if __name__ == '__main__':
         MODE = 'TensorRT'  # choices=['pytorch', 'TensorRT']
     else:
         MODE = 'pytorch'
+
+    PROTOCOLS = args.protocols
     
     # if MODEL_SIZE == 'sm':
         # N = 2500
