@@ -351,7 +351,7 @@ if __name__ == '__main__':
     MODEL_PATH = args.model_path
     MODEL_SIZE = args.model_size
     RMSNORM = args.RMSNorm
-    MODE = 'TensorRT'  # choices=['pytorch', 'TensorRT']
+    MODE = 'pytorch'  # choices=['pytorch', 'TensorRT']
     
     # if MODEL_SIZE == 'sm':
         # N = 2500
