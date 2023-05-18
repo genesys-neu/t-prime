@@ -14,6 +14,10 @@ import threading
 from dstl_transformer.model_transformer import TransformerModel
 from queue import Queue
 from preprocessing.model_rmsnorm import RMSNorm
+import tensorrt as trt
+from inference.onnx2plan import onnx2plan
+from inference.plan_bench import plan_bench
+import inference.trt_utils as trt_utils
 
 
 N = 12900 # number of complex samples needed
@@ -199,7 +203,132 @@ def machinelearning():
                 time_avg = time_avg + (t2-t1)
     
     time.sleep(1)
-    print("ML predictions takes {} ms on average to complete {} cycles".format(1000*time_avg/pred_cntr,pred_cntr)) 
+    print("ML predictions takes {} ms on average to complete {} cycles".format(1000*time_avg/pred_cntr,pred_cntr))
+
+
+def machinelearning_tensorRT():
+    # Model configuration and loading
+    PROTOCOLS = ['802_11ax', '802_11b', '802_11n', '802_11g']
+    batch_size = 1
+    INPUT_NODE_NAME = 'input_buffer'  # (for TensorRT) User defined name of input node
+    OUTPUT_NODE_NAME = 'output_buffer'  # User defined name of output node
+    ONNX_VERSION = 10  # the ONNX version to export the model to
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    Nclasses = len(PROTOCOLS)
+    # print('Device is {}'.format(device))
+    # RMS layer
+    if RMSNORM:
+        RMSNorm_layer = RMSNorm(model='Transformer')
+    else:
+        RMSNorm_layer = None
+
+    fname = os.path.basename(MODEL_PATH)
+    if fname[-3:] == '.pt':
+        fname = fname[:-3]
+    ONNX_FILE_NAME = os.path.join(os.path.dirname(MODEL_PATH), str(fname) + ".onnx")
+
+    if MODEL_SIZE == 'sm':
+        seq_len = 24
+        sli_len = 64 * 2
+        model = TransformerModel(classes=Nclasses, d_model=64 * 2, seq_len=seq_len, nlayers=2, use_pos=False)
+    else:  # lg architecture
+
+        seq_len = 64
+        sli_len = 128 * 2
+        model = TransformerModel(classes=Nclasses, d_model=128 * 2, seq_len=seq_len, nlayers=2, use_pos=False)
+    try:
+        model.load_state_dict(torch.load(MODEL_PATH, map_location=device)['model_state_dict'])
+    except:
+        raise Exception(
+            "The model you provided does not correspond with the selected architecture. Please revise the path and try again.")
+    # model.eval()
+
+    slice_in = np.random.random((batch_size, seq_len, sli_len))
+    model = model.float()
+    model.to(device)
+    model.eval()
+
+    plan_file = generate_model_plan(INPUT_NODE_NAME, ONNX_FILE_NAME, ONNX_VERSION, OUTPUT_NODE_NAME, model, slice_in, benchmark=False)
+    input_dtype = np.float32
+    # Use pyCUDA to create a shared memory buffer that will receive samples from the
+    # AIR-T to be fed into the neural network.
+    batch_size, seq_len, cplx_samples = slice_in.shape
+    buff_len = seq_len * cplx_samples * batch_size
+    sample_buffer = trt_utils.MappedBuffer(buff_len, input_dtype)
+
+    # Set up the inference engine. Note that the output buffers are created for
+    # us when we create the inference object.
+    dnn = trt_utils.TrtInferFromPlan(plan_file, batch_size,
+                                     sample_buffer, verbose=False)
+
+    preds = []  # list to keep track of model predictions
+    pred_cntr = 0
+    time_avg = 0
+    while not exitFlag:
+        with torch.no_grad():
+            if not q2.empty():
+                t1 = time.perf_counter()
+                input = q2.get()
+                # print('ML input recieved')
+                # split sequence into words
+                input = np.split(input, seq_len)
+                # print('words are now {}'.format(input))
+                input = np.array(input)
+                input = torch.from_numpy(input)
+                #  create empty batch dimension
+                input = torch.unsqueeze(input, 0)
+                input = input.to(device)
+                # predict class
+                if RMSNorm_layer is not None:
+                    input = RMSNorm_layer(input)    # NOTE: this should also be included in the .plan
+
+                X = input.numpy()
+                dnn.input_buff.host[:] = X.flatten().astype(input_dtype)
+                dnn.feed_forward()
+                trt_out = dnn.output_buff.host.reshape((batch_size, Nclasses))
+                pred = trt_out.argmax(1)
+
+                #pred = model(input.float()).argmax(1)
+                print(PROTOCOLS[pred])
+
+                # Write it in output file to pass it to the GUI
+                file_flag = 'a'
+                # Every 500 predictions flush output content
+                if pred_cntr % 500 == 0:
+                    file_flag = 'w'
+                with open('output.txt', file_flag) as file:
+                    file.write(f'{pred.item()} {time.time()}\n')
+                preds.append(pred)
+                # print(str(q2.qsize()) + ' items in queue 2')
+                t2 = time.perf_counter()
+                pred_cntr = pred_cntr + 1
+                time_avg = time_avg + (t2 - t1)
+
+    time.sleep(1)
+    print("ML predictions takes {} ms on average to complete {} cycles".format(1000 * time_avg / pred_cntr, pred_cntr))
+
+
+def generate_model_plan(INPUT_NODE_NAME, ONNX_FILE_NAME, ONNX_VERSION, OUTPUT_NODE_NAME, model, slice_in, benchmark=False):
+    slice_t = torch.Tensor(slice_in)
+    slice_t = slice_t.to(model.device.type)
+    # Let's produce the ONNX schema of the current model
+    torch.onnx.export(model, slice_t, ONNX_FILE_NAME, export_params=True,
+                      opset_version=ONNX_VERSION, do_constant_folding=True,
+                      input_names=[INPUT_NODE_NAME], output_names=[OUTPUT_NODE_NAME],
+                      dynamic_axes={INPUT_NODE_NAME: {0: 'batch_size'},
+                                    OUTPUT_NODE_NAME: {0: 'batch_size'}})
+    # Then create the relative plan file using TensorRT
+    MAX_WORKSPACE_SIZE = 1073741824  # 1 GB for example
+    onnx2plan(onnx_file_name=ONNX_FILE_NAME, nchan=slice_in.shape[1],
+              input_len=slice_in.shape[2], logger=trt.Logger(trt.Logger.WARNING),
+              MAX_BATCH_SIZE=slice_in.shape[0], MAX_WORKSPACE_SIZE=MAX_WORKSPACE_SIZE,
+              BENCHMARK=True)
+    print('Running Inference Benchmark')
+    plan_file = ONNX_FILE_NAME.replace('.onnx', '.plan')
+    if benchmark:
+        plan_bench(plan_file_name=plan_file, cplx_samples=slice_in.shape[2], num_chans=slice_in.shape[1],
+                   batch_size=slice_in.shape[0], num_batches=512, input_dtype=np.float32)
+    return plan_file
 
 
 # TODO add GUI interface - will this require another threadsafe queue?
@@ -222,6 +351,7 @@ if __name__ == '__main__':
     MODEL_PATH = args.model_path
     MODEL_SIZE = args.model_size
     RMSNORM = args.RMSNorm
+    MODE = 'TensorRT'  # choices=['pytorch', 'TensorRT']
     
     # if MODEL_SIZE == 'sm':
         # N = 2500
@@ -232,7 +362,10 @@ if __name__ == '__main__':
     sp = threading.Thread(target=signalprocessing)
     sp.start()
 
-    ml = threading.Thread(target=machinelearning)
+    if MODE == 'pytorch':
+        ml = threading.Thread(target=machinelearning)
+    elif MODE == 'TensorRT':
+        ml = threading.Thread(target=machinelearning_tensorRT)
     ml.start()
 
     # gracefully end program
