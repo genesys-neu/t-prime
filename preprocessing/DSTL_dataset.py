@@ -151,23 +151,30 @@ class DSTLDataset(Dataset):
         # retrieve the list of signals (.mat) from every folder/protocol specified
         for i, p in enumerate(protocols):
             path = os.path.join(ds_path, p)
-            if os.path.isdir(path):
-                mat_list = sorted(glob(os.path.join(path, '*.bin'))) if self.ota else sorted(glob(os.path.join(path, '*.mat')))
-                self.n_sig_per_class[self.protocols[i]] = int(
-                    len(mat_list) * self.raw_data_ratio)  # for each protocol, we save the amount of raw signals to retain
+            if path.split('_')[-1] == 'power':
+                paths = [path + pfix for pfix in ['_0', '_10', '_20', '_30']]
+            else:
+                paths = [path]
+            for power_path in paths:
+                mat_list_path = []   
+                num_mat = 0     
+                if os.path.isdir(power_path):
+                    mat_list = sorted(glob(os.path.join(power_path, '*.bin'))) if self.ota else sorted(glob(os.path.join(power_path, '*.mat')))
+                    self.n_sig_per_class[self.protocols[i]] = int(
+                        len(mat_list) * self.raw_data_ratio)  # for each protocol, we save the amount of raw signals to retain
 
-                mat_list = mat_list[:self.n_sig_per_class[self.protocols[i]]] # then we just clip the list
-                num_mat = len(mat_list)                     # and store the new list value length
-                examples_map[self.protocols[i]] = dict(
+                    mat_list = mat_list[:self.n_sig_per_class[self.protocols[i]]] # then we just clip the list
+                    num_mat += len(mat_list)                     # and store the new list value length
+                    mat_list_path.extend(mat_list)
+                else:
+                    if p != 'noise': # not all datasets contain noise 
+                        sys.exit('[DSTLDataset] folder ' + path + ' not found. Aborting...')
+            examples_map[self.protocols[i]] = dict(
                     zip(
                         list(range(num_mat)),
-                        mat_list
+                        mat_list_path
                     )
                 )
-
-            else:
-                if p != 'noise': # not all datasets contain noise 
-                    sys.exit('[DSTLDataset] folder ' + path + ' not found. Aborting...')
 
         # now let's go through each class examples and assign a global sample index
         # based on the slice len and overlap configuration
