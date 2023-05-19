@@ -144,14 +144,16 @@ class DSTLDataset(Dataset):
         # check if folders are names with _ or .
         if os.path.isdir(os.path.join(ds_path, self.protocols[0])):
             protocols = self.protocols
-        elif os.path.isdir(os.path.join(ds_path, '802.11ax')):
+        elif (os.path.isdir(os.path.join(ds_path, '802.11ax')) or os.path.isdir(os.path.join(ds_path, '802.11ax_0'))):
             protocols = ['802.11ax', '802.11b', '802.11n', '802.11g']
             if len(self.protocols) == 5:
                 protocols.append('noise') 
+        else:
+            sys.exit('[DSTLDataset] protocols folder names  not found at ' + ds_path + '. Aborting...')
         # retrieve the list of signals (.mat) from every folder/protocol specified
         for i, p in enumerate(protocols):
             path = os.path.join(ds_path, p)
-            if path.split('_')[-1] == 'power':
+            if ds_path.split('_')[-1] == 'power':
                 paths = [path + pfix for pfix in ['_0', '_10', '_20', '_30']]
             else:
                 paths = [path]
