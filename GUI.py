@@ -149,10 +149,10 @@ while True:
             if len(labels) > 300: 
                 # Display only last 200
                 ax = sns.heatmap([labels[-300:]], xticklabels=False, yticklabels=False, 
-                                cmap=COLORS, cbar=False, vmin=0, vmax=3)
+                                cmap=COLORS, cbar=False, vmin=0, vmax=4)
             else:
                 ax = sns.heatmap([labels], xticklabels=False, yticklabels=False, 
-                                cmap=COLORS, cbar=False, vmin=0, vmax=3)
+                                    cmap=COLORS, cbar=False, vmin=0, vmax=4)
             ax.set_xlabel('Time')
             st.pyplot(fig)
         

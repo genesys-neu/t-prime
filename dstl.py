@@ -143,7 +143,6 @@ def signalprocessing():
 
 def machinelearning():
     # Model configuration and loading
-    PROTOCOLS = ['802_11ax', '802_11b', '802_11n', '802_11g']
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # print('Device is {}'.format(device))
     # RMS layer
@@ -181,7 +180,7 @@ def machinelearning():
                 # print('words are now {}'.format(input))
                 input = np.array(input)
                 input = torch.from_numpy(input)
-                # create empty batch dimension
+                # create empty batch dimension
                 input = torch.unsqueeze(input, 0) 
                 input = input.to(device)
                 # predict class
@@ -208,13 +207,15 @@ def machinelearning():
 
 def machinelearning_tensorRT():
     # Model configuration and loading
-    PROTOCOLS = ['802_11ax', '802_11b', '802_11n', '802_11g']
+
     batch_size = 1
     INPUT_NODE_NAME = 'input_buffer'  # (for TensorRT) User defined name of input node
     OUTPUT_NODE_NAME = 'output_buffer'  # User defined name of output node
     ONNX_VERSION = 10  # the ONNX version to export the model to
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     Nclasses = len(PROTOCOLS)
+    # Setup the pyCUDA context
+    trt_utils.make_cuda_context()
     # print('Device is {}'.format(device))
     # RMS layer
     if RMSNORM:
@@ -281,15 +282,14 @@ def machinelearning_tensorRT():
                 # predict class
                 if RMSNorm_layer is not None:
                     input = RMSNorm_layer(input)    # NOTE: this should also be included in the .plan
-
-                X = input.numpy()
+                X = input.cpu().numpy()
                 dnn.input_buff.host[:] = X.flatten().astype(input_dtype)
                 dnn.feed_forward()
                 trt_out = dnn.output_buff.host.reshape((batch_size, Nclasses))
                 pred = trt_out.argmax(1)
 
                 #pred = model(input.float()).argmax(1)
-                print(PROTOCOLS[pred])
+                print(PROTOCOLS[np.squeeze(pred)])
 
                 # Write it in output file to pass it to the GUI
                 file_flag = 'a'
@@ -323,9 +323,10 @@ def generate_model_plan(INPUT_NODE_NAME, ONNX_FILE_NAME, ONNX_VERSION, OUTPUT_NO
               input_len=slice_in.shape[2], logger=trt.Logger(trt.Logger.WARNING),
               MAX_BATCH_SIZE=slice_in.shape[0], MAX_WORKSPACE_SIZE=MAX_WORKSPACE_SIZE,
               BENCHMARK=True)
-    print('Running Inference Benchmark')
+
     plan_file = ONNX_FILE_NAME.replace('.onnx', '.plan')
     if benchmark:
+        print('Running Inference Benchmark')
         plan_bench(plan_file_name=plan_file, cplx_samples=slice_in.shape[2], num_chans=slice_in.shape[1],
                    batch_size=slice_in.shape[0], num_batches=512, input_dtype=np.float32)
     return plan_file
@@ -340,6 +341,8 @@ if __name__ == '__main__':
     parser.add_argument("--model_path", default='./', help='Path to the checkpoint to load the model for inference.')
     parser.add_argument("--model_size", default="lg", choices=["sm", "lg"], help="Define the use of the large or the small transformer.")
     parser.add_argument("--RMSNorm", default=False, action='store_true', help="If present, we apply RMS normalization on input signals while training and testing")
+    parser.add_argument("--tensorRT", action="store_true", default=False, help='Use TensorRT model' )
+    parser.add_argument("--protocols", default=['802_11ax', '802_11b', '802_11n', '802_11g', 'noise'], help="Specify the list of classes")
     args = parser.parse_args()
 
     if args.frequency:
@@ -351,7 +354,12 @@ if __name__ == '__main__':
     MODEL_PATH = args.model_path
     MODEL_SIZE = args.model_size
     RMSNORM = args.RMSNorm
-    MODE = 'pytorch'  # choices=['pytorch', 'TensorRT']
+    if args.tensorRT:
+        MODE = 'TensorRT'  # choices=['pytorch', 'TensorRT']
+    else:
+        MODE = 'pytorch'
+
+    PROTOCOLS = args.protocols
     
     # if MODEL_SIZE == 'sm':
         # N = 2500
