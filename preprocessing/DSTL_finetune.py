@@ -50,7 +50,7 @@ def train(model, criterion, optimizer, dataloader, RMSnorm_layer=None):
         if batch % 50 == 0:
             loss, current = loss.item(), batch * len(X)
             print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
-    total_loss /= size
+    total_loss /= len(dataloader)
     correct /= size
     return correct*100.0, total_loss
 
@@ -71,7 +71,7 @@ def validate(model, criterion, dataloader, nclasses, RMSnorm_layer=None):
             y_cpu = y.to('cpu')
             pred_cpu = pred.to('cpu')
             conf_matrix += conf_mat(y_cpu, pred_cpu.argmax(1), labels=list(range(nclasses)))
-    test_loss /= size
+    test_loss /= len(dataloader)
     correct /= size
     return correct*100.0, test_loss, conf_matrix
 
@@ -264,7 +264,7 @@ if __name__ == "__main__":
                     pred_cpu = pred.to('cpu')
                     conf_matrix += conf_mat(y_cpu, pred_cpu.argmax(1), labels=list(range(train_config['nClasses'])))
                     global_conf_matrix += conf_mat(y_cpu, pred_cpu.argmax(1), labels=list(range(train_config['nClasses'])))
-            test_loss /= size
+            test_loss /= len(test_dataloader)
             global_correct += correct
             correct /= size
             # report accuracy and save confusion matrix
