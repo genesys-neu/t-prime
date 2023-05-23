@@ -129,7 +129,7 @@ def finetune(model, config):
     print(np.around(best_cm, decimals=2))
     prot_display = ['ax', 'b', 'n', 'g'] #PROTOCOLS
     if len(PROTOCOLS) > 4: # We need to add noise class
-        prot_display.append('unk.')
+        prot_display.append('noise')
     #prot_display[1] = '802_11b'
     disp = ConfusionMatrixDisplay(confusion_matrix=best_cm, display_labels=prot_display)
     disp.plot(cmap="Blues", values_format='.2f')
@@ -277,11 +277,11 @@ if __name__ == "__main__":
             for r in range(conf_matrix.shape[0]):  # for each row in the confusion matrix
                 sum_row = np.sum(conf_matrix[r, :])
                 conf_matrix[r, :] = conf_matrix[r, :] / sum_row  * 100.0 # compute in percentage
-
+            conf_matrix[np.isnan(conf_matrix)] = 0
             # plt.figure(figsize=(10,7))
             prot_display = ['ax', 'b', 'n', 'g']#PROTOCOLS
             if len(PROTOCOLS) > 4: # We need to add noise class
-                prot_display.append('unk.')
+                prot_display.append('noise')
             #prot_display[1] = '802_11b'
             disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=prot_display)
             disp.plot(cmap="Blues", values_format='.2f')
@@ -305,6 +305,7 @@ if __name__ == "__main__":
             for r in range(global_conf_matrix.shape[0]):  # for each row in the confusion matrix
                 sum_row = np.sum(global_conf_matrix[r, :])
                 global_conf_matrix[r, :] = global_conf_matrix[r, :] / sum_row  * 100.0 # compute in percentage
+            global_conf_matrix[np.isnan(global_conf_matrix)] = 0
             disp = ConfusionMatrixDisplay(confusion_matrix=global_conf_matrix, display_labels=prot_display)
             disp.plot(cmap="Blues", values_format='.2f')
             disp.ax_.get_images()[0].set_clim(0, 100)
