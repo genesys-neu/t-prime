@@ -144,7 +144,7 @@ class DSTLDataset(Dataset):
         # check if folders are names with _ or .
         if os.path.isdir(os.path.join(ds_path, self.protocols[0])):
             protocols = self.protocols
-        elif (os.path.isdir(os.path.join(ds_path, '802.11ax')) or os.path.isdir(os.path.join(ds_path, '802.11ax_0'))):
+        elif (os.path.isdir(os.path.join(ds_path, '802.11ax')) or ds_path[-3:] == 'dBs'): #os.path.isdir(os.path.join(ds_path, '802.11ax_0'))):
             protocols = ['802.11ax', '802.11b', '802.11n', '802.11g']
             if len(self.protocols) == 5:
                 protocols.append('noise') 
@@ -153,13 +153,13 @@ class DSTLDataset(Dataset):
         # retrieve the list of signals (.mat) from every folder/protocol specified
         for i, p in enumerate(protocols):
             path = os.path.join(ds_path, p)
-            if ds_path.split('_')[-1] == 'power' or ds_path[-3:] == 'dBs':
+            if (ds_path.split('_')[-1] == 'power' or ds_path[-3:] == 'dBs'):
                 paths = [path + pfix for pfix in ['_0', '_10', '_20', '_30']]
             else:
                 paths = [path]
-            for power_path in paths:
-                mat_list_path = []   
-                num_mat = 0     
+            mat_list_path = []
+            num_mat = 0
+            for power_path in paths:     
                 if os.path.isdir(power_path):
                     mat_list = sorted(glob(os.path.join(power_path, '*.bin'))) if self.ota else sorted(glob(os.path.join(power_path, '*.mat')))
                     self.n_sig_per_class[self.protocols[i]] = int(
@@ -170,7 +170,7 @@ class DSTLDataset(Dataset):
                     mat_list_path.extend(mat_list)
                 else:
                     if p != 'noise' and not ds_path[-3:] == 'dBs': # not all datasets contain noise 
-                        sys.exit('[DSTLDataset] folder ' + path + ' not found. Aborting...')
+                        sys.exit('[DSTLDataset] folder ' + power_path + ' not found. Aborting...')
             examples_map[self.protocols[i]] = dict(
                     zip(
                         list(range(num_mat)),
