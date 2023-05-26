@@ -153,7 +153,7 @@ class DSTLDataset(Dataset):
         # retrieve the list of signals (.mat) from every folder/protocol specified
         for i, p in enumerate(protocols):
             path = os.path.join(ds_path, p)
-            if ds_path.split('_')[-1] == 'power':
+            if ds_path.split('_')[-1] == 'power' or ds_path[-3:] == 'dBs':
                 paths = [path + pfix for pfix in ['_0', '_10', '_20', '_30']]
             else:
                 paths = [path]
@@ -169,7 +169,7 @@ class DSTLDataset(Dataset):
                     num_mat += len(mat_list)                     # and store the new list value length
                     mat_list_path.extend(mat_list)
                 else:
-                    if p != 'noise': # not all datasets contain noise 
+                    if p != 'noise' and not ds_path[-3:] == 'dBs': # not all datasets contain noise 
                         sys.exit('[DSTLDataset] folder ' + path + ' not found. Aborting...')
             examples_map[self.protocols[i]] = dict(
                     zip(
