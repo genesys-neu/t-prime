@@ -116,7 +116,7 @@ if __name__ == "__main__":
     parser.add_argument("--use_gpu", action='store_true', default=False, help="Use gpu for inference")
     args, _ = parser.parse_known_args()
     class_map = dict(zip(PROTOCOLS, range(len(PROTOCOLS))))
-    norm_flag = '_norm_' if args.normalize else ''
+    norm_flag = '.norm' if args.normalize else ''
     device = torch.device("cuda" if torch.cuda.is_available() and args.use_gpu else "cpu")
 
     if args.experiment == '1': # Evaluate the models trained for a specific noise and channel condition - we took 10.0 dBs as fixed noise during training
@@ -129,7 +129,7 @@ if __name__ == "__main__":
             model_sm.load_state_dict(torch.load(f"{TRANS_PATH}/model{channel}_10_sm.pt", map_location=device)['model_state_dict'])
             model_sm.eval()
             cnn = Baseline_CNN1D(classes=len(PROTOCOLS), numChannels=2, slice_len=512, normalize=args.normalize)
-            cnn.load_state_dict(torch.load(f"{CNN_PATH}/model.cnn.{channel}.10.pt", map_location=device)['model_state_dict'])
+            cnn.load_state_dict(torch.load(f"{CNN_PATH}/model.cnn.{channel}{norm_flag}.10.pt", map_location=device)['model_state_dict'])
             cnn.eval()
             if args.use_gpu:
                 model_lg.cuda()
@@ -157,7 +157,7 @@ if __name__ == "__main__":
             model_sm.load_state_dict(torch.load(f"{TRANS_PATH}/model{channel}_sm.pt", map_location=device)['model_state_dict'])
             model_sm.eval()
             cnn = Baseline_CNN1D(classes=len(PROTOCOLS), numChannels=2, slice_len=512, normalize=args.normalize)
-            cnn.load_state_dict(torch.load(f"{CNN_PATH}/model.cnn.{channel}.pt", map_location=device)['model_state_dict'])
+            cnn.load_state_dict(torch.load(f"{CNN_PATH}/model.cnn.{channel}{norm_flag}.range.pt", map_location=device)['model_state_dict'])
             cnn.eval()
             if args.use_gpu:
                 model_lg.cuda()
@@ -184,7 +184,7 @@ if __name__ == "__main__":
         model_sm.load_state_dict(torch.load(f"{TRANS_PATH}/modelrandom_sm.pt", map_location=device)['model_state_dict'])
         model_sm.eval()
         cnn = Baseline_CNN1D(classes=len(PROTOCOLS), numChannels=2, slice_len=512, normalize=args.normalize)
-        cnn.load_state_dict(torch.load(f"{CNN_PATH}/model.cnn.random.pt", map_location=device)['model_state_dict'])
+        cnn.load_state_dict(torch.load(f"{CNN_PATH}/model.cnn.random{norm_flag}.range.pt", map_location=device)['model_state_dict'])
         cnn.eval()
         if args.use_gpu:
             model_lg.cuda()
