@@ -108,8 +108,8 @@ def train_func(config: Dict):
         test_dataloader = train.torch.prepare_data_loader(test_dataloader)
 
     # Create model.
-    model = global_model(classes=Nclass, numChannels=num_channels, slice_len=slice_len)
-    if use_ray:
+    model = global_model(classes=Nclass, numChannels=num_channels, slice_len=slice_len, normalize=config['normalize'])
+    if use_ray:   
         model = train.torch.prepare_model(model)
     else:
         model.to(device)
@@ -122,6 +122,7 @@ def train_func(config: Dict):
     loss_results = []
     best_loss = np.inf
     wandb.watch(model, log_freq=10)
+    normalize_flag = 'norm.' if config['normalize'] else ''
     for e in range(epochs):
         tr_loss, tr_acc = train_epoch(train_dataloader, model, loss_fn, optimizer, use_ray)
         wandb.log({'Tr_loss': tr_loss}, step=e)
@@ -152,7 +153,7 @@ def train_func(config: Dict):
                     'model_state_dict': model.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
                     'loss': loss,
-                }, os.path.join(logdir,f'model.cnn.{config["wchannel"]}.{config["snr_dB"]}.pt'))
+                }, os.path.join(logdir,f'model.cnn.{config["wchannel"]}.{normalize_flag}{config["snr_dB"]}.pt'))
                 df_confmat = plot_confmatrix(logdir, pkl_file, train_config['class_labels'], 'conf_mat_epoch'+str(e)+'.png')
                 wandb.log({'Confusion_Matrix': df_confmat.to_numpy()}, step=e)
     # return required for backwards compatibility with the old API
@@ -181,10 +182,10 @@ if __name__ == "__main__":
     parser.add_argument('--overlap_ratio', default=0.5, help='Overlap ratio for slices generation')
     parser.add_argument('--postfix', default='', help='Postfix to append to dataset file.')
     parser.add_argument('--raw_data_ratio', default=1.0, type=float, help='Specify the ratio of examples per class to consider while training/testing')
+    parser.add_argument("--normalize", action='store_true', default=False, help="Use a layer norm as a first layer.")
     args, _ = parser.parse_known_args()
 
     print('Apply noise:', args.noise)
-    
     args.channel = args.channel if args.channel != 'None' else None
     protocols = args.protocols
     ds_train = DSTLDataset(protocols,
@@ -192,7 +193,7 @@ if __name__ == "__main__":
                            ds_type='train',
                            snr_dbs=args.snr_db,
                            slice_len=args.slicelen,
-                           slice_overlap_ratio=args.overlap_ratio,
+                           slice_overlap_ratio=float(args.overlap_ratio),
                            raw_data_ratio=args.raw_data_ratio,
                            file_postfix=args.postfix,
                            override_gen_map=True,
@@ -203,7 +204,7 @@ if __name__ == "__main__":
                           ds_type='test',
                           snr_dbs=args.snr_db,
                           slice_len=args.slicelen,
-                          slice_overlap_ratio=args.overlap_ratio,
+                          slice_overlap_ratio=float(args.overlap_ratio),
                           raw_data_ratio=args.raw_data_ratio,
                           file_postfix=args.postfix,
                           override_gen_map=False,    # it will use the same as above call
@@ -221,6 +222,7 @@ if __name__ == "__main__":
     train_config['Nclass'] = Nclass
     train_config['useRay'] = args.useRay    # TODO: fix this, currently it's not working with Ray because the dataset gets replicated among workers
     train_config['slice_len'] = ds_info['slice_len']
+    train_config['normalize'] = args.normalize
     train_config['num_feats'] = 1
     train_config['num_chans'] = ds_info['nchans']
     train_config['device'] = device
