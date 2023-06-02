@@ -107,11 +107,87 @@ def validate(model, class_map, seq_len, sli_len, channel, cnn=False):
         prev_time = time.time()
     return correct/total_samples*100
 
+def generate_dummy_input(channel, seq_len, sli_len):
+    p = '802.11ax'
+    dBs = 10
+    path = os.path.join(TEST_DATA_PATH, p) if channel == 'None' else os.path.join(TEST_DATA_PATH, p, channel)
+    mat_list = sorted(glob(os.path.join(path, '*.mat'))) if channel == 'None' else sorted(glob(os.path.join(path, '*.npy')))
+    signal_path = mat_list[0]
+    sig = sio.loadmat(signal_path) if channel == 'None' else np.load(signal_path)
+    if channel == 'None':
+        sig = sig['waveform']
+    len_sig = sig.shape[0]
+    noisy_sig = apply_AWGN(dBs, sig)
+    len_sig = noisy_sig.shape[0]
+    # stack real and imag parts
+    obs = np.stack((noisy_sig.real, noisy_sig.imag))
+    obs = np.squeeze(obs, axis=2)
+    # zip the I and Q values
+    if not cnn: # Transformer architecture
+        obs = chan2sequence(obs)
+        # generate idxs for split
+        idxs = list(range(seq_len*sli_len*2, len_sig, seq_len*sli_len*2)) # *2 because I and Q are already zipped
+        # split stream in sequences
+        obs = np.split(obs, idxs)[:-1]
+        # split each sequence in slices
+        for j, seq in enumerate(obs):
+            obs[j] = np.split(seq, seq_len)
+    else: # CNN
+        # generate idxs for split
+        idxs = list(range(sli_len, len_sig, sli_len))
+        obs = np.split(obs, idxs, axis=1)[:-1]
+    # create batch of sequences
+    X = np.asarray(obs)
+    # keep just one
+    X = X[0,:,:]
+    # create torch tensor
+    X = torch.from_numpy(X)
+    print(X.shape)
+    return
+
+def timing_inference_GPU(device, channel, seq_len, sli_len, model):
+    # PREPARE INPUT
+    dummy_input = generate_dummy_input(channel, seq_len, sli_len)
+    dummy_input.to(device)
+    # INIT LOGGERS
+    starter, ender = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
+    repetitions = 300
+    timings = np.zeros((repetitions, 1))
+    # GPU-WARM-UP
+    for _ in range(10):
+        _ = model(dummy_input)
+    # MEASURE PERFORMANCE
+    with torch.no_grad():
+        for rep in range(repetitions):
+            starter.record()
+            _ = model(dummy_input)
+            ender.record()
+            # WAIT FOR GPU SYNC
+            torch.cuda.synchronize()
+            curr_time = starter.elapsed_time(ender)
+            timings[rep] = curr_time
+
+    mean_syn = np.sum(timings) / repetitions
+    std_syn = np.std(timings)
+    return mean_syn, std_syn
+
+def calculate_avg_time(means, sds):
+    # Calculate weights as inverse squared standard deviations
+    weights = 1 / sds ** 2
+
+    # Calculate weighted average (mean)
+    weighted_average = np.average(means, weights=weights)
+
+    # Calculate uncertainty-weighted root mean square deviation (standard deviation)
+    weighted_std = np.sqrt(np.average((means - weighted_average) ** 2, weights=weights))
+
+    return weighted_average, weighted_std
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--experiment", default='3', choices=['1', '2', '3'], help="Decide which models to test, 1 is for specific model per \
-                        noise and channel, 2 is for specific model per channel and 3 is for single model for all channel and noise conditions")
+    parser.add_argument("--experiment", default='3', choices=['1', '2', '3', '4'], help="Decide which models to test, 1 is for specific model per \
+                        noise and channel, 2 is for specific model per channel, 3 is for single model for all channel and noise conditions and 4 is for inference time analysis")
     parser.add_argument("--normalize", action='store_true', default=False, help="Use a layer norm as a first layer.")
     parser.add_argument("--use_gpu", action='store_true', default=False, help="Use gpu for inference")
     args, _ = parser.parse_known_args()
@@ -175,7 +251,7 @@ if __name__ == "__main__":
             with open(f'test_results_uniformdist_{channel}{norm_flag}.txt', 'w') as f:
                 f.write(str(y_trans_lg) + '%' + str(y_trans_sm) + '%' + str(y_cnn))
     
-    else: # Experiment 3: # Evaluate the models trained for general noise and channel conditions
+    elif args.experiment == '3': # Evaluate the models trained for general noise and channel conditions
         # Load the three models only one time
         model_lg = TransformerModel(classes=len(PROTOCOLS), d_model=128*2, seq_len=64, nlayers=2, use_pos=False)
         model_lg.load_state_dict(torch.load(f"{TRANS_PATH}/modelrandom_lg.pt", map_location=device)['model_state_dict'])
@@ -202,25 +278,66 @@ if __name__ == "__main__":
         with open(f'test_results_uniformdist_onemodel{norm_flag}.txt', 'w') as f:
             f.write(str(y_trans_lg) + '%' + str(y_trans_sm) + '%' + str(y_cnn))
     
-    fig, ax = plt.subplots(2, 2, figsize = (12, 6))
+    else: # Experiment 4: # Inference time analysis for each of the model architectures
+        print('Using protocol 802.11ax and 10 dBs as a sample input.')
+        # Load the three models only one time
+        model_lg = TransformerModel(classes=len(PROTOCOLS), d_model=128*2, seq_len=64, nlayers=2, use_pos=False)
+        model_lg.load_state_dict(torch.load(f"{TRANS_PATH}/modelrandom_lg.pt", map_location=device)['model_state_dict'])
+        model_lg.eval()
+        model_sm = TransformerModel(classes=len(PROTOCOLS), d_model=64*2, seq_len=24, nlayers=2, use_pos=False)
+        model_sm.load_state_dict(torch.load(f"{TRANS_PATH}/modelrandom_sm.pt", map_location=device)['model_state_dict'])
+        model_sm.eval()
+        cnn = Baseline_CNN1D(classes=len(PROTOCOLS), numChannels=2, slice_len=512, normalize=args.normalize)
+        cnn.load_state_dict(torch.load(f"{CNN_PATH}/model.cnn.random{norm_flag}.range.pt", map_location=device)['model_state_dict'])
+        cnn.eval()
+        if args.use_gpu:
+            model_lg.cuda()
+            model_sm.cuda()
+            cnn.cuda()
+        y_trans_lg_time, y_trans_sm_time, y_cnn_time = [], [], []
+        y_trans_lg_sd, y_trans_sm_sd, y_cnn_sd = [], [], []
+        for channel in CHANNELS:
+            lg_ch_time, lg_ch_sd = timing_inference_GPU(device, channel=channel, seq_len=64, sli_len=128, model=model_lg)
+            y_trans_lg_time.append(lg_ch_time)
+            y_trans_lg_sd.append(lg_ch_sd)
+            print(f'Inference time mean and sd for channel {channel} and large architecture are: ', lg_ch_time, ' +- ', lg_ch_sd)
+            sm_ch_time, sm_ch_sd = timing_inference_GPU(channel=channel, seq_len=24, sli_len=64, model=model_sm)
+            y_trans_sm_time.append(sm_ch_time)
+            y_trans_sm_sd.append(sm_ch_sd)
+            print(f'Inference time mean and sd for channel {channel} and small architecture are: ', sm_ch_time, ' +- ', sm_ch_sd)
+            cnn_ch_time, cnn_ch_sd = timing_inference_GPU(channel=channel, seq_len=1, sli_len=512, model=cnn)
+            y_cnn_time.append(cnn_ch_time)
+            y_cnn_sd.append(cnn_ch_sd)
+            print(f'Inference time mean and sd for channel {channel} and cnn architecture are: ', cnn_ch_time, ' +- ', cnn_ch_sd)
+        print('---------------------------------------------')
+        # Calculate total mean and sd
+        mean, sd = calculate_avg_time(np.array(y_trans_lg_time), np.array(y_trans_lg_sd))
+        print(f'Average inference time mean and sd for large architecture are: ', mean, ' +- ', sd)
+        mean, sd = calculate_avg_time(np.array(y_trans_sm_time), np.array(y_trans_sm_sd))
+        print(f'Average inference time mean and sd for small architecture are: ', mean, ' +- ', sd)
+        mean, sd = calculate_avg_time(np.array(y_cnn_time), np.array(y_cnn_sd))
+        print(f'Average inference time mean and sd for cnn architecture are: ', mean, ' +- ', sd)
 
-    for i in range(2):
-        for j in range(2):
-            ax[i][j].plot(SNR, y_trans_lg[i*2+j], color='#000000', linestyle='solid', marker='o', label=MODELS[0])
-            ax[i][j].plot(SNR, y_trans_sm[i*2+j], color='#56B4E9', linestyle='dashed', marker='v', label=MODELS[1])
-            ax[i][j].plot(SNR, y_cnn[i*2+j], color='#D55E00', linestyle='dashdot', marker='^', label=MODELS[2])
-            ax[i][j].set_title(CHANNELS[i*2+j])
-            ax[i][j].set_xlabel('SNR (dBs)')
-            ax[i][j].set_ylabel('Accuracy (%)')
-            ax[i][j].set_ylim(15,105)
-            ax[i][j].grid()     
-    plt.suptitle('Results comparison between different architectures')
-    fig.legend(MODELS, bbox_to_anchor=(0.87, 0.02), ncols=3, labelspacing=1)
-    plt.tight_layout() 
-    if args.experiment == '1':
-        img_name = 'Testing_noiseandchannel.png'
-    elif args.experiment == '2':
-        img_name = 'Testing_modelperchannel.png'
-    else: # experiment 3
-        img_name = 'Testing_onemodel.png'
-    plt.savefig(img_name) 
+    if not args.experiment == '4':
+        fig, ax = plt.subplots(2, 2, figsize = (12, 6))
+
+        for i in range(2):
+            for j in range(2):
+                ax[i][j].plot(SNR, y_trans_lg[i*2+j], color='#000000', linestyle='solid', marker='o', label=MODELS[0])
+                ax[i][j].plot(SNR, y_trans_sm[i*2+j], color='#56B4E9', linestyle='dashed', marker='v', label=MODELS[1])
+                ax[i][j].plot(SNR, y_cnn[i*2+j], color='#D55E00', linestyle='dashdot', marker='^', label=MODELS[2])
+                ax[i][j].set_title(CHANNELS[i*2+j])
+                ax[i][j].set_xlabel('SNR (dBs)')
+                ax[i][j].set_ylabel('Accuracy (%)')
+                ax[i][j].set_ylim(15,105)
+                ax[i][j].grid()     
+        plt.suptitle('Results comparison between different architectures')
+        fig.legend(MODELS, bbox_to_anchor=(0.87, 0.02), ncols=3, labelspacing=1)
+        plt.tight_layout() 
+        if args.experiment == '1':
+            img_name = 'Testing_noiseandchannel.png'
+        elif args.experiment == '2':
+            img_name = 'Testing_modelperchannel.png'
+        else: # experiment 3
+            img_name = 'Testing_onemodel.png'
+        plt.savefig(img_name) 
