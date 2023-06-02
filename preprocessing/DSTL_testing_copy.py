@@ -108,7 +108,7 @@ def validate(model, class_map, seq_len, sli_len, channel, cnn=False):
     return correct/total_samples*100
 
 def generate_dummy_input(channel, seq_len, sli_len):
-    p = '802.11ax'
+    p = '802_11ax'
     dBs = 10
     path = os.path.join(TEST_DATA_PATH, p) if channel == 'None' else os.path.join(TEST_DATA_PATH, p, channel)
     mat_list = sorted(glob(os.path.join(path, '*.mat'))) if channel == 'None' else sorted(glob(os.path.join(path, '*.npy')))
@@ -123,7 +123,7 @@ def generate_dummy_input(channel, seq_len, sli_len):
     obs = np.stack((noisy_sig.real, noisy_sig.imag))
     obs = np.squeeze(obs, axis=2)
     # zip the I and Q values
-    if not cnn: # Transformer architecture
+    if seq_len != 1: # Transformer architecture
         obs = chan2sequence(obs)
         # generate idxs for split
         idxs = list(range(seq_len*sli_len*2, len_sig, seq_len*sli_len*2)) # *2 because I and Q are already zipped
@@ -142,20 +142,22 @@ def generate_dummy_input(channel, seq_len, sli_len):
     X = X[0,:,:]
     # create torch tensor
     X = torch.from_numpy(X)
+    X = torch.unsqueeze(X, 0)
     print(X.shape)
-    return
+    return X
 
 def timing_inference_GPU(device, channel, seq_len, sli_len, model):
     # PREPARE INPUT
     dummy_input = generate_dummy_input(channel, seq_len, sli_len)
-    dummy_input.to(device)
+    dummy_input = dummy_input.to(device)
+    model = model.double()
     # INIT LOGGERS
     starter, ender = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
     repetitions = 300
     timings = np.zeros((repetitions, 1))
     # GPU-WARM-UP
-    for _ in range(10):
-        _ = model(dummy_input)
+    for _ in range(100):
+        _ = model(dummy_input.double())
     # MEASURE PERFORMANCE
     with torch.no_grad():
         for rep in range(repetitions):
@@ -301,11 +303,11 @@ if __name__ == "__main__":
             y_trans_lg_time.append(lg_ch_time)
             y_trans_lg_sd.append(lg_ch_sd)
             print(f'Inference time mean and sd for channel {channel} and large architecture are: ', lg_ch_time, ' +- ', lg_ch_sd)
-            sm_ch_time, sm_ch_sd = timing_inference_GPU(channel=channel, seq_len=24, sli_len=64, model=model_sm)
+            sm_ch_time, sm_ch_sd = timing_inference_GPU(device, channel=channel, seq_len=24, sli_len=64, model=model_sm)
             y_trans_sm_time.append(sm_ch_time)
             y_trans_sm_sd.append(sm_ch_sd)
             print(f'Inference time mean and sd for channel {channel} and small architecture are: ', sm_ch_time, ' +- ', sm_ch_sd)
-            cnn_ch_time, cnn_ch_sd = timing_inference_GPU(channel=channel, seq_len=1, sli_len=512, model=cnn)
+            cnn_ch_time, cnn_ch_sd = timing_inference_GPU(device, channel=channel, seq_len=1, sli_len=512, model=cnn)
             y_cnn_time.append(cnn_ch_time)
             y_cnn_sd.append(cnn_ch_sd)
             print(f'Inference time mean and sd for channel {channel} and cnn architecture are: ', cnn_ch_time, ' +- ', cnn_ch_sd)
