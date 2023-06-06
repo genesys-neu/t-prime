@@ -403,7 +403,129 @@ class DSTLDataset_Transformer(DSTLDataset):
         obs = [obs[i:i+self.slice_len*2] for i in slice_ixs]
         return np.asarray(obs)
     
-    
+
+class DSTLDataset_Transformer_overlap(DSTLDataset_Transformer):
+    def __init__(self, overlap_type: str, **kwargs):
+        self.overlap_type = overlap_type
+        self.mixes = ['b-ax', 'b-g', 'b-n', 'g-ax', 'g-n', 'n-ax']
+        super().__init__(**kwargs)
+
+    def mix_to_labels(self, classes):
+        if classes == 'NOISE':
+            return [4]
+        # signal belongs to two classes 
+        classes = classes.split('-')
+        final_labels = []
+        if 'ax' in classes:
+            final_labels.append(0)
+        if 'b' in classes:
+            final_labels.append(1)
+        if 'n' in classes:
+            final_labels.append(2)
+        if 'g' in classes:
+            final_labels.append(3)
+        return final_labels
+
+    def generate_ds_map(self, ds_path, filename, test_ratio=0.2):
+        examples_map = {}
+        class_map = dict(zip(self.protocols, range(len(self.protocols))))
+        # check if folders are names with _ or .
+        directories = self.mixes + 'NOISE'
+        # retrieve the list of signals (.mat) from every folder/mix specified
+        for i, p in enumerate(directories):
+            if p == 'NOISE':
+                paths = [os.path.join(ds_path, 'NOISE')]
+            else:
+                paths = [os.path.join(ds_path, 'OVERLAP25', p.replace('-', '')),
+                         os.path.join(ds_path, 'OVERLAP50', p.replace('-', ''))]
+            mat_list_path = []
+            num_mat = 0
+            for path in paths:
+                if os.path.isdir(path):
+                    mat_list = sorted(glob(os.path.join(path, '*.bin')))
+                    self.n_sig_per_class[self.directories[i]] = int(
+                        len(mat_list) * self.raw_data_ratio)  # for each mix, we save the amount of raw signals to retain
+
+                    mat_list = mat_list[:self.n_sig_per_class[self.directories[i]]] # then we just clip the list
+                    num_mat += len(mat_list)                     # and store the new list value length
+                    mat_list_path.extend(mat_list)
+                else:
+                    sys.exit('[DSTLDataset] folder ' + path + ' not found. Aborting...')
+            examples_map[self.directories[i]] = dict(
+                    zip(
+                        list(range(num_mat)),
+                        mat_list_path
+                    )
+                )
+
+        # now let's go through each class examples and assign a global sample index
+        # based on the slice len and overlap configuration
+
+        # also, we need to assign a unique slice index to each possible slice to be used with __getitem__ function
+        # and assign the corresponding label
+        # TRAINING DATA
+        data_ixs = {}
+        labels_ixs = {}
+        ixs_count = 0
+        # TEST DATA
+        test_data_ixs = {}
+        test_labels_ixs = {}
+        test_ixs_count = 0
+        for c in tqdm(examples_map.keys(), desc='Analyzing signal dataset...'):
+            nsamples = len(examples_map[c].items())
+            if self.testing_mode == 'inference':
+                test_threshold = int(nsamples *(1-self.test_ratio))
+            else:
+                test_threshold = nsamples
+            for ix, path in examples_map[c].items():
+                # read binary files and get length
+                sig = np.fromfile(path, dtype=np.complex128)
+                len_sig = sig.shape[0]
+                window_ixs = self.generate_windows(len_sig)
+                n_windows = len(window_ixs)
+                examples_map[c][ix] = {'sample': window_ixs, # sample is slice for CNN or sequence for Transformer
+                                       'path': examples_map[c][ix]}  # here we modify the original content
+                if ix <= test_threshold:
+                    for w in window_ixs:
+                        data_ixs[ixs_count] = {'path': path, 'sample_ix': w}
+                        labels_ixs[ixs_count] = self.mix_to_labels(c)
+                        ixs_count += 1
+                else:
+                    for w in window_ixs:
+                        test_data_ixs[test_ixs_count] = {'path': path, 'sample_ix': w}
+                        test_labels_ixs[test_ixs_count] = self.mix_to_labels(c)
+                        test_ixs_count += 1
+
+
+        # lastly, we separate the training and testing dataset by randomly sampling a certain % of data samples indexes
+        if self.testing_mode == 'random_sampling':
+            test_ixs = np.random.choice(ixs_count, size=int(ixs_count*test_ratio), replace=False)
+            for i in test_ixs.tolist():
+                i_data = data_ixs.pop(i)
+                test_data_ixs[i] = i_data
+                i_label = labels_ixs.pop(i)
+                test_labels_ixs[i] = i_label
+        # we also need to store a map from linear indexes (used by ray when retrieving data from dataset)
+        train_ixs = dict(zip(range(len(data_ixs.keys())), list(data_ixs.keys())))
+        test_ixs = dict(zip(range(len(test_data_ixs.keys())), list(test_data_ixs.keys())))
+
+
+        # after creating class map and examples map, let's store this information for future use
+        ds_info_path = os.path.join(ds_path, filename)
+        ds_info = {
+            'class_map': class_map, 'examples_map': examples_map,
+            'overlapping_samples': True,
+            'ds_indexes':
+                {
+                    'train': {'data': data_ixs, 'labels': labels_ixs},
+                    'test': {'data': test_data_ixs, 'labels': test_labels_ixs}
+                },
+            'ixs_maps': {'train': train_ixs, 'test': test_ixs}  # linear indexes maps (used by ray/torch)
+            }
+        pickle.dump(ds_info, open(ds_info_path, 'wb'))
+
+        return ds_info
+
 if __name__ == "__main__":
 
     import argparse
