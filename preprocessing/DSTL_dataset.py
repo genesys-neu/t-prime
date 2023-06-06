@@ -405,14 +405,13 @@ class DSTLDataset_Transformer(DSTLDataset):
     
 
 class DSTLDataset_Transformer_overlap(DSTLDataset_Transformer):
-    def __init__(self, overlap_type: str, **kwargs):
-        self.overlap_type = overlap_type
+    def __init__(self, **kwargs):
         self.mixes = ['b-ax', 'b-g', 'b-n', 'g-ax', 'g-n', 'n-ax']
         super().__init__(**kwargs)
 
     def mix_to_labels(self, classes):
         if classes == 'NOISE':
-            return [4]
+            return [4, 4]
         # signal belongs to two classes 
         classes = classes.split('-')
         final_labels = []
@@ -429,8 +428,7 @@ class DSTLDataset_Transformer_overlap(DSTLDataset_Transformer):
     def generate_ds_map(self, ds_path, filename, test_ratio=0.2):
         examples_map = {}
         class_map = dict(zip(self.protocols, range(len(self.protocols))))
-        # check if folders are names with _ or .
-        directories = self.mixes + 'NOISE'
+        directories = self.mixes + ['NOISE']
         # retrieve the list of signals (.mat) from every folder/mix specified
         for i, p in enumerate(directories):
             if p == 'NOISE':
@@ -443,15 +441,15 @@ class DSTLDataset_Transformer_overlap(DSTLDataset_Transformer):
             for path in paths:
                 if os.path.isdir(path):
                     mat_list = sorted(glob(os.path.join(path, '*.bin')))
-                    self.n_sig_per_class[self.directories[i]] = int(
+                    self.n_sig_per_class[directories[i]] = int(
                         len(mat_list) * self.raw_data_ratio)  # for each mix, we save the amount of raw signals to retain
 
-                    mat_list = mat_list[:self.n_sig_per_class[self.directories[i]]] # then we just clip the list
+                    mat_list = mat_list[:self.n_sig_per_class[directories[i]]] # then we just clip the list
                     num_mat += len(mat_list)                     # and store the new list value length
                     mat_list_path.extend(mat_list)
                 else:
                     sys.exit('[DSTLDataset] folder ' + path + ' not found. Aborting...')
-            examples_map[self.directories[i]] = dict(
+            examples_map[directories[i]] = dict(
                     zip(
                         list(range(num_mat)),
                         mat_list_path

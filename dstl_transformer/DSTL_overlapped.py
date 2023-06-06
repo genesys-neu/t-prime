@@ -10,7 +10,7 @@ import numpy as np
 from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix as conf_mat
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-from DSTL_dataset import DSTLDataset_Transformer, DSTLDataset_Transformer_overlap
+from preprocessing.DSTL_dataset import DSTLDataset_Transformer, DSTLDataset_Transformer_overlap
 from dstl_transformer.model_transformer import TransformerModel, TransformerModel_multiclass, TransformerModel_multiclass_transfer
 from cnn_baseline.model_cnn1d import Baseline_CNN1D
 from preprocessing.model_rmsnorm import RMSNorm
@@ -27,14 +27,18 @@ def get_model_name(name):
     name = name.split("/")[-1]
     return '.'.join(name.split(".")[0:-1])
 
+def target_transform(labels):
+    return torch.stack([torch.tensor([x, y]) for x, y in zip(labels[0], labels[1])])
+
 def one_hot_encode(index_list):
     num_classes = len(PROTOCOLS)
     encoded_list = []
+    index_list = target_transform(index_list)
     for sublist in index_list:
         one_hot = np.zeros(num_classes)
         one_hot[sublist] = 1
         encoded_list.append(one_hot)
-    return encoded_list
+    return torch.Tensor(np.array(encoded_list))
 
 def train(model, criterion, optimizer, dataloader, RMSnorm_layer=None):
     size = len(dataloader.dataset)
@@ -50,7 +54,7 @@ def train(model, criterion, optimizer, dataloader, RMSnorm_layer=None):
             X = RMSnorm_layer(X)
         pred = model(X.float())
         loss = criterion(pred, y)
-        correct += (torch.round(pred) == y).type(torch.float).sum().item()
+        correct += (torch.round(pred) == y).all(dim=1).type(torch.float).sum().item()
 
         # Backpropagation
         optimizer.zero_grad()
@@ -78,7 +82,7 @@ def validate(model, criterion, dataloader, nclasses, RMSnorm_layer=None):
                 X = RMSnorm_layer(X)
             pred = model(X.float())
             test_loss += criterion(pred, y).item()
-            correct += (torch.round(pred) == y).type(torch.float).sum().item()
+            correct += (torch.round(pred) == y).all(dim=1).type(torch.float).sum().item()
             #y_cpu = y.to('cpu')
             #pred_cpu = pred.to('cpu')
             #conf_matrix += conf_mat(y_cpu, pred_cpu.argmax(1), labels=list(range(nclasses)))
@@ -96,11 +100,12 @@ def load_params(model, trained):
     model_dict.update(pretrained_dict) 
     # 3. load the new state dict
     model.load_state_dict(model_dict)
-
+    frozen_layers = [k[0] for k in pretrained_dict.items()]
     # Now we will freeze the weights of those params coming from the pretrained model
     for name, param in model.named_parameters():
-        if param.requires_grad and name in pretrained_dict.items():
+        if param.requires_grad and name in frozen_layers:
             param.requires_grad = False
+            print(name)
 
     return model
 
@@ -109,12 +114,17 @@ def finetune(model, config, trained_model=None):
     train_dataloader = DataLoader(ds_train, batch_size=config['batchSize'], shuffle=True)
     test_dataloader = DataLoader(ds_test, batch_size=config['batchSize'], shuffle=True)
     # If we part from an already trained model, load the params into the new one and freeze them
-    if not config['retrain'] and trained_model is not None:
+    if config['retrain'] and trained_model is not None:
         model = load_params(model, trained_model)
+    if args.use_gpu:
+        model.cuda()
     print('Initiating training...')
     # Define loss, optimizer and scheduler for training
     criterion = nn.BCELoss() # Multiclass
     non_frozen_parameters = [p for p in model.parameters() if p.requires_grad]
+    for name, p in model.named_parameters():
+        if p.requires_grad:
+            print(name)
     optimizer = torch.optim.Adam(non_frozen_parameters, lr=config['lr']) # CHANGE FOR FINE TUNE
     scheduler = ReduceLROnPlateau(optimizer, 'min', min_lr=0.00001, verbose=True)
     train_acc = []
@@ -218,15 +228,16 @@ if __name__ == "__main__":
     datasets = args.datasets
     ds_train = []
     ds_test = []
+    tr_model = None
     # Load model
     # choose correct version
-    if not args.retrain:
+    if args.retrain:
         global_model = TransformerModel_multiclass_transfer
     else: # retrain
         global_model = TransformerModel_multiclass
     # choose correct size
     if args.transformer == "sm":
-        if not args.retrain:
+        if args.retrain:
             tr_model = TransformerModel(classes=len(PROTOCOLS), d_model=64*2, seq_len=24, nlayers=2, use_pos=False)
         model = global_model(classes=len(PROTOCOLS), d_model=64*2, seq_len=24, nlayers=2)
         # Load over the air dataset
@@ -236,9 +247,9 @@ if __name__ == "__main__":
             ds_test.append(DSTLDataset_Transformer_overlap(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds), ds_type='test', seq_len=24, slice_len=64, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
                                             raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence))
     else: # lg
-        if not args.retrain:
+        if args.retrain:
             tr_model = TransformerModel(classes=len(PROTOCOLS), d_model=128*2, seq_len=64, nlayers=2, use_pos=False)
-        model = global_model(classes=len(PROTOCOLS), d_model=128*2, seq_len=64, nlayers=2, use_pos=False)
+        model = global_model(classes=len(PROTOCOLS), d_model=128*2, seq_len=64, nlayers=2)
         for ds in datasets:
             ds_train.append(DSTLDataset_Transformer_overlap(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds), ds_type='train', seq_len=64, slice_len=128, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
                                             raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence))
@@ -250,7 +261,7 @@ if __name__ == "__main__":
         ds_test = torch.utils.data.ConcatDataset(ds_test)
 
     device = torch.device("cuda" if torch.cuda.is_available() and args.use_gpu else "cpu")
-    if not args.retrain: # Load pretrained model
+    if args.retrain: # Load pretrained model
         try:
             tr_model.load_state_dict(torch.load(args.model_path, map_location=device)['model_state_dict'])
         except:
