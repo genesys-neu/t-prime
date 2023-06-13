@@ -308,6 +308,8 @@ class DSTLDataset(Dataset):
         obs = self.retrieve_obs(noisy_sig, obs_info)
         if self.target_transform:
             label = self.target_transform(label)
+        if type(label) is not list:
+            label = [label, label]
         return obs, label
 
     # Function to change the shape of obs
