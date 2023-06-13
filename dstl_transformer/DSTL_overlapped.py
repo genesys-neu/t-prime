@@ -14,6 +14,7 @@ from preprocessing.DSTL_dataset import DSTLDataset_Transformer, DSTLDataset_Tran
 from dstl_transformer.model_transformer import TransformerModel, TransformerModel_multiclass, TransformerModel_multiclass_transfer
 from cnn_baseline.model_cnn1d import Baseline_CNN1D
 from preprocessing.model_rmsnorm import RMSNorm
+from sklearn.metrics import roc_auc_score
 
 # Function to change the shape of obs
 # the input is obs with shape (channel, slice)
@@ -282,11 +283,14 @@ if __name__ == "__main__":
 
     if args.test and not args.retrain:
         # Use the loaded model to do inference over the OTA dataset
-        global_conf_matrix = np.zeros((train_config['nClasses'], train_config['nClasses']))
+        global_preds = []
+        global_trues = []
         global_correct = 0
         global_size = 0
         for ds_ix, ds in enumerate(ds_test):
             # Calculate performance and save matrix
+            preds = []
+            trues = []
             if train_config['RMSNorm']:
                 RMSNorm_l = RMSNorm(model='Transformer')
             else:
@@ -297,9 +301,7 @@ if __name__ == "__main__":
             test_dataloader = DataLoader(ds, batch_size=train_config['batchSize'], shuffle=True)
             size = len(test_dataloader.dataset)
             global_size += size
-            criterion = nn.NLLLoss()
-            test_loss, correct = 0, 0
-            conf_matrix = np.zeros((train_config['nClasses'], train_config['nClasses']))
+            correct = 0
             with torch.no_grad():
                 for X, y in test_dataloader:
                     X = X.to(device)
@@ -307,62 +309,32 @@ if __name__ == "__main__":
                     if not (RMSNorm_l is None):
                         X = RMSNorm_l(X)
                     pred = model(X.float())
-                    test_loss += criterion(pred, y).item()
-                    correct += (pred.argmax(1) == y).type(torch.float).sum().item()
+                    correct += (torch.round(pred) == y).all(dim=1).type(torch.float).sum().item()
                     y_cpu = y.to('cpu')
                     pred_cpu = pred.to('cpu')
-                    conf_matrix += conf_mat(y_cpu, pred_cpu.argmax(1), labels=list(range(train_config['nClasses'])))
-                    global_conf_matrix += conf_mat(y_cpu, pred_cpu.argmax(1), labels=list(range(train_config['nClasses'])))
-            test_loss /= len(test_dataloader)
+                    preds.extend(pred_cpu)
+                    trues.extend(y_cpu)
             global_correct += correct
+            global_preds.extend(preds)
+            global_trues.extend(trues)
             correct /= size
             # report accuracy and save confusion matrix
             print(
                 f"\n\nTest Error for dataset {args.datasets[ds_ix]}: \n "
-                f"Accuracy: {(100 * correct):>0.1f}%, "
-                f"Avg loss: {test_loss:>8f} \n"
+                f"Exact accuracy: {(100 * correct):>0.1f}%, "
+                f"AUC: {roc_auc_score(trues, preds)} \n"
             )
-            conf_matrix = conf_matrix.astype('float')
-            for r in range(conf_matrix.shape[0]):  # for each row in the confusion matrix
-                sum_row = np.sum(conf_matrix[r, :])
-                conf_matrix[r, :] = conf_matrix[r, :] / sum_row  * 100.0 # compute in percentage
-            conf_matrix[np.isnan(conf_matrix)] = 0
-            # plt.figure(figsize=(10,7))
-            prot_display = ['ax', 'b', 'n', 'g']#PROTOCOLS
-            if len(PROTOCOLS) > 4: # We need to add noise class
-                prot_display.append('noise')
-            #prot_display[1] = '802_11b'
-            disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=prot_display)
-            disp.plot(cmap="Blues", values_format='.2f')
-            disp.ax_.get_images()[0].set_clim(0, 100)
-            plt.title(f'Conf. Matrix (%): Total Acc. {(100 * correct):>0.1f}%')
-            plt.savefig(f"Results_finetune_{MODEL_NAME}.{args.datasets[ds_ix]}.{TEST_FLAG}.{RMS_FLAG}{NOISE_FLAG}.pdf")
-            plt.clf()
-            print(f'Confusion matrix (%) for {args.datasets[ds_ix]}')
-            print(np.around(conf_matrix, decimals=2))
             print('-------------------------------------------')
             print('-------------------------------------------')
         
         # Global confusion matrix for all test datasets if more than one provided
         if len(args.datasets) > 1:
-            global_conf_matrix = global_conf_matrix.astype('float')
             global_correct /= global_size
             print(
                 f"\n\nTest Error for dataset {OTA_DATASET}: \n "
-                f"Accuracy: {(100 * global_correct):>0.1f}%\n "
+                f"Exact accuracy: {(100 * global_correct):>0.1f}%\n "
+                f"AUC: {roc_auc_score(global_trues, global_preds)} \n"
             )
-            for r in range(global_conf_matrix.shape[0]):  # for each row in the confusion matrix
-                sum_row = np.sum(global_conf_matrix[r, :])
-                global_conf_matrix[r, :] = global_conf_matrix[r, :] / sum_row  * 100.0 # compute in percentage
-            global_conf_matrix[np.isnan(global_conf_matrix)] = 0
-            disp = ConfusionMatrixDisplay(confusion_matrix=global_conf_matrix, display_labels=prot_display)
-            disp.plot(cmap="Blues", values_format='.2f')
-            disp.ax_.get_images()[0].set_clim(0, 100)
-            plt.title(f'Global Conf. Matrix (%): Total Acc. {(100 * global_correct):>0.1f}%')
-            plt.savefig(f"Results_finetune_{MODEL_NAME}.{OTA_DATASET}.{TEST_FLAG}.{RMS_FLAG}{NOISE_FLAG}.pdf")
-            plt.clf()
-            print(f'Global Confusion Matrix (%) for {OTA_DATASET}')
-            print(np.around(global_conf_matrix, decimals=2))
             print('-------------------------------------------')
     else:
         # Fine-tune the provided model with the new data
