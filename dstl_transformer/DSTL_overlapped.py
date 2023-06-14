@@ -305,6 +305,7 @@ if __name__ == "__main__":
             with torch.no_grad():
                 for X, y in test_dataloader:
                     X = X.to(device)
+                    y = one_hot_encode(y)
                     y = y.to(device)
                     if not (RMSNorm_l is None):
                         X = RMSNorm_l(X)
@@ -312,18 +313,26 @@ if __name__ == "__main__":
                     correct += (torch.round(pred) == y).all(dim=1).type(torch.float).sum().item()
                     y_cpu = y.to('cpu')
                     pred_cpu = pred.to('cpu')
-                    preds.extend(pred_cpu)
-                    trues.extend(y_cpu)
+                    preds.extend(pred_cpu.tolist())
+                    trues.extend(y_cpu.tolist())
             global_correct += correct
             global_preds.extend(preds)
             global_trues.extend(trues)
             correct /= size
             # report accuracy and save confusion matrix
-            print(
-                f"\n\nTest Error for dataset {args.datasets[ds_ix]}: \n "
-                f"Exact accuracy: {(100 * correct):>0.1f}%, "
-                f"AUC: {roc_auc_score(trues, preds)} \n"
-            )
+            if ds[index] == 'DATASET3_1':
+
+                print(
+                    f"\n\nTest Error for dataset {args.datasets[ds_ix]}: \n "
+                    f"Exact accuracy: {(100 * correct):>0.1f}%, "
+                    f"AUC: {roc_auc_score(trues, preds)} \n"
+                )
+            else:
+                print(
+                    f"\n\nTest Error for dataset {args.datasets[ds_ix]}: \n "
+                    f"Exact accuracy: {(100 * correct):>0.1f}%, "
+                    #f"AUC: {roc_auc_score(trues, preds)} \n"
+                )
             print('-------------------------------------------')
             print('-------------------------------------------')
         

@@ -144,7 +144,7 @@ class DSTLDataset(Dataset):
         # check if folders are names with _ or .
         if os.path.isdir(os.path.join(ds_path, self.protocols[0])):
             protocols = self.protocols
-        elif (os.path.isdir(os.path.join(ds_path, '802.11ax')) or ds_path[-3:] == 'dBs'): #os.path.isdir(os.path.join(ds_path, '802.11ax_0'))):
+        elif (os.path.isdir(os.path.join(ds_path, '802.11ax')) or os.path.isdir(os.path.join(ds_path, '802.11ax_0'))): #ds_path[-3:] == 'dBs'): 
             protocols = ['802.11ax', '802.11b', '802.11n', '802.11g']
             if len(self.protocols) == 5:
                 protocols.append('noise') 
