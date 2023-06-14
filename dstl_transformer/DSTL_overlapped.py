@@ -157,7 +157,7 @@ def finetune(model, config, trained_model=None):
                     'model_state_dict': model.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
                     'loss': loss,
-                }, os.path.join(PATH, MODEL_NAME + '_overlapp.pt')) #+ OTA_DATASET + '_' + TEST_FLAG + '_' + RMS_FLAG + NOISE_FLAG + '_ft.pt'))
+                }, os.path.join(PATH, MODEL_NAME + '_overlap.pt')) #+ OTA_DATASET + '_' + TEST_FLAG + '_' + RMS_FLAG + NOISE_FLAG + '_ft.pt'))
             #best_cm = conf_matrix
         if epochs_wo_improvement > 12: # early stopping
             print('------------------------------------')
@@ -234,7 +234,7 @@ if __name__ == "__main__":
     # choose correct version
     if args.retrain:
         global_model = TransformerModel_multiclass_transfer
-    else: # retrain
+    else: # no retrain
         global_model = TransformerModel_multiclass
     # choose correct size
     if args.transformer == "sm":
@@ -287,16 +287,16 @@ if __name__ == "__main__":
         global_trues = []
         global_correct = 0
         global_size = 0
+        if train_config['RMSNorm']:
+                RMSNorm_l = RMSNorm(model='Transformer')
+        else:
+            RMSNorm_l = None
+        model.to(device)
+        model.eval()
         for ds_ix, ds in enumerate(ds_test):
             # Calculate performance and save matrix
             preds = []
             trues = []
-            if train_config['RMSNorm']:
-                RMSNorm_l = RMSNorm(model='Transformer')
-            else:
-                RMSNorm_l = None
-            model.to(device)
-            model.eval()
             # validation loop through test data
             test_dataloader = DataLoader(ds, batch_size=train_config['batchSize'], shuffle=True)
             size = len(test_dataloader.dataset)
@@ -312,16 +312,15 @@ if __name__ == "__main__":
                     pred = model(X.float())
                     correct += (torch.round(pred) == y).all(dim=1).type(torch.float).sum().item()
                     y_cpu = y.to('cpu')
+                    trues.extend(y_cpu.tolist())
                     pred_cpu = pred.to('cpu')
                     preds.extend(pred_cpu.tolist())
-                    trues.extend(y_cpu.tolist())
             global_correct += correct
             global_preds.extend(preds)
             global_trues.extend(trues)
             correct /= size
             # report accuracy and save confusion matrix
-            if ds[index] == 'DATASET3_1':
-
+            if args.datasets[ds_ix] == 'DATASET3_1':
                 print(
                     f"\n\nTest Error for dataset {args.datasets[ds_ix]}: \n "
                     f"Exact accuracy: {(100 * correct):>0.1f}%, "
