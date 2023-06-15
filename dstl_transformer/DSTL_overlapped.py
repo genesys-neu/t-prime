@@ -14,7 +14,7 @@ from preprocessing.DSTL_dataset import DSTLDataset_Transformer, DSTLDataset_Tran
 from dstl_transformer.model_transformer import TransformerModel, TransformerModel_multiclass, TransformerModel_multiclass_transfer
 from cnn_baseline.model_cnn1d import Baseline_CNN1D
 from preprocessing.model_rmsnorm import RMSNorm
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import roc_auc_score, classification_report, multilabel_confusion_matrix
 
 # Function to change the shape of obs
 # the input is obs with shape (channel, slice)
@@ -28,8 +28,10 @@ def get_model_name(name):
     name = name.split("/")[-1]
     return '.'.join(name.split(".")[0:-1])
 
-def target_transform(labels):
-    return torch.stack([torch.tensor([x, y]) for x, y in zip(labels[0], labels[1])])
+def target_transform(label):
+    if type(label) is not list:
+        return [label, label]
+    return label
 
 def one_hot_encode(index_list):
     num_classes = len(PROTOCOLS)
@@ -245,14 +247,14 @@ if __name__ == "__main__":
         for ds in datasets:
             if ds == 'DATASET3_1':
                 ds_train.append(DSTLDataset_Transformer_overlap(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds), ds_type='train', seq_len=24, slice_len=64, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
-                                                raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence))
+                                                raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence, target_transform=target_transform))
                 ds_test.append(DSTLDataset_Transformer_overlap(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds), ds_type='test', seq_len=24, slice_len=64, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
-                                                raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence))
+                                                raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence, target_transform=target_transform))
             else:
                 ds_train.append(DSTLDataset_Transformer(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds), ds_type='train', seq_len=24, slice_len=64, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
-                                               raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence))
+                                               raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence, target_transform=target_transform))
                 ds_test.append(DSTLDataset_Transformer(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds), ds_type='test', seq_len=24, slice_len=64, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
-                                              raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence))
+                                              raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence, target_transform=target_transform))
     else: # lg
         if args.retrain:
             tr_model = TransformerModel(classes=len(PROTOCOLS), d_model=128*2, seq_len=64, nlayers=2, use_pos=False)
@@ -260,14 +262,14 @@ if __name__ == "__main__":
         for ds in datasets:
             if ds == 'DATASET3_1':
                 ds_train.append(DSTLDataset_Transformer_overlap(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds), ds_type='train', seq_len=64, slice_len=128, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
-                                                raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence))
+                                                raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence, target_transform=target_transform))
                 ds_test.append(DSTLDataset_Transformer_overlap(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds), ds_type='test', seq_len=64, slice_len=128, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
-                                                raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence))
+                                                raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence, target_transform=target_transform))
             else:
                 ds_train.append(DSTLDataset_Transformer(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds), ds_type='train', seq_len=64, slice_len=128, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
-                                               raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence))
+                                               raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence, target_transform=target_transform))
                 ds_test.append(DSTLDataset_Transformer(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds), ds_type='test', seq_len=64, slice_len=128, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
-                                              raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence))
+                                              raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence, target_transform=target_transform))
     
     # concat all loaded datasets
     ds_train = torch.utils.data.ConcatDataset(ds_train)
@@ -282,6 +284,8 @@ if __name__ == "__main__":
             raise Exception("The model you provided does not correspond with the selected architecture. Please revise and try again.")
 
     if args.test and not args.retrain:
+        # load model
+        model.load_state_dict(torch.load(args.model_path, map_location=device)['model_state_dict'])
         # Use the loaded model to do inference over the OTA dataset
         global_preds = []
         global_trues = []
@@ -319,19 +323,21 @@ if __name__ == "__main__":
             global_preds.extend(preds)
             global_trues.extend(trues)
             correct /= size
+            labels = ['ax', 'b', 'n', 'g', 'noise']
             # report accuracy and save confusion matrix
-            if args.datasets[ds_ix] == 'DATASET3_1':
-                print(
-                    f"\n\nTest Error for dataset {args.datasets[ds_ix]}: \n "
-                    f"Exact accuracy: {(100 * correct):>0.1f}%, "
-                    f"AUC: {roc_auc_score(trues, preds)} \n"
-                )
-            else:
-                print(
-                    f"\n\nTest Error for dataset {args.datasets[ds_ix]}: \n "
-                    f"Exact accuracy: {(100 * correct):>0.1f}%, "
-                    #f"AUC: {roc_auc_score(trues, preds)} \n"
-                )
+            #if args.datasets[ds_ix] == 'DATASET3_1':
+            print(
+                f"\n\nTest Error for dataset {args.datasets[ds_ix]}: \n "
+                f"Exact accuracy: {(100 * correct):>0.1f}%, "
+                f"AUC: {roc_auc_score(trues, preds)} \n"
+                f"Classification report: {classification_report(trues, preds, np.arange(5), labels, zero_division=0)}"
+            )
+            # else:
+            #     print(
+            #         f"\n\nTest Error for dataset {args.datasets[ds_ix]}: \n "
+            #         f"Exact accuracy: {(100 * correct):>0.1f}%, "
+            #         f"AUC: {roc_auc_score(trues, preds)} \n"
+            #     )
             print('-------------------------------------------')
             print('-------------------------------------------')
         
@@ -342,6 +348,8 @@ if __name__ == "__main__":
                 f"\n\nTest Error for dataset {OTA_DATASET}: \n "
                 f"Exact accuracy: {(100 * global_correct):>0.1f}%\n "
                 f"AUC: {roc_auc_score(global_trues, global_preds)} \n"
+                f"Classification report: {classification_report(global_trues, global_preds, np.arange(5), labels, zero_division=0)}"
+                f"Confusion matrices: {multilabel_confusion_matrix(global_trues, global_preds, labels=np.arange(5))}"
             )
             print('-------------------------------------------')
     else:

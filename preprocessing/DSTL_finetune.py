@@ -135,7 +135,7 @@ def finetune(model, config):
     disp.plot(cmap="Blues", values_format='.2f')
     disp.ax_.get_images()[0].set_clim(0, 100)
     plt.title(f'Conf. Matrix (%): Total Acc. {(best_acc):>0.1f}%')
-    plt.savefig(f"Results_finetune_{MODEL_NAME}_ft.{OTA_DATASET}.{TEST_FLAG}.{RMS_FLAG}{NOISE_FLAG}.pdf")
+    plt.savefig(f"./results_CV/training/Results_finetune_{MODEL_NAME}_ft.{OTA_DATASET}.{TEST_FLAG}.{RMS_FLAG}{NOISE_FLAG}.pdf")
     plt.clf()
     print('-----------------------------------------------------------------')
     return
@@ -176,7 +176,7 @@ if __name__ == "__main__":
     train_config = {
         'batchSize': 122,
         'lr': 0.00002,
-        'epochs': 100,
+        'epochs': 30,
         'nClasses': len(PROTOCOLS),
         'RMSNorm': args.RMSNorm
     }
@@ -287,7 +287,7 @@ if __name__ == "__main__":
             disp.plot(cmap="Blues", values_format='.2f')
             disp.ax_.get_images()[0].set_clim(0, 100)
             plt.title(f'Conf. Matrix (%): Total Acc. {(100 * correct):>0.1f}%')
-            plt.savefig(f"Results_finetune_{MODEL_NAME}.{args.datasets[ds_ix]}.{TEST_FLAG}.{RMS_FLAG}{NOISE_FLAG}.pdf")
+            plt.savefig(f"./results_CV/Results_finetune_{MODEL_NAME}.{args.datasets[ds_ix]}.{TEST_FLAG}.{RMS_FLAG}{NOISE_FLAG}.pdf")
             plt.clf()
             print(f'Confusion matrix (%) for {args.datasets[ds_ix]}')
             print(np.around(conf_matrix, decimals=2))
