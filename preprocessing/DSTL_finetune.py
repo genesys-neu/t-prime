@@ -310,7 +310,7 @@ if __name__ == "__main__":
             disp.plot(cmap="Blues", values_format='.2f')
             disp.ax_.get_images()[0].set_clim(0, 100)
             plt.title(f'Global Conf. Matrix (%): Total Acc. {(100 * global_correct):>0.1f}%')
-            plt.savefig(f"Results_finetune_{MODEL_NAME}.{OTA_DATASET}.{TEST_FLAG}.{RMS_FLAG}{NOISE_FLAG}.pdf")
+            plt.savefig(f"./results_CV/Results_finetune_{MODEL_NAME}.{OTA_DATASET}.{TEST_FLAG}.{RMS_FLAG}{NOISE_FLAG}.pdf")
             plt.clf()
             print(f'Global Confusion Matrix (%) for {OTA_DATASET}')
             print(np.around(global_conf_matrix, decimals=2))

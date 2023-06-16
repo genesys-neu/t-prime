@@ -1,6 +1,6 @@
 #!/bin/bash
 
-datasets=("DATASET3_1" "RM_573C_1" "RM_573C_2" "RM_573C_power" "RM_142_1" "RM_142_2" "RM_572C_1" "RM_572C_2")
+datasets=("RM_573C_1" "RM_573C_2" "RM_142_1" "RM_142_2" "RM_572C_1" "RM_572C_2")
 
 for dataset in "${datasets[@]}"; do
     echo "Running command without $dataset dataset:"

@@ -28,10 +28,11 @@ def get_model_name(name):
     name = name.split("/")[-1]
     return '.'.join(name.split(".")[0:-1])
 
-def target_transform(label):
-    if type(label) is not list:
-        return [label, label]
-    return label
+def target_transform(labels):
+    return torch.stack([torch.tensor([x, y]) for x, y in zip(labels[0], labels[1])])
+    #if type(label) is not list:
+    #    return [label, label]
+    #return label
 
 def one_hot_encode(index_list):
     num_classes = len(PROTOCOLS)
@@ -111,6 +112,9 @@ def load_params(model, trained):
             print(name)
 
     return model
+
+def convert(predictions):
+    return [[round(x) for x in sublist] for sublist in predictions]
 
 def finetune(model, config, trained_model=None):
     # Create data loaders
@@ -247,14 +251,14 @@ if __name__ == "__main__":
         for ds in datasets:
             if ds == 'DATASET3_1':
                 ds_train.append(DSTLDataset_Transformer_overlap(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds), ds_type='train', seq_len=24, slice_len=64, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
-                                                raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence, target_transform=target_transform))
+                                                raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence))
                 ds_test.append(DSTLDataset_Transformer_overlap(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds), ds_type='test', seq_len=24, slice_len=64, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
-                                                raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence, target_transform=target_transform))
+                                                raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence))
             else:
                 ds_train.append(DSTLDataset_Transformer(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds), ds_type='train', seq_len=24, slice_len=64, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
-                                               raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence, target_transform=target_transform))
+                                               raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence))
                 ds_test.append(DSTLDataset_Transformer(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds), ds_type='test', seq_len=24, slice_len=64, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
-                                              raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence, target_transform=target_transform))
+                                              raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence))
     else: # lg
         if args.retrain:
             tr_model = TransformerModel(classes=len(PROTOCOLS), d_model=128*2, seq_len=64, nlayers=2, use_pos=False)
@@ -262,14 +266,14 @@ if __name__ == "__main__":
         for ds in datasets:
             if ds == 'DATASET3_1':
                 ds_train.append(DSTLDataset_Transformer_overlap(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds), ds_type='train', seq_len=64, slice_len=128, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
-                                                raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence, target_transform=target_transform))
+                                                raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence))
                 ds_test.append(DSTLDataset_Transformer_overlap(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds), ds_type='test', seq_len=64, slice_len=128, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
-                                                raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence, target_transform=target_transform))
+                                                raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence))
             else:
                 ds_train.append(DSTLDataset_Transformer(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds), ds_type='train', seq_len=64, slice_len=128, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
-                                               raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence, target_transform=target_transform))
+                                               raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence))
                 ds_test.append(DSTLDataset_Transformer(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds), ds_type='test', seq_len=64, slice_len=128, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
-                                              raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence, target_transform=target_transform))
+                                              raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence))
     
     # concat all loaded datasets
     ds_train = torch.utils.data.ConcatDataset(ds_train)
@@ -329,8 +333,8 @@ if __name__ == "__main__":
             print(
                 f"\n\nTest Error for dataset {args.datasets[ds_ix]}: \n "
                 f"Exact accuracy: {(100 * correct):>0.1f}%, "
-                f"AUC: {roc_auc_score(trues, preds)} \n"
-                f"Classification report: {classification_report(trues, preds, np.arange(5), labels, zero_division=0)}"
+                f"AUC: {roc_auc_score(trues, preds) if args.datasets[ds_ix] == 'DATASET3_1' else '-'} \n"
+                f"Classification report: {classification_report(trues, convert(preds), labels=np.arange(5), target_names=labels, zero_division=0)}"
             )
             # else:
             #     print(
@@ -348,8 +352,8 @@ if __name__ == "__main__":
                 f"\n\nTest Error for dataset {OTA_DATASET}: \n "
                 f"Exact accuracy: {(100 * global_correct):>0.1f}%\n "
                 f"AUC: {roc_auc_score(global_trues, global_preds)} \n"
-                f"Classification report: {classification_report(global_trues, global_preds, np.arange(5), labels, zero_division=0)}"
-                f"Confusion matrices: {multilabel_confusion_matrix(global_trues, global_preds, labels=np.arange(5))}"
+                f"Classification report: {classification_report(global_trues, convert(global_preds), labels=np.arange(5), target_names=labels, zero_division=0)}"
+                f"Confusion matrices: {multilabel_confusion_matrix(global_trues, convert(global_preds), labels=np.arange(5))}"
             )
             print('-------------------------------------------')
     else:
