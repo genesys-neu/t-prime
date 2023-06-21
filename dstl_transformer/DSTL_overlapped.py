@@ -294,6 +294,7 @@ if __name__ == "__main__":
         global_preds = []
         global_trues = []
         global_correct = 0
+        global_any_correct = 0
         global_size = 0
         if train_config['RMSNorm']:
                 RMSNorm_l = RMSNorm(model='Transformer')
@@ -310,6 +311,7 @@ if __name__ == "__main__":
             size = len(test_dataloader.dataset)
             global_size += size
             correct = 0
+            any_correct = 0
             with torch.no_grad():
                 for X, y in test_dataloader:
                     X = X.to(device)
@@ -319,38 +321,45 @@ if __name__ == "__main__":
                         X = RMSNorm_l(X)
                     pred = model(X.float())
                     correct += (torch.round(pred) == y).all(dim=1).type(torch.float).sum().item()
+                    any_correct +=  ((pred == 1) & (y == 1)).any(dim=1).type(torch.float).sum().item()
                     y_cpu = y.to('cpu')
                     trues.extend(y_cpu.tolist())
                     pred_cpu = pred.to('cpu')
                     preds.extend(pred_cpu.tolist())
             global_correct += correct
+            global_any_correct += any_correct
             global_preds.extend(preds)
             global_trues.extend(trues)
             correct /= size
+            any_correct /= size
             labels = ['ax', 'b', 'n', 'g', 'noise']
             # report accuracy and save confusion matrix
-            #if args.datasets[ds_ix] == 'DATASET3_1':
-            print(
-                f"\n\nTest Error for dataset {args.datasets[ds_ix]}: \n "
-                f"Exact accuracy: {(100 * correct):>0.1f}%, "
-                f"AUC: {roc_auc_score(trues, preds) if args.datasets[ds_ix] == 'DATASET3_1' else '-'} \n"
-                f"Classification report: {classification_report(trues, convert(preds), labels=np.arange(5), target_names=labels, zero_division=0)}"
-            )
-            # else:
-            #     print(
-            #         f"\n\nTest Error for dataset {args.datasets[ds_ix]}: \n "
-            #         f"Exact accuracy: {(100 * correct):>0.1f}%, "
-            #         f"AUC: {roc_auc_score(trues, preds)} \n"
-            #     )
+            if args.datasets[ds_ix] == 'DATASET3_1':
+                print(
+                    f"\n\nTest Error for dataset {args.datasets[ds_ix]}: \n "
+                    f"Exact accuracy: {(100 * correct):>0.1f}%, "
+                    f"At least one detected: {(100 * any_correct):>0.1f}"
+                    f"AUC: {roc_auc_score(trues, preds)} \n"
+                    f"Classification report: {classification_report(trues, convert(preds), labels=np.arange(5), target_names=labels, zero_division=0)}"
+                )
+            else:
+                print(
+                    f"\n\nTest Error for dataset {args.datasets[ds_ix]}: \n "
+                    f"Exact accuracy: {(100 * correct):>0.1f}%, "
+                    f"AUC: '-' \n"
+                    f"Classification report: {classification_report(trues, convert(preds), labels=np.arange(5), target_names=labels, zero_division=0)}"
+                )
             print('-------------------------------------------')
             print('-------------------------------------------')
         
         # Global confusion matrix for all test datasets if more than one provided
         if len(args.datasets) > 1:
             global_correct /= global_size
+            global_any_correct /= global_size
             print(
                 f"\n\nTest Error for dataset {OTA_DATASET}: \n "
                 f"Exact accuracy: {(100 * global_correct):>0.1f}%\n "
+                f"At least one detected: {(100 * global_any_correct):>0.1f}"
                 f"AUC: {roc_auc_score(global_trues, global_preds)} \n"
                 f"Classification report: {classification_report(global_trues, convert(global_preds), labels=np.arange(5), target_names=labels, zero_division=0)}"
                 f"Confusion matrices: {multilabel_confusion_matrix(global_trues, convert(global_preds), labels=np.arange(5))}"
