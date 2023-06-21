@@ -18,7 +18,7 @@ for dataset in "${datasets[@]}"; do
     
     echo "Running command with $dataset dataset only:"
     model_name="model_lg_no${dataset}_inf_RMSn_bckg_ft.pt"
-    command_test="python3 DSTL_finetune.py --model_path=/home/miquelsirera/Desktop/dstl/dstl_transformer/model_cp/$model_name --RMSNorm --ds_path=/home/miquelsirera/Desktop/dstl/data --use_gpu --transformer_version v1 --transformer lg --ota_dataset=no$dataset --test_mode=inference --retrain --back_class --datasets ${dataset} --test"
+    command_test="python3 DSTL_finetune.py --model_path=/home/miquelsirera/Desktop/dstl/dstl_transformer/model_cp/$model_name --RMSNorm --ds_path=/home/miquelsirera/Desktop/dstl/data --use_gpu --transformer_version v1 --transformer lg --ota_dataset=no$dataset --test_mode=inference --back_class --datasets ${dataset} --test"
     echo "Executing command: $command_test"
     (eval "$command_test") &
     wait
