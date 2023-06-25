@@ -434,8 +434,7 @@ class DSTLDataset_Transformer_overlap(DSTLDataset_Transformer):
             if p == 'NOISE':
                 paths = [os.path.join(ds_path, 'NOISE')]
             else:
-                paths = [os.path.join(ds_path, 'OVERLAP25', p.replace('-', '')),
-                         os.path.join(ds_path, 'OVERLAP50', p.replace('-', ''))]
+                paths = [os.path.join(ds_path, p.replace('-', ''))]
             mat_list_path = []
             num_mat = 0
             for path in paths:
