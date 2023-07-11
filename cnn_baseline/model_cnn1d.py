@@ -5,12 +5,13 @@ from torch import nn
 
 # Define model
 class Baseline_CNN1D(nn.Module):
-    def __init__(self, numChannels=1, slice_len=4, classes=3):
+    def __init__(self, numChannels=1, slice_len=4, classes=3, normalize=False):
         super(Baseline_CNN1D, self).__init__()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         self.numChannels = numChannels
-
+        self.normalize = normalize
+        self.norm = nn.LayerNorm(slice_len)
         # initialize first set of CONV => RELU => POOL layers
         self.conv1 = nn.Conv1d(in_channels=numChannels, out_channels=64, kernel_size=7)
         self.relu1 = nn.ReLU()
@@ -35,6 +36,8 @@ class Baseline_CNN1D(nn.Module):
         # x = x.reshape((x.shape[0], self.numChannels, x.shape[2]))   # CNN 1D expects a [N, Cin, L] size of data
         # pass the input through our first set of CONV => RELU =>
         # POOL layers
+        if self.normalize:
+            x = self.norm(x)
         x = self.conv1(x)
         x = self.relu1(x)
         x = self.maxpool1(x)

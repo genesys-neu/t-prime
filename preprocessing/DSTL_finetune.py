@@ -50,7 +50,7 @@ def train(model, criterion, optimizer, dataloader, RMSnorm_layer=None):
         if batch % 50 == 0:
             loss, current = loss.item(), batch * len(X)
             print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
-    total_loss /= size
+    total_loss /= len(dataloader)
     correct /= size
     return correct*100.0, total_loss
 
@@ -71,7 +71,7 @@ def validate(model, criterion, dataloader, nclasses, RMSnorm_layer=None):
             y_cpu = y.to('cpu')
             pred_cpu = pred.to('cpu')
             conf_matrix += conf_mat(y_cpu, pred_cpu.argmax(1), labels=list(range(nclasses)))
-    test_loss /= size
+    test_loss /= len(dataloader)
     correct /= size
     return correct*100.0, test_loss, conf_matrix
 
@@ -129,13 +129,13 @@ def finetune(model, config):
     print(np.around(best_cm, decimals=2))
     prot_display = ['ax', 'b', 'n', 'g'] #PROTOCOLS
     if len(PROTOCOLS) > 4: # We need to add noise class
-        prot_display.append('Not known')
+        prot_display.append('noise')
     #prot_display[1] = '802_11b'
     disp = ConfusionMatrixDisplay(confusion_matrix=best_cm, display_labels=prot_display)
     disp.plot(cmap="Blues", values_format='.2f')
     disp.ax_.get_images()[0].set_clim(0, 100)
     plt.title(f'Conf. Matrix (%): Total Acc. {(best_acc):>0.1f}%')
-    plt.savefig(f"Results_finetune_{MODEL_NAME}_ft.{OTA_DATASET}.{TEST_FLAG}.{RMS_FLAG}{NOISE_FLAG}.pdf")
+    plt.savefig(f"./results_CV/training/Results_finetune_{MODEL_NAME}_ft.{OTA_DATASET}.{TEST_FLAG}.{RMS_FLAG}{NOISE_FLAG}.pdf")
     plt.clf()
     print('-----------------------------------------------------------------')
     return
@@ -176,7 +176,7 @@ if __name__ == "__main__":
     train_config = {
         'batchSize': 122,
         'lr': 0.00002,
-        'epochs': 100,
+        'epochs': 30,
         'nClasses': len(PROTOCOLS),
         'RMSNorm': args.RMSNorm
     }
@@ -264,7 +264,7 @@ if __name__ == "__main__":
                     pred_cpu = pred.to('cpu')
                     conf_matrix += conf_mat(y_cpu, pred_cpu.argmax(1), labels=list(range(train_config['nClasses'])))
                     global_conf_matrix += conf_mat(y_cpu, pred_cpu.argmax(1), labels=list(range(train_config['nClasses'])))
-            test_loss /= size
+            test_loss /= len(test_dataloader)
             global_correct += correct
             correct /= size
             # report accuracy and save confusion matrix
@@ -277,17 +277,17 @@ if __name__ == "__main__":
             for r in range(conf_matrix.shape[0]):  # for each row in the confusion matrix
                 sum_row = np.sum(conf_matrix[r, :])
                 conf_matrix[r, :] = conf_matrix[r, :] / sum_row  * 100.0 # compute in percentage
-
+            conf_matrix[np.isnan(conf_matrix)] = 0
             # plt.figure(figsize=(10,7))
             prot_display = ['ax', 'b', 'n', 'g']#PROTOCOLS
             if len(PROTOCOLS) > 4: # We need to add noise class
-                prot_display.append('Not known')
+                prot_display.append('noise')
             #prot_display[1] = '802_11b'
             disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=prot_display)
             disp.plot(cmap="Blues", values_format='.2f')
             disp.ax_.get_images()[0].set_clim(0, 100)
             plt.title(f'Conf. Matrix (%): Total Acc. {(100 * correct):>0.1f}%')
-            plt.savefig(f"Results_finetune_{MODEL_NAME}.{args.datasets[ds_ix]}.{TEST_FLAG}.{RMS_FLAG}{NOISE_FLAG}.pdf")
+            plt.savefig(f"./results_CV/Results_finetune_{MODEL_NAME}.{args.datasets[ds_ix]}.{TEST_FLAG}.{RMS_FLAG}{NOISE_FLAG}.pdf")
             plt.clf()
             print(f'Confusion matrix (%) for {args.datasets[ds_ix]}')
             print(np.around(conf_matrix, decimals=2))
@@ -305,11 +305,12 @@ if __name__ == "__main__":
             for r in range(global_conf_matrix.shape[0]):  # for each row in the confusion matrix
                 sum_row = np.sum(global_conf_matrix[r, :])
                 global_conf_matrix[r, :] = global_conf_matrix[r, :] / sum_row  * 100.0 # compute in percentage
+            global_conf_matrix[np.isnan(global_conf_matrix)] = 0
             disp = ConfusionMatrixDisplay(confusion_matrix=global_conf_matrix, display_labels=prot_display)
             disp.plot(cmap="Blues", values_format='.2f')
             disp.ax_.get_images()[0].set_clim(0, 100)
             plt.title(f'Global Conf. Matrix (%): Total Acc. {(100 * global_correct):>0.1f}%')
-            plt.savefig(f"Results_finetune_{MODEL_NAME}.{OTA_DATASET}.{TEST_FLAG}.{RMS_FLAG}{NOISE_FLAG}.pdf")
+            plt.savefig(f"./results_CV/Results_finetune_{MODEL_NAME}.{OTA_DATASET}.{TEST_FLAG}.{RMS_FLAG}{NOISE_FLAG}.pdf")
             plt.clf()
             print(f'Global Confusion Matrix (%) for {OTA_DATASET}')
             print(np.around(global_conf_matrix, decimals=2))
