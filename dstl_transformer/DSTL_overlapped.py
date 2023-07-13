@@ -233,6 +233,7 @@ if __name__ == "__main__":
     plt.rc('font', **font)
 
     datasets = args.datasets
+    ds_names = []
     ds_train = []
     ds_test = []
     tr_model = None
@@ -249,31 +250,45 @@ if __name__ == "__main__":
         model = global_model(classes=len(PROTOCOLS), d_model=64*2, seq_len=24, nlayers=2)
         # Load over the air dataset
         for ds in datasets:
-            if (ds == 'OVERLAP25' or ds == 'OVERLAP50'):
-                ds_train.append(DSTLDataset_Transformer_overlap(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, 'DATASET3_1', ds), ds_type='train', seq_len=24, slice_len=64, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
+            if (ds == 'DATASET3_1' or ds == 'DATASET3_2'):
+                ds_train.append(DSTLDataset_Transformer_overlap(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds, 'OVERLAP25'), ds_type='train', seq_len=24, slice_len=64, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
                                                 raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence))
-                ds_test.append(DSTLDataset_Transformer_overlap(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, 'DATASET3_1', ds), ds_type='test', seq_len=24, slice_len=64, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
+                ds_test.append(DSTLDataset_Transformer_overlap(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds, 'OVERLAP25'), ds_type='test', seq_len=24, slice_len=64, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
                                                 raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence))
+                ds_names.append(ds + ' OVERLAP25')
+                ds_train.append(DSTLDataset_Transformer_overlap(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds, 'OVERLAP50'), ds_type='train', seq_len=24, slice_len=64, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
+                                                raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence))
+                ds_test.append(DSTLDataset_Transformer_overlap(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds, 'OVERLAP50'), ds_type='test', seq_len=24, slice_len=64, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
+                                                raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence))
+                ds_names.append(ds + ' OVERLAP50')
             else:
                 ds_train.append(DSTLDataset_Transformer(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds), ds_type='train', seq_len=24, slice_len=64, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
                                                raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence))
                 ds_test.append(DSTLDataset_Transformer(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds), ds_type='test', seq_len=24, slice_len=64, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
                                               raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence))
+                ds_names.append(ds)
     else: # lg
         if args.retrain:
             tr_model = TransformerModel(classes=len(PROTOCOLS), d_model=128*2, seq_len=64, nlayers=2, use_pos=False)
         model = global_model(classes=len(PROTOCOLS), d_model=128*2, seq_len=64, nlayers=2)
         for ds in datasets:
-            if (ds == 'OVERLAP25' or ds == 'OVERLAP50'):
-                ds_train.append(DSTLDataset_Transformer_overlap(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, 'DATASET3_1', ds), ds_type='train', seq_len=64, slice_len=128, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
+            if (ds == 'DATASET3_1' or ds == 'DATASET3_2'):
+                ds_train.append(DSTLDataset_Transformer_overlap(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds, 'OVERLAP25'), ds_type='train', seq_len=24, slice_len=64, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
                                                 raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence))
-                ds_test.append(DSTLDataset_Transformer_overlap(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, 'DATASET3_1', ds), ds_type='test', seq_len=64, slice_len=128, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
+                ds_test.append(DSTLDataset_Transformer_overlap(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds, 'OVERLAP25'), ds_type='test', seq_len=24, slice_len=64, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
                                                 raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence))
+                ds_names.append(ds + ' OVERLAP25')
+                ds_train.append(DSTLDataset_Transformer_overlap(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds, 'OVERLAP50'), ds_type='train', seq_len=24, slice_len=64, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
+                                                raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence))
+                ds_test.append(DSTLDataset_Transformer_overlap(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds, 'OVERLAP50'), ds_type='test', seq_len=24, slice_len=64, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
+                                                raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence))
+                ds_names.append(ds + ' OVERLAP50')
             else:
                 ds_train.append(DSTLDataset_Transformer(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds), ds_type='train', seq_len=64, slice_len=128, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
                                                raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence))
                 ds_test.append(DSTLDataset_Transformer(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds), ds_type='test', seq_len=64, slice_len=128, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
                                               raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence))
+                ds_names.append(ds)
     
     # concat all loaded datasets
     ds_train = torch.utils.data.ConcatDataset(ds_train)
@@ -341,9 +356,9 @@ if __name__ == "__main__":
             any_correct /= size
             labels = ['ax', 'b', 'n', 'g', 'noise']
             # report accuracy and save confusion matrix
-            if (args.datasets[ds_ix] == 'OVERLAP25' or args.datasets[ds_ix] == 'OVERLAP50'):
+            if (ds_names[ds_ix].split(' ')[-1] == 'OVERLAP25' or ds_names[ds_ix].split(' ')[-1] == 'OVERLAP50'):
                 print(
-                    f"\n\nTest Error for dataset {args.datasets[ds_ix]}: \n "
+                    f"\n\nTest Error for dataset {ds_names[ds_ix]}: \n "
                     f"Exact accuracy: {(100 * correct):>0.1f}%, "
                     f"At least one detected: {(100 * any_correct):>0.1f}%, "
                     f"AUC: {roc_auc_score(trues, preds)} \n"
@@ -352,7 +367,7 @@ if __name__ == "__main__":
                 )
             else:
                 print(
-                    f"\n\nTest Error for dataset {args.datasets[ds_ix]}: \n "
+                    f"\n\nTest Error for dataset {ds_names[ds_ix]}: \n "
                     f"Exact accuracy: {(100 * correct):>0.1f}%, "
                     f"AUC: '-' \n"
                     f"Classification report: {classification_report(trues, convert(preds), labels=np.arange(5), target_names=labels, zero_division=0)}"
@@ -361,7 +376,7 @@ if __name__ == "__main__":
             print('-------------------------------------------')
         
         # Global confusion matrix for all test datasets if more than one provided
-        if len(args.datasets) > 1:
+        if len(ds_names) > 1:
             global_correct /= global_size
             global_any_correct /= global_size
             print(
