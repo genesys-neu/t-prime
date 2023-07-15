@@ -447,13 +447,15 @@ class DSTLDataset_Transformer_overlap(DSTLDataset_Transformer):
                     num_mat += len(mat_list)                     # and store the new list value length
                     mat_list_path.extend(mat_list)
                 else:
-                    sys.exit('[DSTLDataset] folder ' + path + ' not found. Aborting...')
-            examples_map[directories[i]] = dict(
-                    zip(
-                        list(range(num_mat)),
-                        mat_list_path
+                    if p != 'NOISE':
+                        sys.exit('[DSTLDataset] folder ' + path + ' not found. Aborting...')
+            if num_mat != 0:
+                examples_map[directories[i]] = dict(
+                        zip(
+                            list(range(num_mat)),
+                            mat_list_path
+                        )
                     )
-                )
 
         # now let's go through each class examples and assign a global sample index
         # based on the slice len and overlap configuration
