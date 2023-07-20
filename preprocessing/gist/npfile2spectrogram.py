@@ -23,20 +23,22 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
     import matplotlib.colors as colors
 
+    max_plots = 20
+
     for p in args.protocols:
         for dbm in args.dbm:
             filename = p + '_' + dbm if dbm != "" else p
             path = os.path.join(args.raw_path, filename)
             for ix, bin in enumerate(glob(os.path.join(path, '*.bin'))):
-                if ix < 3:
+                if ix < max_plots:
                     s = np.fromfile(bin, dtype=np.complex128)
                     fs = args.fs
 
-                    f, t, Sxx = signal.spectrogram(s, fs=fs)
-                    th = Sxx.max() - 1e-10
-                    Sxx[np.where(Sxx > th)] = th    # clip values for visualization po
+                    #f, t, Sxx = signal.spectrogram(s, fs=fs)
+                    #th = Sxx.max() - 1e-10
+                    #Sxx[np.where(Sxx > th)] = th    # clip values for visualization po
 
-                    plt.specgram(s, Fs=fs)
+                    Sxx, freqs, t, im = plt.specgram(s, Fs=fs)
                     plt.xlabel("Time")
                     plt.ylabel("Frequency")
 
@@ -60,27 +62,30 @@ if __name__ == "__main__":
                     #plt.show()
                     plt.savefig(os.path.join(path, p+'_'+os.path.basename(args.raw_path)+'_'+str(ix)+'.png'))
 
-                    plt.hlines(y=0, xmin=0, xmax=max(t),
+                    xmin = 1e-5
+                    plt.hlines(y=0, xmin=xmin, xmax=max(t),
                                colors='red',
-                               label='fc = 2.45e9')
+                               label='fc = '+str(fc))
 
-                    plt.hlines(y=ch7, xmin=0, xmax=max(t),
-                               colors=ch7_col, linestyles='dashed',
-                               label='fc = 2.443e9 [Ch 7]')
+                    if ch7 != 0:
+                        plt.hlines(y=ch7, xmin=xmin, xmax=max(t),
+                                   colors=ch7_col, linestyles='dashed',
+                                   label='fc = 2.443e9 [Ch 7]')
 
-                    plt.hlines(y=ch8, xmin=0, xmax=max(t),
+                    plt.hlines(y=ch8, xmin=xmin, xmax=max(t),
                                colors=ch8_col, linestyles='solid',
                                label='fc = 2.447e9 [Ch 8]')
-                    plt.hlines(y=ch9, xmin=0, xmax=max(t),
+                    plt.hlines(y=ch9, xmin=xmin, xmax=max(t),
                                colors=ch9_col, linestyles='dashdot',
                                label='fc = 2.452e9[Ch 9]')
+                    if fs > 20e6:
+                        plt.hlines(y=ch10, xmin=xmin, xmax=max(t),
+                                   colors=ch10_col, linestyles='dotted',
+                                   label='fc = 2.457e9 [Ch 10]')
 
-                    plt.hlines(y=ch10, xmin=0, xmax=max(t),
-                               colors=ch10_col, linestyles='dotted',
-                               label='fc = 2.457e9 [Ch 10]')
 
                     plt.legend()
-                    plt.show()
+                    #plt.show()
                     plt.savefig(os.path.join(path, p + '_' + os.path.basename(args.raw_path) + '_' + str(ix) + '__lines.png'))
                     plt.clf()
                 else:
