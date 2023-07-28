@@ -18,6 +18,7 @@ from tqdm import tqdm
 from model_cnn1d import Baseline_CNN1D
 from model_AMCNet import AMC_Net
 from model_ResNet import ResNet
+from model_LSTM import LSTM_ap
 from confusion_matrix import plot_confmatrix
 import wandb
 
@@ -120,6 +121,10 @@ def train_func(config: Dict):
     elif config['pytorch_model'] == 'ResNet':
         model = ResNet(num_classes=Nclass, num_samples=slice_len, iq_dim=2, kernel_size=3, pool_size=2)
         loss_fn = nn.CrossEntropyLoss()
+    elif config['pytorch_model'] == 'LSTM':
+        model = LSTM_ap(input_size=2, hidden_size=128, output_size=Nclass, num_layers=2)
+        loss_fn = nn.CrossEntropyLoss()
+
 
     if use_ray:   
         model = train.torch.prepare_model(model)
@@ -176,8 +181,8 @@ def train_func(config: Dict):
     return loss_results
 
 
-supported_models = ['baseline_cnn1d', 'AMCNet', 'ResNet']
-supported_outmode = ['real', 'complex', 'real_invdim']
+supported_models = ['baseline_cnn1d', 'AMCNet', 'ResNet', 'LSTM']
+supported_outmode = ['real', 'complex', 'real_invdim', 'real_ampphase']
 
 if __name__ == "__main__":
     import argparse
