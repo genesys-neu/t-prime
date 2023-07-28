@@ -16,6 +16,8 @@ import pickle
 from torch.nn.modules.utils import consume_prefix_in_state_dict_if_present
 from tqdm import tqdm
 from model_cnn1d import Baseline_CNN1D
+from model_AMCNet import AMC_Net
+from model_ResNet import ResNet
 from confusion_matrix import plot_confmatrix
 import wandb
 
@@ -81,7 +83,7 @@ def validate_epoch(dataloader, model, loss_fn, Nclasses, use_ray=False):
     return test_loss, correct, conf_matrix
 
 def train_func(config: Dict):
-    global_model = config['pytorch_model']
+
     batch_size = config["batch_size"]
     lr = config["lr"]
     epochs = config["epochs"]
@@ -92,6 +94,7 @@ def train_func(config: Dict):
     num_channels = config['num_chans']
     device = config['device']
     logdir = config['cp_path']
+    is_wandb = config['is_wandb']
     os.makedirs(logdir, exist_ok=True)
 
     if not use_ray:
@@ -108,28 +111,39 @@ def train_func(config: Dict):
         test_dataloader = train.torch.prepare_data_loader(test_dataloader)
 
     # Create model.
-    model = global_model(classes=Nclass, numChannels=num_channels, slice_len=slice_len, normalize=config['normalize'])
+    if config['pytorch_model'] == 'baseline_cnn1d':
+        model = Baseline_CNN1D(classes=Nclass, numChannels=num_channels, slice_len=slice_len, normalize=config['normalize'])
+        loss_fn = nn.NLLLoss()
+    elif config['pytorch_model'] == 'AMCNet':
+        model = AMC_Net(num_classes=Nclass)
+        loss_fn = nn.CrossEntropyLoss()
+    elif config['pytorch_model'] == 'ResNet':
+        model = ResNet(num_classes=Nclass, num_samples=slice_len, in_channels=2, kernel_size=3, pool_size=2)
+        loss_fn = nn.CrossEntropyLoss()
+
     if use_ray:   
         model = train.torch.prepare_model(model)
     else:
         model.to(device)
 
-    loss_fn = nn.NLLLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     from torch.optim.lr_scheduler import ReduceLROnPlateau
 
     scheduler = ReduceLROnPlateau(optimizer, 'min', min_lr=0.00001, verbose=True)
     loss_results = []
     best_loss = np.inf
-    wandb.watch(model, log_freq=10)
+    if is_wandb:
+        wandb.watch(model, log_freq=10)
     normalize_flag = 'norm.' if config['normalize'] else ''
     for e in range(epochs):
         tr_loss, tr_acc = train_epoch(train_dataloader, model, loss_fn, optimizer, use_ray)
-        wandb.log({'Tr_loss': tr_loss}, step=e)
-        wandb.log({'Tr_acc': tr_acc}, step=e)
+        if is_wandb:
+            wandb.log({'Tr_loss': tr_loss}, step=e)
+            wandb.log({'Tr_acc': tr_acc}, step=e)
         loss, acc, conf_matrix = validate_epoch(test_dataloader, model, loss_fn, Nclasses=Nclass, use_ray=use_ray)
-        wandb.log({'Val_loss': loss}, step=e)
-        wandb.log({'Val_acc': acc}, step=e)
+        if is_wandb:
+            wandb.log({'Val_loss': loss}, step=e)
+            wandb.log({'Val_acc': acc}, step=e)
         scheduler.step(loss)
         loss_results.append(loss)
         if use_ray:
@@ -155,10 +169,15 @@ def train_func(config: Dict):
                     'loss': loss,
                 }, os.path.join(logdir,f'model.cnn.{config["wchannel"]}.{normalize_flag}{config["snr_dB"]}.pt'))
                 df_confmat = plot_confmatrix(logdir, pkl_file, train_config['class_labels'], 'conf_mat_epoch'+str(e)+'.png')
-                wandb.log({'Confusion_Matrix': df_confmat.to_numpy()}, step=e)
+                if is_wandb:
+                    wandb.log({'Confusion_Matrix': df_confmat.to_numpy()}, step=e)
     # return required for backwards compatibility with the old API
     # TODO(team-ml) clean up and remove return
     return loss_results
+
+
+supported_models = ['baseline_cnn1d', 'AMCNet', 'ResNet']
+supported_outmode = ['real', 'complex', 'real_invdim']
 
 if __name__ == "__main__":
     import argparse
@@ -183,6 +202,9 @@ if __name__ == "__main__":
     parser.add_argument('--postfix', default='', help='Postfix to append to dataset file.')
     parser.add_argument('--raw_data_ratio', default=1.0, type=float, help='Specify the ratio of examples per class to consider while training/testing')
     parser.add_argument("--normalize", action='store_true', default=False, help="Use a layer norm as a first layer.")
+    parser.add_argument('--model', choices=supported_models, default='baseline_cnn1d', help='Model to be used for training')
+    parser.add_argument('--out_mode', choices=supported_outmode, default='real', help='Specify data generator output format')
+
     args, _ = parser.parse_known_args()
 
     print('Apply noise:', args.noise)
@@ -196,9 +218,10 @@ if __name__ == "__main__":
                            slice_overlap_ratio=float(args.overlap_ratio),
                            raw_data_ratio=args.raw_data_ratio,
                            file_postfix=args.postfix,
-                           override_gen_map=True,
+                           override_gen_map=False,
                            apply_wchannel=args.channel,
-                           apply_noise=args.noise)
+                           apply_noise=args.noise,
+                           out_mode=args.out_mode)
     ds_test = DSTLDataset(protocols,
                           ds_path=args.raw_path,
                           ds_type='test',
@@ -209,28 +232,42 @@ if __name__ == "__main__":
                           file_postfix=args.postfix,
                           override_gen_map=False,    # it will use the same as above call
                           apply_wchannel=args.channel,
-                          apply_noise=args.noise)
+                          apply_noise=args.noise,
+                          out_mode=args.out_mode)
 
     if not os.path.isdir(args.cp_path):
         os.makedirs(args.cp_path)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    train_config = {"lr": 1e-3, "batch_size": 512, "epochs": 5}
+    #device = "cpu"
     ds_info = ds_train.info()
     Nclass = ds_info['nclasses']
-    train_config['pytorch_model'] = Baseline_CNN1D
-    train_config['Nclass'] = Nclass
-    train_config['useRay'] = args.useRay    # TODO: fix this, currently it's not working with Ray because the dataset gets replicated among workers
-    train_config['slice_len'] = ds_info['slice_len']
-    train_config['normalize'] = args.normalize
-    train_config['num_feats'] = 1
-    train_config['num_chans'] = ds_info['nchans']
-    train_config['device'] = device
-    train_config['cp_path'] = args.cp_path
-    train_config['class_labels'] = protocols
-    train_config['wchannel'] = args.channel if args.channel is not None else 'nochan'
-    train_config['postfix'] = args.postfix
-    train_config['snr_dB'] = args.snr_db[0]
+
+    assert(args.model in supported_models)
+
+    is_wandb = True
+
+    train_config = {
+
+        "lr": 1e-3,
+        "batch_size": 512,
+        "epochs": 5,
+        'pytorch_model': args.model,
+        'Nclass': Nclass,
+        'useRay': args.useRay,
+        # TODO: fix this, currently it's not working with Ray because the dataset gets replicated among workers
+        'slice_len': ds_info['slice_len'],
+        'normalize': args.normalize,
+        'num_feats': 1,
+        'num_chans': ds_info['nchans'],
+        'device': device,
+        'cp_path': args.cp_path,
+        'class_labels': protocols,
+        'wchannel': args.channel if args.channel is not None else 'nochan',
+        'postfix': args.postfix,
+        'snr_dB': args.snr_db[0],
+        'is_wandb': is_wandb
+    }
 
     """
     if not train_config['isDebug']:
@@ -251,19 +288,21 @@ if __name__ == "__main__":
     exp_config = {  # Experiment configuration for tracking
         "Dataset": "1_1",
         "Dataset_Ratio": args.raw_data_ratio,
-        "Architecture": "Baseline_CNN1D",
+        "Architecture": args.model,
         "Wireless channel": args.channel,
         "Snr (dbs)": args.snr_db,
         "Learning rate": train_config['lr'],
         "Batch size": train_config['batch_size'],
         "Slice length": args.slicelen
     }
-    wandb.init(project="RF_Baseline_CNN1D", config=exp_config)
-    wandb.run.name = f'{args.snr_db[0]} dBs {args.channel} sl:{ds_info["slice_len"]}'
+    if is_wandb:
+        wandb.init(project="RF_Baseline_CNN1D", config=exp_config)
+        wandb.run.name = f'{args.snr_db[0]} dBs {args.channel} sl:{ds_info["slice_len"]}'
 
     epochs_loss = train_func(train_config)
     pickle.dump(epochs_loss, open(os.path.join(args.cp_path, 'epochs_loss.pkl'), 'wb'))
     print(epochs_loss)
-    wandb.finish()
+    if is_wandb:
+        wandb.finish()
 
 
