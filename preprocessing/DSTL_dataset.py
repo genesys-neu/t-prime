@@ -55,7 +55,9 @@ class DSTLDataset(Dataset):
                  override_gen_map=False,
                  normalize=False,
                  ota=False, # OVER THE AIR
-                 transform=None, target_transform=None):
+                 transform=None, target_transform=None,
+                 double_class_label=False,
+                 out_mode='real'):
 
         self.protocols = protocols
         self.slice_len = slice_len
@@ -70,6 +72,9 @@ class DSTLDataset(Dataset):
         self.seed = seed
         self.ds_path = ds_path
         self.test_ratio = test_ratio
+        self.double_class_label = double_class_label    # this is used for overlapping case (it outputs two labels)
+        self.out_mode = out_mode
+
         if not (self.seed is None):
             np.random.seed(self.seed)
 
@@ -264,7 +269,13 @@ class DSTLDataset(Dataset):
     
     def retrieve_obs(self, noisy_sig, obs_info):
         obs = noisy_sig[obs_info['sample_ix']:obs_info['sample_ix']+self.slice_len, 0]
-        obs = np.stack((obs.real, obs.imag))
+        if self.out_mode == 'complex':
+            obs = obs   # return complex version
+        elif self.out_mode == 'real_invdim':
+            obs = np.stack((obs.real, obs.imag))
+            obs = np.swapaxes(obs, 1, 0)        # shape = [N, 2]
+        else:
+            obs = np.stack((obs.real, obs.imag))  # shape = [2, N] with real and imag separated
 
         if self.transform:
             obs = self.transform(obs)
@@ -308,7 +319,7 @@ class DSTLDataset(Dataset):
         obs = self.retrieve_obs(noisy_sig, obs_info)
         if self.target_transform:
             label = self.target_transform(label)
-        if type(label) is not list:
+        if self.double_class_label and (type(label) is not list):
             label = [label, label]
         return obs, label
 
