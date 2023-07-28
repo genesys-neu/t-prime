@@ -5,13 +5,13 @@ import numpy as np
 
 
 class ResidualStack(nn.Module):
-    def __init__(self, in_channels, kernel_size, seq, pool_size):
+    def __init__(self, in_channels, out_channels, kernel_size, pool_size):
         super(ResidualStack, self).__init__()
-        self.conv1 = nn.Conv2d(in_channels, 32, kernel_size=(1, 1), padding='same')
-        self.conv2 = nn.Conv2d(32, 32, kernel_size=kernel_size, padding='same')
-        self.conv3 = nn.Conv2d(32, 32, kernel_size=kernel_size, padding='same')
-        self.conv4 = nn.Conv2d(32, 32, kernel_size=kernel_size, padding='same')
-        self.conv5 = nn.Conv2d(32, 32, kernel_size=kernel_size, padding='same')
+        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=(1, 1), padding='same')
+        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=kernel_size, padding='same')
+        self.conv3 = nn.Conv2d(out_channels, out_channels, kernel_size=kernel_size, padding='same')
+        self.conv4 = nn.Conv2d(out_channels, out_channels, kernel_size=kernel_size, padding='same')
+        self.conv5 = nn.Conv2d(out_channels, out_channels, kernel_size=kernel_size, padding='same')
         self.pool_size = pool_size
 
     def forward(self, x):
@@ -39,19 +39,19 @@ class ResidualStack(nn.Module):
 
 
 class ResNet(nn.Module):
-    def __init__(self, in_channels: int, num_samples: int, kernel_size: int, pool_size: int, num_classes: int ):
+    def __init__(self, iq_dim: int, num_samples: int, kernel_size: int, pool_size: int, num_classes: int):
         super(ResNet, self).__init__()
-
-        self.res_stack1 = ResidualStack(1, (kernel_size, in_channels), seq='ReStk0', pool_size=(pool_size, in_channels))
-        self.res_stack2 = ResidualStack(32, (1, kernel_size), seq='ReStk1', pool_size=(1, pool_size))
-        self.res_stack3 = ResidualStack(32, (1, kernel_size), seq='ReStk2', pool_size=(1, pool_size))
-        self.res_stack4 = ResidualStack(32, (1, kernel_size), seq='ReStk3', pool_size=(1, pool_size))
-        self.res_stack5 = ResidualStack(32, (1, kernel_size), seq='ReStk4', pool_size=(1, pool_size))
-        self.res_stack6 = ResidualStack(32, (1, kernel_size), seq='ReStk5', pool_size=(1, pool_size))
+        num_kernels = 32
+        self.res_stack1 = ResidualStack(in_channels=1, out_channels=num_kernels, kernel_size=(kernel_size, iq_dim),  pool_size=(pool_size, iq_dim))
+        self.res_stack2 = ResidualStack(in_channels=num_kernels, out_channels=num_kernels, kernel_size=(kernel_size,1),  pool_size=(pool_size,1))
+        self.res_stack3 = ResidualStack(in_channels=num_kernels, out_channels=num_kernels, kernel_size=(kernel_size,1),  pool_size=(pool_size,1))
+        self.res_stack4 = ResidualStack(in_channels=num_kernels, out_channels=num_kernels, kernel_size=(kernel_size,1),  pool_size=(pool_size,1))
+        self.res_stack5 = ResidualStack(in_channels=num_kernels, out_channels=num_kernels, kernel_size=(kernel_size,1),  pool_size=(pool_size,1))
+        self.res_stack6 = ResidualStack(in_channels=num_kernels, out_channels=num_kernels, kernel_size=(kernel_size,1),  pool_size=(pool_size,1))
 
         self.flatten = nn.Flatten()
 
-        rand_x = torch.Tensor(np.random.random((1, in_channels, num_samples)))
+        rand_x = torch.Tensor(np.random.random((1, num_samples, iq_dim)))
         rand_x = rand_x.unsqueeze(1)
         rand_x = self.res_stack1(rand_x)
         rand_x = self.res_stack2(rand_x)

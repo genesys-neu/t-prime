@@ -118,7 +118,7 @@ def train_func(config: Dict):
         model = AMC_Net(num_classes=Nclass)
         loss_fn = nn.CrossEntropyLoss()
     elif config['pytorch_model'] == 'ResNet':
-        model = ResNet(num_classes=Nclass, num_samples=slice_len, in_channels=2, kernel_size=3, pool_size=2)
+        model = ResNet(num_classes=Nclass, num_samples=slice_len, iq_dim=2, kernel_size=3, pool_size=2)
         loss_fn = nn.CrossEntropyLoss()
 
     if use_ray:   
