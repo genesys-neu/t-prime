@@ -274,6 +274,12 @@ class DSTLDataset(Dataset):
         elif self.out_mode == 'real_invdim':
             obs = np.stack((obs.real, obs.imag))
             obs = np.swapaxes(obs, 1, 0)        # shape = [N, 2]
+        elif self.out_mode == 'real_ampphase':
+            angle = np.angle(obs)   # phase in radians
+            n_angle = (angle-np.min(angle))/(np.max(angle)-np.min(angle))   # normalize within 0,1 first
+            n_angle = 2 * n_angle - 1  # then we convert -1, 1 (from the paper)
+            obs = np.stack((np.abs(obs), n_angle))    # compute phase and amplitude
+            obs = np.swapaxes(obs, 1, 0)                    # shape = [N, 2]
         else:
             obs = np.stack((obs.real, obs.imag))  # shape = [2, N] with real and imag separated
 
