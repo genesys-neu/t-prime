@@ -12,12 +12,18 @@ sys.path.insert(0, '../')
 import argparse
 from dstl_transformer.model_transformer import TransformerModel
 from cnn_baseline.model_cnn1d import Baseline_CNN1D
+from cnn_baseline.model_AMCNet import AMC_Net
+from cnn_baseline.model_ResNet import ResNet
+from cnn_baseline.LSTM import ComplexDataClassificationModel
 
 # CONFIG
 TEST_DATA_PATH = '/home/miquelsirera/Desktop/dstl/data/DSTL_DATASET_1_1_TEST'
 TRANS_PATH = '/home/miquelsirera/Desktop/dstl/dstl_transformer/model_cp'
 CNN_PATH = '/home/miquelsirera/Desktop/dstl/cnn_baseline/results_slice512'
-MODELS = ["Trans. (64 x 128) [6.8M params]", "Trans. (24 x 64) [1.6M params]", "CNN (1 x 512) [4.1M params]"]
+AMC_PATH = '/home/belgiovinem/Research/DSTL/dstl/cnn_baseline/results_AMCNet'
+RESNET_PATH = '/home/belgiovinem/Research/DSTL/dstl/cnn_baseline/results_ResNet'
+LSTM_PATH = '/home/belgiovinem/Research/DSTL/dstl/cnn_baseline/results_LSTM'
+MODELS = ["Trans. (64 x 128) [6.8M params]", "Trans. (24 x 64) [1.6M params]", "CNN (1 x 512) [4.1M params]", "AMCNet () []", "ResNet () []", "LSTM () []"]
 PROTOCOLS = ['802_11ax', '802_11b_upsampled', '802_11n', '802_11g']
 CHANNELS = ['None', 'TGn', 'TGax', 'Rayleigh']
 SNR = [-30.0, -25.0, -20.0, -15.0, -10.0, -5.0, 0.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0]
@@ -264,11 +270,23 @@ if __name__ == "__main__":
         cnn = Baseline_CNN1D(classes=len(PROTOCOLS), numChannels=2, slice_len=512, normalize=args.normalize)
         cnn.load_state_dict(torch.load(f"{CNN_PATH}/model.cnn.random{norm_flag}.range.pt", map_location=device)['model_state_dict'])
         cnn.eval()
+        amc = AMC_Net(num_classes=len(PROTOCOLS), sig_len=128, extend_channel=36, latent_dim=512, num_heads=2, conv_chan_list=None)
+        amc.load_state_dict(torch.load(f"{AMC_PATH}/model.cnn.random.range.pt", map_location=device)['model_state_dict'])
+        amc.eval()
+        resnet = ResNet(in_channels=, num_samples=, kernel_size=, pool_size=, num_classes=len(PROTOCOLS))
+        resnet.load_state_dict(torch.load(f"{RESNET_PATH}/model.cnn.random.range.pt", map_location=device)['model_state_dict'])
+        resnet.eval()
+        lstm = ComplexDataClassificationModel(input_size=, hidden_size=, num_layers=2, num_classes=len(PROTOCOLS))
+        lstm.load_state_dict(torch.load(f"{LSTM_PATH}/model.cnn.random.range.pt", map_location=device)['model_state_dict'])
+        lstm.eval()
         if args.use_gpu:
             model_lg.cuda()
             model_sm.cuda()
             cnn.cuda()
-        y_trans_lg, y_trans_sm, y_cnn = [], [], []
+            amc.cuda()
+            resnet.cuda()
+            lstm.cuda()
+        y_trans_lg, y_trans_sm, y_cnn, y_amc, y_resnet, y_lstm= [], [], [], [], [], []
         for channel in CHANNELS:
             y_trans_lg.append(validate(model_lg, class_map, seq_len=64, sli_len=128, channel=channel))
             print(f'Accuracy values for channel {channel} and large architecture are: ', y_trans_lg[-1])
@@ -276,9 +294,15 @@ if __name__ == "__main__":
             print(f'Accuracy values for channel {channel} and small architecture are: ', y_trans_sm[-1])
             y_cnn.append(validate(cnn, class_map, seq_len=1, sli_len=512, channel=channel, cnn=True))
             print(f'Accuracy values for channel {channel} and cnn architecture are: ', y_cnn[-1])
+            y_amc.append(validate(amc, class_map, seq_len=1, sli_len=512, channel=channel, cnn=True))
+            print(f'Accuracy values for channel {channel} and AMCNet architecture are: ', y_amc[-1])
+            y_resnet.append(validate(resnet, class_map, seq_len=1, sli_len=512, channel=channel, cnn=True))
+            print(f'Accuracy values for channel {channel} and ResNet architecture are: ', y_resnet[-1])
+            y_lstm.append(validate(lstm, class_map, seq_len=1, sli_len=512, channel=channel, cnn=True))
+            print(f'Accuracy values for channel {channel} and LSTM architecture are: ', y_lstm[-1])
         
-        with open(f'test_results_uniformdist_onemodel{norm_flag}.txt', 'w') as f:
-            f.write(str(y_trans_lg) + '%' + str(y_trans_sm) + '%' + str(y_cnn))
+        with open(f'test_results_arhcs_comparison.txt', 'w') as f:
+            f.write(str(y_trans_lg) + '%' + str(y_trans_sm) + '%' + str(y_cnn) + '%' + str(y_amc) + '%' + str(y_resnet) + '%' + str(y_lstm))
     
     else: # Experiment 4: # Inference time analysis for each of the model architectures
         print('Using protocol 802.11ax and 10 dBs as a sample input.')
@@ -320,26 +344,26 @@ if __name__ == "__main__":
         mean, sd = calculate_avg_time(np.array(y_cnn_time), np.array(y_cnn_sd))
         print(f'Average inference time mean and sd for cnn architecture are: ', mean, ' +- ', sd)
 
-    if not args.experiment == '4':
-        fig, ax = plt.subplots(2, 2, figsize = (12, 6))
+    # if not args.experiment == '4':
+    #     fig, ax = plt.subplots(2, 2, figsize = (12, 6))
 
-        for i in range(2):
-            for j in range(2):
-                ax[i][j].plot(SNR, y_trans_lg[i*2+j], color='#000000', linestyle='solid', marker='o', label=MODELS[0])
-                ax[i][j].plot(SNR, y_trans_sm[i*2+j], color='#56B4E9', linestyle='dashed', marker='v', label=MODELS[1])
-                ax[i][j].plot(SNR, y_cnn[i*2+j], color='#D55E00', linestyle='dashdot', marker='^', label=MODELS[2])
-                ax[i][j].set_title(CHANNELS[i*2+j])
-                ax[i][j].set_xlabel('SNR (dBs)')
-                ax[i][j].set_ylabel('Accuracy (%)')
-                ax[i][j].set_ylim(15,105)
-                ax[i][j].grid()     
-        plt.suptitle('Results comparison between different architectures')
-        fig.legend(MODELS, bbox_to_anchor=(0.87, 0.02), ncols=3, labelspacing=1)
-        plt.tight_layout() 
-        if args.experiment == '1':
-            img_name = 'Testing_noiseandchannel.png'
-        elif args.experiment == '2':
-            img_name = 'Testing_modelperchannel.png'
-        else: # experiment 3
-            img_name = 'Testing_onemodel.png'
-        plt.savefig(img_name) 
+    #     for i in range(2):
+    #         for j in range(2):
+    #             ax[i][j].plot(SNR, y_trans_lg[i*2+j], color='#000000', linestyle='solid', marker='o', label=MODELS[0])
+    #             ax[i][j].plot(SNR, y_trans_sm[i*2+j], color='#56B4E9', linestyle='dashed', marker='v', label=MODELS[1])
+    #             ax[i][j].plot(SNR, y_cnn[i*2+j], color='#D55E00', linestyle='dashdot', marker='^', label=MODELS[2])
+    #             ax[i][j].set_title(CHANNELS[i*2+j])
+    #             ax[i][j].set_xlabel('SNR (dBs)')
+    #             ax[i][j].set_ylabel('Accuracy (%)')
+    #             ax[i][j].set_ylim(15,105)
+    #             ax[i][j].grid()     
+    #     plt.suptitle('Results comparison between different architectures')
+    #     fig.legend(MODELS, bbox_to_anchor=(0.87, 0.02), ncols=3, labelspacing=1)
+    #     plt.tight_layout() 
+    #     if args.experiment == '1':
+    #         img_name = 'Testing_noiseandchannel.png'
+    #     elif args.experiment == '2':
+    #         img_name = 'Testing_modelperchannel.png'
+    #     else: # experiment 3
+    #         img_name = 'Testing_onemodel.png'
+    #     plt.savefig(img_name) 
