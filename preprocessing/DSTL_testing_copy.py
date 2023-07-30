@@ -371,7 +371,7 @@ if __name__ == "__main__":
         print(f'Average inference time mean and sd for small architecture are: ', mean, ' +- ', sd)
         mean, sd = calculate_avg_time(np.array(y_cnn_time), np.array(y_cnn_sd))
         print(f'Average inference time mean and sd for cnn architecture are: ', mean, ' +- ', sd)
-
+    """
     if not args.experiment == '4':
         fig, ax = plt.subplots(2, 2, figsize = (12, 6))
 
@@ -395,3 +395,4 @@ if __name__ == "__main__":
         else: # experiment 3
             img_name = 'Testing_onemodel.png'
         plt.savefig(img_name) 
+    """
