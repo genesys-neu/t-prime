@@ -19,8 +19,12 @@ from model_cnn1d import Baseline_CNN1D
 from model_AMCNet import AMC_Net
 from model_ResNet import ResNet
 from model_LSTM import LSTM_ap
+from model_MCFormer import MCformer
 from confusion_matrix import plot_confmatrix
 import wandb
+
+def count_parameters(model):
+    return sum(p.numel() for p in model.parameters())
 
 def train_epoch(dataloader, model, loss_fn, optimizer, use_ray=False):
     if use_ray:
@@ -122,8 +126,13 @@ def train_func(config: Dict):
         model = ResNet(num_classes=Nclass, num_samples=slice_len, iq_dim=2, kernel_size=3, pool_size=2)
         loss_fn = nn.CrossEntropyLoss()
     elif config['pytorch_model'] == 'LSTM':
-        model = LSTM_ap(input_size=2, hidden_size=128, output_size=Nclass, num_layers=2)
+        model = LSTM_ap(input_shape=[slice_len, 2], hidden_size=128, output_size=Nclass, num_layers=2)
         loss_fn = nn.CrossEntropyLoss()
+    elif config['pytorch_model'] == 'MCformer':
+        model = MCformer()
+        loss_fn = nn.CrossEntropyLoss()
+
+    print("Model:", config['pytorch_model'], "Num. Parameters:", count_parameters(model) )
 
 
     if use_ray:   
@@ -172,7 +181,7 @@ def train_func(config: Dict):
                     'model_state_dict': model.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
                     'loss': loss,
-                }, os.path.join(logdir,f'model.cnn.{config["wchannel"]}.{normalize_flag}{config["snr_dB"]}.pt'))
+                }, os.path.join(logdir,f'model.{config["pytorch_model"]}.{config["wchannel"]}.{normalize_flag}{config["snr_dB"]}.pt'))
                 df_confmat = plot_confmatrix(logdir, pkl_file, train_config['class_labels'], 'conf_mat_epoch'+str(e)+'.png')
                 if is_wandb:
                     wandb.log({'Confusion_Matrix': df_confmat.to_numpy()}, step=e)
@@ -181,7 +190,7 @@ def train_func(config: Dict):
     return loss_results
 
 
-supported_models = ['baseline_cnn1d', 'AMCNet', 'ResNet', 'LSTM']
+supported_models = ['baseline_cnn1d', 'AMCNet', 'ResNet', 'LSTM', 'MCformer']
 supported_outmode = ['real', 'complex', 'real_invdim', 'real_ampphase']
 
 if __name__ == "__main__":
@@ -209,6 +218,7 @@ if __name__ == "__main__":
     parser.add_argument("--normalize", action='store_true', default=False, help="Use a layer norm as a first layer.")
     parser.add_argument('--model', choices=supported_models, default='baseline_cnn1d', help='Model to be used for training')
     parser.add_argument('--out_mode', choices=supported_outmode, default='real', help='Specify data generator output format')
+    parser.add_argument('--debug', default=False, action='store_true', help='It will force run on cpu and disable Wandb.')
 
     args, _ = parser.parse_known_args()
 
@@ -243,14 +253,20 @@ if __name__ == "__main__":
     if not os.path.isdir(args.cp_path):
         os.makedirs(args.cp_path)
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    #device = "cpu"
+    if args.debug:
+        device = "cpu"
+        is_wandb = False
+    else:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        is_wandb = True
+
+
     ds_info = ds_train.info()
     Nclass = ds_info['nclasses']
 
     assert(args.model in supported_models)
 
-    is_wandb = True
+
 
     train_config = {
 

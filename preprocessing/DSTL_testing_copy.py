@@ -12,12 +12,26 @@ sys.path.insert(0, '../')
 import argparse
 from dstl_transformer.model_transformer import TransformerModel
 from cnn_baseline.model_cnn1d import Baseline_CNN1D
+from cnn_baseline.model_AMCNet import AMC_Net
+from cnn_baseline.model_ResNet import ResNet
+from cnn_baseline.model_LSTM import LSTM_ap
+from cnn_baseline.model_MCFormer import MCformer
+
+supported_outmode = ['real', 'complex', 'real_invdim', 'real_ampphase'] # has to be same as in DSTL_torch_train
 
 # CONFIG
 TEST_DATA_PATH = '/home/miquelsirera/Desktop/dstl/data/DSTL_DATASET_1_1_TEST'
+
 TRANS_PATH = '/home/miquelsirera/Desktop/dstl/dstl_transformer/model_cp'
 CNN_PATH = '/home/miquelsirera/Desktop/dstl/cnn_baseline/results_slice512'
 MODELS = ["Trans. (64 x 128) [6.8M params]", "Trans. (24 x 64) [1.6M params]", "CNN (1 x 512) [4.1M params]"]
+
+RESNET_PATH = '/home/belgiovinem/Research/DSTL/dstl/cnn_baseline/results_ResNet_norm'
+AMCNET_PATH = '/home/belgiovinem/Research/DSTL/dstl/cnn_baseline/results_AMCNet'
+MCFORMER_PATH = '/home/belgiovinem/Research/DSTL/dstl/cnn_baseline/results_MCformer_largekernel'
+#LSTM_PATH = '/home/belgiovinem/Research/DSTL/dstl/cnn_baseline/results_LSTM/'  # this is just random output
+MODELS += ["ResNet [13] (1 x 1024) [162K params]", "AMCNet [16] (1 x 128) [462K params]", "MCFormer [8] (1 x 128) [78K params]"]
+
 PROTOCOLS = ['802_11ax', '802_11b_upsampled', '802_11n', '802_11g']
 CHANNELS = ['None', 'TGn', 'TGax', 'Rayleigh']
 SNR = [-30.0, -25.0, -20.0, -15.0, -10.0, -5.0, 0.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0]
@@ -57,7 +71,8 @@ def chan2sequence(obs):
     seq[1::2] = obs[1]
     return seq
 
-def validate(model, class_map, seq_len, sli_len, channel, cnn=False):
+def validate(model, class_map, seq_len, sli_len, channel, cnn=False, out_mode='real'):
+
     correct = np.zeros(len(SNR))
     total_samples = 0
     prev_time = time.time()
@@ -86,9 +101,16 @@ def validate(model, class_map, seq_len, sli_len, channel, cnn=False):
                     for j, seq in enumerate(obs):
                         obs[j] = np.split(seq, seq_len)
                 else: # CNN
-                    # generate idxs for split
-                    idxs = list(range(sli_len, len_sig, sli_len))
-                    obs = np.split(obs, idxs, axis=1)[:-1]
+                    assert (out_mode in supported_outmode)
+                    if out_mode == 'real_invdim':
+                        obs = np.swapaxes(obs, 1, 0)  # shape = [N, 2]
+                        # generate idxs for split
+                        idxs = list(range(sli_len, len_sig, sli_len))
+                        obs = np.split(obs, idxs, axis=0)[:-1]
+                    else:
+                        # generate idxs for split
+                        idxs = list(range(sli_len, len_sig, sli_len))
+                        obs = np.split(obs, idxs, axis=1)[:-1]
                 # create batch of sequences
                 X = np.asarray(obs)
                 # predict
@@ -103,6 +125,7 @@ def validate(model, class_map, seq_len, sli_len, channel, cnn=False):
                 correct[i] += (pred.argmax(1) == y).type(torch.float).sum().item()
                 if i == 0:
                     total_samples += len(idxs)
+        print("--------", p, "--------")
         print("--- %s seconds for protocol ---" % (time.time() - prev_time))
         prev_time = time.time()
     return correct/total_samples*100
@@ -261,24 +284,53 @@ if __name__ == "__main__":
         model_sm = TransformerModel(classes=len(PROTOCOLS), d_model=64*2, seq_len=24, nlayers=2, use_pos=False)
         model_sm.load_state_dict(torch.load(f"{TRANS_PATH}/modelrandom_sm.pt", map_location=device)['model_state_dict'])
         model_sm.eval()
-        cnn = Baseline_CNN1D(classes=len(PROTOCOLS), numChannels=2, slice_len=512, normalize=args.normalize)
+        # CNN Baseline
+        cnn_slicelen = 512
+        cnn = Baseline_CNN1D(classes=len(PROTOCOLS), numChannels=2, slice_len=cnn_slicelen, normalize=args.normalize)
         cnn.load_state_dict(torch.load(f"{CNN_PATH}/model.cnn.random{norm_flag}.range.pt", map_location=device)['model_state_dict'])
         cnn.eval()
+        # ResNet
+        resnet_slicelen = 1024
+        resnet = ResNet(num_classes=len(PROTOCOLS), num_samples=resnet_slicelen, iq_dim=2, kernel_size=3, pool_size=2)
+        resnet.load_state_dict(torch.load(f"{RESNET_PATH}/model.ResNet.random.range.pt", map_location=device)['model_state_dict'])
+        resnet.eval()
+        # AMCNet
+        amcnet_slicelen = 128
+        amcnet = AMC_Net(num_classes=len(PROTOCOLS))
+        amcnet.load_state_dict(torch.load(f"{AMCNET_PATH}/model.AMCNet.random.range.pt", map_location=device)['model_state_dict'])
+        amcnet.eval()
+        # MCformer
+        #mcformer_slicelen = 128
+        #mcformer = MCformer()
+        #mcformer.load_state_dict(torch.load(f"{MCFORMER_PATH}/model.MCformer.random.range.pt", map_location=device)['model_state_dict'])
+        #mcformer.eval()
+
         if args.use_gpu:
             model_lg.cuda()
             model_sm.cuda()
             cnn.cuda()
+            resnet.cuda()
+            amcnet.cuda()
+            #mcformer.cuda()
         y_trans_lg, y_trans_sm, y_cnn = [], [], []
+        y_resnet, y_amcnet, y_mcformer = [], [], []
         for channel in CHANNELS:
             y_trans_lg.append(validate(model_lg, class_map, seq_len=64, sli_len=128, channel=channel))
             print(f'Accuracy values for channel {channel} and large architecture are: ', y_trans_lg[-1])
             y_trans_sm.append(validate(model_sm, class_map, seq_len=24, sli_len=64, channel=channel))
             print(f'Accuracy values for channel {channel} and small architecture are: ', y_trans_sm[-1])
-            y_cnn.append(validate(cnn, class_map, seq_len=1, sli_len=512, channel=channel, cnn=True))
+            y_cnn.append(validate(cnn, class_map, seq_len=1, sli_len=cnn_slicelen, channel=channel, cnn=True))
             print(f'Accuracy values for channel {channel} and cnn architecture are: ', y_cnn[-1])
+            y_resnet.append(validate(resnet, class_map, seq_len=1, sli_len=resnet_slicelen, channel=channel, cnn=True, out_mode='real_invdim'))
+            print(f'Accuracy values for channel {channel} and ResNet architecture are: ', y_resnet[-1])
+            y_amcnet.append(validate(amcnet, class_map, seq_len=1, sli_len=amcnet_slicelen, channel=channel, cnn=True))
+            print(f'Accuracy values for channel {channel} and AMCNet architecture are: ', y_amcnet[-1])
+            #y_mcformer.append(validate(mcformer, class_map, seq_len=1, sli_len=mcformer_slicelen, channel=channel, cnn=True))
+            #print(f'Accuracy values for channel {channel} and MCformer architecture are: ', y_mcformer[-1])
+
         
         with open(f'test_results_uniformdist_onemodel{norm_flag}.txt', 'w') as f:
-            f.write(str(y_trans_lg) + '%' + str(y_trans_sm) + '%' + str(y_cnn))
+            f.write(str(y_trans_lg) + '%' + str(y_trans_sm) + '%' + str(y_cnn) + '%' + str(y_resnet) + '%' + str(y_amcnet))
     
     else: # Experiment 4: # Inference time analysis for each of the model architectures
         print('Using protocol 802.11ax and 10 dBs as a sample input.')

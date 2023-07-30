@@ -7,6 +7,7 @@ import numpy as np
 class ResidualStack(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, pool_size):
         super(ResidualStack, self).__init__()
+
         self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=(1, 1), padding='same')
         self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=kernel_size, padding='same')
         self.conv3 = nn.Conv2d(out_channels, out_channels, kernel_size=kernel_size, padding='same')
@@ -42,6 +43,7 @@ class ResNet(nn.Module):
     def __init__(self, iq_dim: int, num_samples: int, kernel_size: int, pool_size: int, num_classes: int):
         super(ResNet, self).__init__()
         num_kernels = 32
+
         self.res_stack1 = ResidualStack(in_channels=1, out_channels=num_kernels, kernel_size=(kernel_size, iq_dim),  pool_size=(pool_size, iq_dim))
         self.res_stack2 = ResidualStack(in_channels=num_kernels, out_channels=num_kernels, kernel_size=(kernel_size,1),  pool_size=(pool_size,1))
         self.res_stack3 = ResidualStack(in_channels=num_kernels, out_channels=num_kernels, kernel_size=(kernel_size,1),  pool_size=(pool_size,1))
@@ -65,8 +67,12 @@ class ResNet(nn.Module):
         self.alpha_dropout = nn.AlphaDropout(p=0.3)
         self.fc2 = nn.Linear(128, num_classes)
 
+        self.norm = nn.LayerNorm([num_samples, iq_dim])
+
     def forward(self, x):
+
         x = x.unsqueeze(1)
+        x = self.norm(x)
         x = self.res_stack1(x)
         x = self.res_stack2(x)
         x = self.res_stack3(x)
