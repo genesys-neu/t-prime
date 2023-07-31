@@ -14,6 +14,43 @@ class SelfAttentionTransformer(nn.Module):
         x = self.norm(x)
         return x.permute(1, 2, 0)  # Shape: [batch_size, C, R]
 
+class SelfAttentionTransformerBERT(nn.Module):
+    def __init__(self, hidden_size, num_heads, dropout_prob=0.1):
+        super(SelfAttentionTransformerBERT, self).__init__()
+        self.hidden_size = hidden_size
+        self.num_heads = num_heads
+
+        # Multi-head self-attention
+        self.self_attn = nn.MultiheadAttention(hidden_size, num_heads, dropout=dropout_prob)
+
+        # Feed-forward neural network (FFN)
+        self.feed_forward = nn.Sequential(
+            nn.Linear(hidden_size, hidden_size * 4),
+            nn.GELU(),
+            nn.Linear(hidden_size * 4, hidden_size),
+            nn.Dropout(dropout_prob)
+        )
+
+        # Layer normalization and dropout
+        self.norm1 = nn.LayerNorm(hidden_size)
+        self.norm2 = nn.LayerNorm(hidden_size)
+        self.dropout = nn.Dropout(dropout_prob)
+
+    def forward(self, x):
+        # Multi-head self-attention
+        x = x.permute(2, 0, 1)  # Shape: [R, batch_size, C]
+        attn_output, _ = self.self_attn(x, x, x)
+        x = x + self.dropout(attn_output)
+        x = self.norm1(x)
+
+        # Feed-forward neural network
+        ffn_output = self.feed_forward(x)
+        x = x + self.dropout(ffn_output)
+        x = self.norm2(x)
+
+        return x.permute(1, 2, 0)  # Shape: [batch_size, C, R]
+
+
 class MCformer(nn.Module):
     def __init__(self, hidden_size=32, kernel_size=65, num_heads=4):
         super(MCformer, self).__init__()
@@ -24,7 +61,7 @@ class MCformer(nn.Module):
 
         # Transformer Encoder layers
         self.transformer_layers = nn.ModuleList([
-            SelfAttentionTransformer(hidden_size, num_heads) for _ in range(4)  # 4 self-attention layers
+            SelfAttentionTransformerBERT(hidden_size, num_heads) for _ in range(4)  # 4 self-attention layers
         ])
         self.flatten = nn.Flatten()
         # Fully connected layers
