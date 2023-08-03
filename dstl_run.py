@@ -361,8 +361,8 @@ if __name__ == '__main__':
 
     PROTOCOLS = args.protocols
     
-    # if MODEL_SIZE == 'sm':
-        # N = 2500
+    if MODEL_SIZE == 'sm':
+        N = 2500
 
     rec = threading.Thread(target=receiver)
     rec.start()
