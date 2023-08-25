@@ -141,3 +141,7 @@ All preprocessing specific code is in the /preprocessing folder.
 The CNN code is in the /cnn_baseline folder.
 
 All huggingface transformer based code is in the /transformer folder. This was only used for the initial visual transformer testing, and is not present or necessary for the final implementation.
+
+# Datasets
+-All datasets can be found on the shared OneDrive: https://northeastern-my.sharepoint.com/:f:/r/personal/sioannidis_northeastern_edu/Documents/DSTL-NU%20OneDrive/Datasets?csf=1&web=1&e=RDViVZ
+-Unzip the datasets into the data/ folder using this command: unzip DATASET_1_0.zip -d data/
