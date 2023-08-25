@@ -144,4 +144,5 @@ All huggingface transformer based code is in the /transformer folder. This was o
 
 # Datasets
 -All datasets can be found on the shared OneDrive: https://northeastern-my.sharepoint.com/:f:/r/personal/sioannidis_northeastern_edu/Documents/DSTL-NU%20OneDrive/Datasets?csf=1&web=1&e=RDViVZ
+
 -Unzip the datasets into the data/ folder using this command: unzip DATASET_1_0.zip -d data/
