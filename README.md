@@ -152,7 +152,7 @@ optional arguments:
 ```
 
 ## OTA data
-To test the models with OTA data the script ```preprocessing/TPrime_finetune.py``` needs to be used. This testing option can only be used with T-Prime Transformer models. The usage is described as follows:
+To test the models with OTA data the script ```preprocessing/TPrime_finetune.py``` needs to be used. This testing option can only be used with T-Prime models. The usage is described as follows:
 ```
 usage: TPrime_finetune.py [-h] [--model_path MODEL_PATH] [--ds_path DS_PATH]
                           --datasets DATASETS [DATASETS ...]
@@ -182,7 +182,7 @@ When using this script for testing, use the ```--test``` flag and avoid the ```-
                         Size of transformer to use, options available are small and large. If not defined CNN architecture will be used (default: CNN)
   --test_mode {random_sampling,future}
                         Get test from separate files (future) or a random sampling of dataset indexes (random_sampling) (default: random_sampling)
-  --retrain               Load the selected model and fine-tune. If this is false the model will be trained from scratch and the model (default: false)
+  --retrain             Load the selected model and fine-tune. If this is false the model will be trained from scratch and the model (default: false)
   --ota_dataset OTA_DATASET
                         Flag to add in results name to identify experiment (default: '')
   --test                If present, just test the provided model on OTA data (default: false)
@@ -190,7 +190,39 @@ When using this script for testing, use the ```--test``` flag and avoid the ```-
   --back_class          Train/Use model with background or noise class (default: false)
 ```
 ## Overlapping data
-
+For the overlapping case, the script necessary to test is ```preprocessing/TPrime_overlapped.py```. This testing option can only be used with T-Prime transformer models. The usage is described as follows:
+```
+usage: TPrime_overlapped.py [-h] [--model_path MODEL_PATH] [--ds_path DS_PATH]
+                            --datasets DATASETS [DATASETS ...]
+                            [--dataset_ratio DATASET_RATIO] [--use_gpu]
+                            [--transformer {sm,lg}]
+                            [--test_mode {random_sampling,inference}]
+                            [--retrain] [--ota_dataset OTA_DATASET] [--test]
+                            [--RMSNorm] [--back_class]
+```
+When using this script for testing, use the ```--test``` flag and avoid the ```--retrain``` one. The results will be outputed in the terminal. Since it is the overlapping case several metrics can be evaluated. These are: AUC of the classifier, exact accuracy (prediction and ground truth is exactly the same), soft accuracy (detecting at least one protocol correctly) and other metrics per class.
+### Optional arguments
+```
+  -h, --help            show this help message and exit
+  --model_path MODEL_PATH
+                        Path to the trained model or where to save the trained from scratch version and under which name (default: ./model_cp)
+  --ds_path DS_PATH     Path to the over the air datasets
+  --datasets DATASETS [DATASETS ...]
+                        Dataset names to be used for training or test (required)
+  --dataset_ratio DATASET_RATIO
+                        Portion of the dataset used for training and validation (default: 1.0)
+  --use_gpu             [DEPRECATED] Use gpu for fine-tuning and inference (default: false)
+  --transformer {sm,lg}
+                        Size of transformer to use, options available are small and large. If not defined lg architecture will be used (default: lg)
+  --test_mode {random_sampling,future}
+                        Get test from separate files (future) or a random sampling of dataset indexes (random_sampling). (default: random_sampling)
+  --retrain             Load the selected model and fine-tune. If this is false the model will be trained from scratch and the model (default: false)
+  --ota_dataset OTA_DATASET
+                        Flag to add in results name to identify experiment. (default: '')
+  --test                If present, just test the provided model on OTA data (default: false)
+  --RMSNorm             If present, apply RMS normalization on input signals while training and testing (default: false)
+  --back_class          Train/Use model with background or noise class (default: false)
+```
 # Pre-processing
 All preprocessing specific code is in the /preprocessing folder.
 
