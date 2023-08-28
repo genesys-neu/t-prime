@@ -4,7 +4,7 @@ import os
 proj_root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.join(os.pardir, os.pardir)))
 import sys
 sys.path.append(proj_root_dir)
-from dstl.preprocessing.DSTL_dataset import DSTLDataset
+from dstl.preprocessing.TPrime_dataset import TPrimeDataset
 from model_cnn1d import Baseline_CNN1D
 
 def timing_inference_GPU(dummy_input, model):
@@ -44,7 +44,7 @@ model_file_name = 'model.best.pt'
 model_path = os.path.join(PATH, model_file_name)
 
 protocols = ['802_11ax', '802_11b', '802_11n', '802_11g']
-ds_test = DSTLDataset(protocols, ds_path=os.path.join(homedir,'Research/DSTL/DSTL_DATASET_1_0'), ds_type='test', snr_dbs=snr_dBs, slice_len=slice_len, slice_overlap_ratio=0.5, override_gen_map=False)
+ds_test = TPrimeDataset(protocols, ds_path=os.path.join(homedir,'Research/DSTL/DSTL_DATASET_1_0'), ds_type='test', snr_dbs=snr_dBs, slice_len=slice_len, slice_overlap_ratio=0.5, override_gen_map=False)
 
 model = Baseline_CNN1D(classes=Nclass, numChannels=num_channels, slice_len=slice_len)
 checkpoint = torch.load(model_path)

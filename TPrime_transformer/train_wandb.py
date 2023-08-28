@@ -2,7 +2,7 @@ import os
 import numpy as np
 import sys
 sys.path.insert(0, '../')
-from preprocessing.DSTL_dataset import DSTLDataset_Transformer
+from preprocessing.TPrime_dataset import TPrimeDataset_Transformer
 from ray.air import session, Checkpoint
 from typing import Dict
 import torch

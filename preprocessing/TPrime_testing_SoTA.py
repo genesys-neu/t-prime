@@ -17,7 +17,7 @@ from cnn_baseline.model_ResNet import ResNet
 from cnn_baseline.model_LSTM import LSTM_ap
 from cnn_baseline.model_MCFormer import MCformer
 
-supported_outmode = ['real', 'complex', 'real_invdim', 'real_ampphase'] # has to be same as in DSTL_torch_train
+supported_outmode = ['real', 'complex', 'real_invdim', 'real_ampphase'] # has to be same as in TPrime_torch_train
 
 # CONFIG
 TEST_DATA_PATH = '../data/DSTL_DATASET_1_1_TEST'
@@ -211,9 +211,9 @@ def calculate_avg_time(means, sds):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--experiment", default='3', choices=['1', '2', '3', '4'], help="Decide which models to test, 1 is for specific model per \
-                        noise and channel, 2 is for specific model per channel, 3 is for single model for all channel and noise conditions and 4 is for inference time analysis")
-    parser.add_argument("--normalize", action='store_true', default=False, help="Use a layer norm as a first layer.")
+    parser.add_argument("--experiment", default='3', choices=['1', '2', '3', '4'], help="Decide which models to test, 1 is for models trained for \
+                         specific noise and channel conditions, 2 is for models specifically trained for a channel, 3 is for single model for all channel and noise conditions (with SoTA models comparison) and 4 is for inference time analysis")
+    parser.add_argument("--normalize", action='store_true', default=False, help="Use a layer norm as a first layer for CNN")
     parser.add_argument("--use_gpu", action='store_true', default=False, help="Use gpu for inference")
     args, _ = parser.parse_known_args()
     class_map = dict(zip(PROTOCOLS, range(len(PROTOCOLS))))

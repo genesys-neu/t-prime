@@ -4,7 +4,7 @@ import os
 proj_root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.join(os.pardir, os.pardir)))
 import sys
 sys.path.append(proj_root_dir)
-from dstl.preprocessing.DSTL_dataset import DSTLDataset
+from dstl.preprocessing.TPrime_dataset import TPrimeDataset
 from model_transformer import TransformerModel
 
 def timing_inference_GPU(dummy_input, model):

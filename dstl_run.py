@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import time
 import argparse
 import threading
-from dstl_transformer.model_transformer import TransformerModel
+from TPrime_transformer.model_transformer import TransformerModel
 from queue import Queue
 from preprocessing.model_rmsnorm import RMSNorm
 import tensorrt as trt

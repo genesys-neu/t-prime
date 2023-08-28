@@ -10,8 +10,8 @@ import numpy as np
 from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix as conf_mat
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-from DSTL_dataset import DSTLDataset, DSTLDataset_Transformer
-from dstl_transformer.model_transformer import TransformerModel, TransformerModel_v2
+from TPrime_dataset import TPrimeDataset, TPrimeDataset_Transformer
+from TPrime_transformer.model_transformer import TransformerModel, TransformerModel_v2
 from cnn_baseline.model_cnn1d import Baseline_CNN1D
 from preprocessing.model_rmsnorm import RMSNorm
 
@@ -135,30 +135,29 @@ def finetune(model, config):
     disp.plot(cmap="Blues", values_format='.2f')
     disp.ax_.get_images()[0].set_clim(0, 100)
     plt.title(f'Conf. Matrix (%): Total Acc. {(best_acc):>0.1f}%')
-    plt.savefig(f"./results_CV/training/Results_finetune_{MODEL_NAME}_ft.{OTA_DATASET}.{TEST_FLAG}.{RMS_FLAG}{NOISE_FLAG}.pdf")
+    plt.savefig(f"./training/Results_finetune_{MODEL_NAME}_ft.{OTA_DATASET}.{TEST_FLAG}.{RMS_FLAG}{NOISE_FLAG}.pdf")
     plt.clf()
     print('-----------------------------------------------------------------')
     return
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_path", default='./model_cp', help='Path to the trained model or where to save the trained from scratch version \
-                        and under which name.')
-    parser.add_argument("--ds_path", default='', help='Path to the over the air dataset.')
-    parser.add_argument("--datasets", nargs='+', required=True, help="Datasets folders name to be used for training or test")
-    parser.add_argument("--dataset_ratio", default=1.0, type=float, help="Portion of the dataset used for training and validation.")
+    parser.add_argument("--model_path", default='../TPrime_transformer/model_cp', help='Path to the trained model or to where to save the trained model from scratch with model name included')
+    parser.add_argument("--ds_path", default='../data', help='Path to the over the air datasets')
+    parser.add_argument("--datasets", nargs='+', required=True, help="Dataset name to be used for training or test")
+    parser.add_argument("--dataset_ratio", default=1.0, type=float, help="Portion of the dataset used for training and validation")
     parser.add_argument("--use_gpu", action='store_true', default=False, help="Use gpu for fine-tuning and inference")
     parser.add_argument("--transformer_version", default=None, required=False, choices=["v1", "v2"], help='Architecture of the model that will be \
-                        finetuned. Options are v1 and v2. These refer to the two Transformer-based architectures available, without or with [CLS] token.')
+                        finetuned. Options are v1 and v2. These refer to the two Transformer-based architectures available, without or with [CLS] token')
     parser.add_argument("--transformer", default="CNN", choices=["sm", "lg"], help="Size of transformer to use, options available are small and \
-                        large. If not defined CNN architecture will be used.")
-    parser.add_argument("--test_mode", default="random_sampling", choices=["random_sampling", "inference"], help="Get test from separate files (inference) or \
-                        a random sampling of dataset indexes (random_sampling).")
-    parser.add_argument("--retrain", action='store_true', default=False, help="Do not load any model and just train from scratch. Model name will be \
-                        taken from the model_path given.")
+                        large. If not defined CNN architecture will be used")
+    parser.add_argument("--test_mode", default="random_sampling", choices=["random_sampling", "future"], help="Get test from separate files (future) or \
+                        a random sampling of dataset indexes (random_sampling)")
+    parser.add_argument("--retrain", action='store_true', default=False, help="Load the selected model and fine-tune. If this is false the model will be trained from scratch and the model name will be \
+                        taken from the model_path given")
     parser.add_argument("--ota_dataset", default='', help="Flag to add in results name to identify experiment.")
-    parser.add_argument("--test", default=False, action='store_true', help="If present, we just test the provided model on OTA data.")
-    parser.add_argument("--RMSNorm", default=False, action='store_true', help="If present, we apply RMS normalization on input signals while training and testing")
+    parser.add_argument("--test", default=False, action='store_true', help="If present, just test the provided model on OTA data.")
+    parser.add_argument("--RMSNorm", default=False, action='store_true', help="If present, apply RMS normalization on input signals while training and testing")
     parser.add_argument("--back_class", default=False, action='store_true', help="Train/Use model with background or noise class.")
     args, _ = parser.parse_known_args()
 
@@ -167,7 +166,7 @@ if __name__ == "__main__":
     PATH = '/'.join(args.model_path.split('/')[0:-1])
     PROTOCOLS = ['802_11ax', '802_11b_upsampled', '802_11n', '802_11g']
     CHANNELS = ['None', 'TGn', 'TGax', 'Rayleigh']
-    TEST_FLAG = 'rsg' if args.test_mode == 'random_sampling' else 'inf'
+    TEST_FLAG = 'rsg' if args.test_mode == 'random_sampling' else 'fut'
     RMS_FLAG = 'RMSn' if args.RMSNorm else ''
     NOISE_FLAG = '_bckg' if args.back_class else ''
     if args.back_class:
@@ -191,9 +190,9 @@ if __name__ == "__main__":
         global_model = Baseline_CNN1D
         model = global_model(classes=len(PROTOCOLS), numChannels=2, slice_len=512)
         for ds in datasets:
-            ds_train.append(DSTLDataset(PROTOCOLS, ds_path=os.path.join(args.ds_path, ds), ds_type='train', slice_len=512, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
+            ds_train.append(TPrimeDataset(PROTOCOLS, ds_path=os.path.join(args.ds_path, ds), ds_type='train', slice_len=512, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
                             raw_data_ratio=args.dataset_ratio, file_postfix='', override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, add_noise=args.back_class))
-            ds_test.append(DSTLDataset(PROTOCOLS, ds_path=os.path.join(args.ds_path, ds), ds_type='test', slice_len=512, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
+            ds_test.append(TPrimeDataset(PROTOCOLS, ds_path=os.path.join(args.ds_path, ds), ds_type='test', slice_len=512, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
                                 raw_data_ratio=args.dataset_ratio, file_postfix='', override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, add_noise=args.back_class))
     else:
         # choose correct version
@@ -206,16 +205,16 @@ if __name__ == "__main__":
             model = global_model(classes=len(PROTOCOLS), d_model=64*2, seq_len=24, nlayers=2, use_pos=False)
             # Load over the air dataset
             for ds in datasets:
-                ds_train.append(DSTLDataset_Transformer(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds), ds_type='train', seq_len=24, slice_len=64, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
+                ds_train.append(TPrimeDataset_Transformer(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds), ds_type='train', seq_len=24, slice_len=64, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
                                                raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence))
-                ds_test.append(DSTLDataset_Transformer(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds), ds_type='test', seq_len=24, slice_len=64, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
+                ds_test.append(TPrimeDataset_Transformer(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds), ds_type='test', seq_len=24, slice_len=64, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
                                               raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence))
         else: # lg
             model = global_model(classes=len(PROTOCOLS), d_model=128*2, seq_len=64, nlayers=2, use_pos=False)
             for ds in datasets:
-                ds_train.append(DSTLDataset_Transformer(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds), ds_type='train', seq_len=64, slice_len=128, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
+                ds_train.append(TPrimeDataset_Transformer(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds), ds_type='train', seq_len=64, slice_len=128, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
                                                raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence))
-                ds_test.append(DSTLDataset_Transformer(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds), ds_type='test', seq_len=64, slice_len=128, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
+                ds_test.append(TPrimeDataset_Transformer(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds), ds_type='test', seq_len=64, slice_len=128, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
                                               raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence))
     # concat all loaded datasets
     ds_train = torch.utils.data.ConcatDataset(ds_train)
@@ -223,7 +222,7 @@ if __name__ == "__main__":
         ds_test = torch.utils.data.ConcatDataset(ds_test)
 
     device = torch.device("cuda" if torch.cuda.is_available() and args.use_gpu else "cpu")
-    if not args.retrain: # Load pretrained model
+    if args.retrain: # Load pretrained model
         try:
             model.load_state_dict(torch.load(args.model_path, map_location=device)['model_state_dict'])
         except:
@@ -287,7 +286,7 @@ if __name__ == "__main__":
             disp.plot(cmap="Blues", values_format='.2f')
             disp.ax_.get_images()[0].set_clim(0, 100)
             plt.title(f'Conf. Matrix (%): Total Acc. {(100 * correct):>0.1f}%')
-            plt.savefig(f"./results_CV/Results_finetune_{MODEL_NAME}.{args.datasets[ds_ix]}.{TEST_FLAG}.{RMS_FLAG}{NOISE_FLAG}.pdf")
+            plt.savefig(f"./Results_finetune_{MODEL_NAME}.{args.datasets[ds_ix]}.{TEST_FLAG}.{RMS_FLAG}{NOISE_FLAG}.pdf")
             plt.clf()
             print(f'Confusion matrix (%) for {args.datasets[ds_ix]}')
             print(np.around(conf_matrix, decimals=2))
@@ -310,7 +309,7 @@ if __name__ == "__main__":
             disp.plot(cmap="Blues", values_format='.2f')
             disp.ax_.get_images()[0].set_clim(0, 100)
             plt.title(f'Global Conf. Matrix (%): Total Acc. {(100 * global_correct):>0.1f}%')
-            plt.savefig(f"./results_CV/Results_finetune_{MODEL_NAME}.{OTA_DATASET}.{TEST_FLAG}.{RMS_FLAG}{NOISE_FLAG}.pdf")
+            plt.savefig(f"./Results_finetune_{MODEL_NAME}.{OTA_DATASET}.{TEST_FLAG}.{RMS_FLAG}{NOISE_FLAG}.pdf")
             plt.clf()
             print(f'Global Confusion Matrix (%) for {OTA_DATASET}')
             print(np.around(global_conf_matrix, decimals=2))

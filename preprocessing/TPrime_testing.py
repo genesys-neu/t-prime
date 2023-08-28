@@ -9,7 +9,7 @@ proj_root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardi
 import sys
 sys.path.append(proj_root_dir)
 import argparse
-from dstl_transformer.model_transformer import TransformerModel
+from TPrime_transformer.model_transformer import TransformerModel
 from cnn_baseline.model_cnn1d import Baseline_CNN1D
 from tqdm import tqdm
 # CONFIG

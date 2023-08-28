@@ -2,7 +2,7 @@ import os
 import numpy as np
 import sys
 sys.path.insert(0, '../')
-from preprocessing.DSTL_dataset import DSTLDataset_Transformer
+from preprocessing.TPrime_dataset import TPrimeDataset_Transformer
 from ray.air import session, Checkpoint
 from typing import Dict
 import torch
@@ -235,9 +235,9 @@ if __name__ == "__main__":
         "Positional encoder": args.Positional_encoder
     }
     protocols = ['802_11ax', '802_11b_upsampled', '802_11n', '802_11g']
-    ds_train = DSTLDataset_Transformer(protocols=protocols, ds_type='train', snr_dbs=args.snr_db, seq_len=exp_config["Sequence length"], slice_len=exp_config["Slice length"], slice_overlap_ratio=0, raw_data_ratio=args.dataset_ratio,
+    ds_train = TPrimeDataset_Transformer(protocols=protocols, ds_type='train', snr_dbs=args.snr_db, seq_len=exp_config["Sequence length"], slice_len=exp_config["Slice length"], slice_overlap_ratio=0, raw_data_ratio=args.dataset_ratio,
             override_gen_map=True, apply_wchannel=args.wchannel, transform=chan2sequence)
-    ds_test = DSTLDataset_Transformer(protocols=protocols, ds_type='test', snr_dbs=args.snr_db, seq_len=exp_config["Sequence length"], slice_len=exp_config["Slice length"], slice_overlap_ratio=0, raw_data_ratio=args.dataset_ratio,
+    ds_test = TPrimeDataset_Transformer(protocols=protocols, ds_type='test', snr_dbs=args.snr_db, seq_len=exp_config["Sequence length"], slice_len=exp_config["Slice length"], slice_overlap_ratio=0, raw_data_ratio=args.dataset_ratio,
             override_gen_map=False, apply_wchannel=args.wchannel, transform=chan2sequence)
 
     if not os.path.isdir(args.cp_path):
