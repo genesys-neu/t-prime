@@ -15,7 +15,11 @@ An example of a complete command:
 ```
 python dstl_run.py -fq 2.427e9 -t 180 --model_path TPrime_transformer/model_cp/model_lg_otaglobal_inf_RMSn_bckg_ft.pt --model_size lg --tensorRT --RMSNorm
 ```
-
+## GUI
+While the main program is running, you can also launch a real-time graphical user interface (GUI) using the Streamlit library. This GUI displays the model's predictions as they are made. To set this up, you'll need to install the ```streamlit``` Python package (follow the [installation guide](https://docs.streamlit.io/library/get-started/installation)). Once installed, simply run the following command to open the display in a web browser.
+```
+streamlit run GUI.py
+```
 # Transformer models
 All T-PRIME specific transformer models are in the `TPrime_transformer/` folder.
 ## Training procedure
