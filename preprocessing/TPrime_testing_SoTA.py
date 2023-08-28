@@ -10,7 +10,7 @@ import sys
 sys.path.append(proj_root_dir)
 sys.path.insert(0, '../')
 import argparse
-from dstl_transformer.model_transformer import TransformerModel
+from TPrime_transformer.model_transformer import TransformerModel
 from cnn_baseline.model_cnn1d import Baseline_CNN1D
 from cnn_baseline.model_AMCNet import AMC_Net
 from cnn_baseline.model_ResNet import ResNet
@@ -20,16 +20,16 @@ from cnn_baseline.model_MCFormer import MCformer
 supported_outmode = ['real', 'complex', 'real_invdim', 'real_ampphase'] # has to be same as in DSTL_torch_train
 
 # CONFIG
-TEST_DATA_PATH = '/home/miquelsirera/Desktop/dstl/data/DSTL_DATASET_1_1_TEST'
+TEST_DATA_PATH = '../data/DSTL_DATASET_1_1_TEST'
 
-TRANS_PATH = '/home/miquelsirera/Desktop/dstl/dstl_transformer/model_cp'
-CNN_PATH = '/home/miquelsirera/Desktop/dstl/cnn_baseline/results_slice512'
+TRANS_PATH = '../TPrime_transformer/model_cp'
+CNN_PATH = '../cnn_baseline/results_slice512'
 MODELS = ["Trans. (64 x 128) [6.8M params]", "Trans. (24 x 64) [1.6M params]", "CNN (1 x 512) [4.1M params]"]
 
-RESNET_PATH = '/home/belgiovinem/Research/DSTL/dstl/cnn_baseline/results_ResNet_norm'
-AMCNET_PATH = '/home/belgiovinem/Research/DSTL/dstl/cnn_baseline/results_AMCNet'
-MCFORMER_PATH = '/home/belgiovinem/Research/DSTL/dstl/cnn_baseline/results_MCformer_largekernel'
-#LSTM_PATH = '/home/belgiovinem/Research/DSTL/dstl/cnn_baseline/results_LSTM/'  # this is just random output
+RESNET_PATH = '../cnn_baseline/results_ResNet_norm'
+AMCNET_PATH = '../cnn_baseline/results_AMCNet'
+MCFORMER_PATH = '../cnn_baseline/results_MCformer_largekernel'
+#LSTM_PATH = '../cnn_baseline/results_LSTM/'  # this is just random output
 MODELS += ["ResNet [13] (1 x 1024) [162K params]", "AMCNet [16] (1 x 128) [462K params]", "MCFormer [8] (1 x 128) [78K params]"]
 
 PROTOCOLS = ['802_11ax', '802_11b_upsampled', '802_11n', '802_11g']
@@ -371,28 +371,3 @@ if __name__ == "__main__":
         print(f'Average inference time mean and sd for small architecture are: ', mean, ' +- ', sd)
         mean, sd = calculate_avg_time(np.array(y_cnn_time), np.array(y_cnn_sd))
         print(f'Average inference time mean and sd for cnn architecture are: ', mean, ' +- ', sd)
-    """
-    if not args.experiment == '4':
-        fig, ax = plt.subplots(2, 2, figsize = (12, 6))
-
-        for i in range(2):
-            for j in range(2):
-                ax[i][j].plot(SNR, y_trans_lg[i*2+j], color='#000000', linestyle='solid', marker='o', label=MODELS[0])
-                ax[i][j].plot(SNR, y_trans_sm[i*2+j], color='#56B4E9', linestyle='dashed', marker='v', label=MODELS[1])
-                ax[i][j].plot(SNR, y_cnn[i*2+j], color='#D55E00', linestyle='dashdot', marker='^', label=MODELS[2])
-                ax[i][j].set_title(CHANNELS[i*2+j])
-                ax[i][j].set_xlabel('SNR (dBs)')
-                ax[i][j].set_ylabel('Accuracy (%)')
-                ax[i][j].set_ylim(15,105)
-                ax[i][j].grid()     
-        plt.suptitle('Results comparison between different architectures')
-        fig.legend(MODELS, bbox_to_anchor=(0.87, 0.02), ncols=3, labelspacing=1)
-        plt.tight_layout() 
-        if args.experiment == '1':
-            img_name = 'Testing_noiseandchannel.png'
-        elif args.experiment == '2':
-            img_name = 'Testing_modelperchannel.png'
-        else: # experiment 3
-            img_name = 'Testing_onemodel.png'
-        plt.savefig(img_name) 
-    """
