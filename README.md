@@ -136,10 +136,11 @@ optional arguments:
 To test our models, we need to differentiate between the three types of data we have: simulated data, data collected over the air (OTA), and overlapping data.
 
 ## Simulated data
-The script `TPrime_testing_SoTA.py`serves for testing all the different (T-PRIME LG and SM, CNN1D, AMCNet, ResNet and MCFormer) models with simulated data generated through MATLAB. It is used as follows:
+The script `preprocessing/TPrime_testing_SoTA.py`serves for testing all the different (T-PRIME LG and SM, CNN1D, AMCNet, ResNet and MCFormer) models with simulated data generated through MATLAB. It is used as follows:
 ```
 TPrime_testing_SoTA.py [-h] [--experiment EXPERIMENT] [--normalize] [--use_gpu]
 ```
+The results will be saved in a file named test_results[experiment_extension].txt. The results for each architecture will be separated by the '%' character to facilitate later processing. For each architecture's results, you will find the testing accuracy for all four explored channel conditions (No channel, TGn, TGax, and Rayleigh) at different noise levels within the range of -30.0 to 30.0 dBs with 5.0 dBs increments.
 ### Arguments description
 When selecting the experiment number, 1 and 2 and 4 are only implemented to work with T-Prime architectures.
 ```
@@ -151,7 +152,43 @@ optional arguments:
 ```
 
 ## OTA data
-
+To test the models with OTA data the script ```preprocessing/TPrime_finetune.py``` needs to be used. This testing option can only be used with T-Prime Transformer models. The usage is described as follows:
+```
+usage: TPrime_finetune.py [-h] [--model_path MODEL_PATH] [--ds_path DS_PATH]
+                          --datasets DATASETS [DATASETS ...]
+                          [--dataset_ratio DATASET_RATIO] [--use_gpu]
+                          [--transformer_version {v1,v2}]
+                          [--transformer {sm,lg}]
+                          [--test_mode {random_sampling,future}]
+                          [--retrain] [--ota_dataset OTA_DATASET] --test
+                          [--RMSNorm] [--back_class]
+```
+When using this script for testing, use the ```--test``` flag and avoid the ```--retrain``` one. The results will be saved in a file named Results_finetune[dataset_and_model_flags].pdf.
+### Optional arguments
+```
+  -h, --help            show this help message and exit
+  --model_path MODEL_PATH
+                        Path to the trained model or to where to save the trained model from scratch with model name included (default: ../TPrime_transformer/model_cp)
+  --ds_path DS_PATH     Path to the over the air datasets (default: ../data)
+  --datasets DATASETS [DATASETS ...]
+                        Dataset names to be used for training or test (required)
+  --dataset_ratio DATASET_RATIO
+                        Portion of the dataset used for training and validation (default: 1.0)
+  --use_gpu             [DEPRECATED] Use gpu for fine-tuning and inference (default: false)
+  --transformer_version {v1,v2}
+                        Architecture of the model that will be finetuned. Options are v1 and v2. These refer to the two Transformer-based architectures available, without or
+                        with [CLS] token (default: v1)
+  --transformer {sm,lg}
+                        Size of transformer to use, options available are small and large. If not defined CNN architecture will be used (default: CNN)
+  --test_mode {random_sampling,future}
+                        Get test from separate files (future) or a random sampling of dataset indexes (random_sampling) (default: random_sampling)
+  --retrain               Load the selected model and fine-tune. If this is false the model will be trained from scratch and the model (default: false)
+  --ota_dataset OTA_DATASET
+                        Flag to add in results name to identify experiment (default: '')
+  --test                If present, just test the provided model on OTA data (default: false)
+  --RMSNorm             If present, apply RMS normalization on input signals while training and testing (default: false)
+  --back_class          Train/Use model with background or noise class (default: false)
+```
 ## Overlapping data
 
 # Pre-processing
