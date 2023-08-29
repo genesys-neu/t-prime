@@ -194,7 +194,7 @@ def train_func(config: Dict):
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--snr_db", nargs='+', default=[30], help="SNR levels to be considered during training. "
                                                                   "It's possible to define multiple noise levels to be "
                                                                   "chosen at random during input slices generation.")
