@@ -11,12 +11,13 @@ All arguments are optional:
 - `--RMSNorm` is a flag that specifies to use the RMSNorm block. 
 - `--tensorRT` is a flag that specifies to use TensorRT optimization. 
 - `--protocols` is a list of the classes to be considered; the default list is ['802_11ax', '802_11b', '802_11n', '802_11g', 'noise'].
+
 An example of a complete command:
 ```
 python dstl_run.py -fq 2.427e9 -t 180 --model_path TPrime_transformer/model_cp/model_lg_otaglobal_inf_RMSn_bckg_ft.pt --model_size lg --tensorRT --RMSNorm
 ```
 ## GUI
-While the main program is running, you can also launch a real-time graphical user interface (GUI) using the Streamlit library. This GUI displays the model's predictions as they are made. To set this up, you'll need to install the ```streamlit``` Python package (follow the [installation guide](https://docs.streamlit.io/library/get-started/installation)). Once installed, simply run the following command to open the display in a web browser.
+While the main program is running, you can also launch a real-time graphical user interface (GUI) using the Streamlit library. This GUI displays the model's predictions as they are made. To set this up, you'll need to install the ```streamlit``` Python package (follow the [installation guide](https://docs.streamlit.io/library/get-started/installation)). Once installed, simply run the following command to open the display in a web browser. 
 ```
 streamlit run GUI.py
 ```
@@ -137,16 +138,16 @@ optional arguments:
 - MCFormer: adapted from [official code](https://github.com/InterDigitalInc/Fireball/blob/8c98a40e6baba489ac9c028aa4fe71b2ae782f79/Playgrounds/MCformer/MCformer.ipynb)
 
 # Testing
-To test our models, we need to differentiate between the three types of data we have: simulated data, data collected over the air (OTA), and overlapping data.
+To test our models, we need to differentiate between the three types of data we have: simulated data obtained with MATLAB, data collected over the air (OTA), and data containing overlapping protocols.
 
 ## Simulated data
 The script `preprocessing/TPrime_testing_SoTA.py`serves for testing all the different (T-PRIME LG and SM, CNN1D, AMCNet, ResNet and MCFormer) models with simulated data generated through MATLAB. It is used as follows:
 ```
 TPrime_testing_SoTA.py [-h] [--experiment EXPERIMENT] [--normalize] [--use_gpu]
 ```
-The results will be saved in a file named test_results[experiment_extension].txt. The results for each architecture will be separated by the '%' character to facilitate later processing. For each architecture's results, you will find the testing accuracy for all four explored channel conditions (No channel, TGn, TGax, and Rayleigh) at different noise levels within the range of -30.0 to 30.0 dBs with 5.0 dBs increments.
+The results will be saved in a file named test_results[experiment_extension].txt. The results for each architecture will be separated by the '%' character to facilitate later processing. For each architecture's results, you will find the testing accuracy for all four explored channel conditions (No channel, TGn, TGax, and Rayleigh) at different noise levels within the range of -30.0 to 30.0 dBs with 5.0 dBs increments. The order of the architectures in the results is the following: T-PRIME LG Trans., T-PRIME SM Trans., CNN1D, ResNet, AMCNet and MCFormer.
 ### Arguments description
-When selecting the experiment number, 1 and 2 and 4 are only implemented to work with T-Prime architectures.
+When selecting the experiment number, 1 and 2 and 4 are only implemented to work with T-PRIME architectures.
 ```
 optional arguments:
   -h, --help            show this help message and exit
@@ -156,7 +157,7 @@ optional arguments:
 ```
 
 ## OTA data
-To test the models with OTA data the script ```preprocessing/TPrime_finetune.py``` needs to be used. This testing option can only be used with T-Prime models. The usage is described as follows:
+To test the models with OTA data the script ```preprocessing/TPrime_finetune.py``` needs to be used. This testing option can only be used with T-PRIME models. The usage is described as follows:
 ```
 usage: TPrime_finetune.py [-h] [--model_path MODEL_PATH] [--ds_path DS_PATH]
                           --datasets DATASETS [DATASETS ...]
@@ -194,7 +195,7 @@ When using this script for testing, use the ```--test``` flag and avoid the ```-
   --back_class          Train/Use model with background or noise class (default: false)
 ```
 ## Overlapping data
-For the overlapping case, the script necessary to test is ```preprocessing/TPrime_overlapped.py```. This testing option can only be used with T-Prime transformer models. The usage is described as follows:
+For the overlapping case, the script necessary to test is ```preprocessing/TPrime_overlapped.py```. This testing option can only be used with T-PRIME transformer models. The usage is described as follows:
 ```
 usage: TPrime_overlapped.py [-h] [--model_path MODEL_PATH] [--ds_path DS_PATH]
                             --datasets DATASETS [DATASETS ...]
