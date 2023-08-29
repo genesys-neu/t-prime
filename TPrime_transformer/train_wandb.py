@@ -211,9 +211,9 @@ if __name__ == "__main__":
     args, _ = parser.parse_known_args()
 
     protocols = ['802_11ax', '802_11b_upsampled', '802_11n', '802_11g']
-    ds_train = DSTLDataset_Transformer(protocols=protocols, ds_type='train', snr_dbs=args.snr_db, seq_len = int(args.seq_len), slice_len=int(args.slice_len), raw_data_ratio=args.dataset_ratio, slice_overlap_ratio=0,
+    ds_train = TPrimeDataset_Transformer(protocols=protocols, ds_type='train', snr_dbs=args.snr_db, seq_len = int(args.seq_len), slice_len=int(args.slice_len), raw_data_ratio=args.dataset_ratio, slice_overlap_ratio=0,
                            override_gen_map=True, apply_wchannel=args.wchannel, transform=chan2sequence)
-    ds_test = DSTLDataset_Transformer(protocols=protocols, ds_type='test', snr_dbs=args.snr_db, seq_len = int(args.seq_len), slice_len=int(args.slice_len), raw_data_ratio=args.dataset_ratio, slice_overlap_ratio=0,
+    ds_test = TPrimeDataset_Transformer(protocols=protocols, ds_type='test', snr_dbs=args.snr_db, seq_len = int(args.seq_len), slice_len=int(args.slice_len), raw_data_ratio=args.dataset_ratio, slice_overlap_ratio=0,
                           override_gen_map=False, apply_wchannel=args.wchannel, transform=chan2sequence)
 
     if not os.path.isdir(args.cp_path):
@@ -238,21 +238,6 @@ if __name__ == "__main__":
         "protocols": protocols
         }
 
-    """
-    if not train_config['isDebug']:
-        import ray
-
-        ray.init(address=args.address)
-        trainer = TorchTrainer(
-            train_func,
-            train_loop_config=train_config,
-            scaling_config=ScalingConfig(num_workers=args.num_workers, use_gpu=args.use_gpu),
-        )
-        result = trainer.fit()
-        print(f"Results: {result.metrics}")
-    else:
-        train_func(train_config)
-    """
     exp_config = { #Experiment configuration for tracking
         "Dataset": "1_1",
         "Architecture": "Transformer_v1",

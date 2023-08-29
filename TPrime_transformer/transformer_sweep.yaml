@@ -1,4 +1,4 @@
-program: DSTL_transformer_train.py
+program: TPrime_transformer_train.py
 method: bayes
 metric:
   goal: minimize
