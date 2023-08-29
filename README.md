@@ -290,7 +290,7 @@ An example of a complete command:
 ```
 python Tprime_airT_run.py -fq 2.427e9 -t 180 --model_path TPrime_transformer/model_cp/model_lg_otaglobal_inf_RMSn_bckg_ft.pt --model_size lg --tensorRT --RMSNorm
 ```
-## GUI
+### GUI
 While the main program is running, you can also launch a real-time graphical user interface (GUI) using the Streamlit library. This GUI displays the model's predictions as they are made. To set this up, you'll need to install the ```streamlit``` Python package (follow the [installation guide](https://docs.streamlit.io/library/get-started/installation)). Once installed, simply run the following command to open the display in a web browser. 
 ```
 streamlit run GUI.py
@@ -300,7 +300,7 @@ streamlit run GUI.py
 All preprocessing specific code is in the /preprocessing folder.
 
 
-# Other models
+## Other models
 The CNN code is in the /cnn_baseline folder.
 
 All huggingface transformer based code is in the /transformer folder. This was only used for the initial visual transformer testing, and is not present or necessary for the final implementation.
