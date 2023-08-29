@@ -39,7 +39,7 @@ def rms(X):
         return (np.sqrt(np.mean(X * X))) # root-mean-square
 
 if __name__ == "__main__":
-    ds_path = "/home/mauro/Research/DSTL/DATASET3_0/OTA_dataset/"
+    ds_path = "../data/DATASET3_0/OTA_dataset/"
     exp_folder = "802.11g_z"
     noise_folder = "noise"
     file_list = glob(os.path.join(os.path.join(ds_path, exp_folder), '*.bin'))
