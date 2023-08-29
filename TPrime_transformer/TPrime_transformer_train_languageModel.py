@@ -2,7 +2,7 @@ import math
 import os
 from tempfile import TemporaryDirectory
 from typing import Tuple
-from dstl.preprocessing.DSTL_dataset import DSTLDataset
+from dstl.preprocessing.TPrime_dataset import TPrimeDataset
 import torch
 from torch import nn, Tensor
 import torch.nn.functional as F
@@ -187,8 +187,8 @@ if __name__ == "__main__":
     args, _ = parser.parse_known_args()
 
     protocols = ['802_11ax', '802_11b', '802_11n', '802_11g']
-    ds_train = DSTLDataset(protocols, ds_type='train', snr_dbs=args.snr_db, slice_len=128, slice_overlap_ratio=0.5, override_gen_map=True)
-    ds_test = DSTLDataset(protocols, ds_type='test', snr_dbs=args.snr_db, slice_len=128, slice_overlap_ratio=0.5, override_gen_map=True)
+    ds_train = TPrimeDataset(protocols, ds_type='train', snr_dbs=args.snr_db, slice_len=128, slice_overlap_ratio=0.5, override_gen_map=True)
+    ds_test = TPrimeDataset(protocols, ds_type='test', snr_dbs=args.snr_db, slice_len=128, slice_overlap_ratio=0.5, override_gen_map=True)
 
     train_data = data_process(ds_train)
     test_data = data_process(ds_test)

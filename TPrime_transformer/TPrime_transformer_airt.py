@@ -57,7 +57,7 @@ for slice_len in [64, 128]:
     print("Mean (ms):", mean_ms, "Std ", std_ms)
 
     homedir=os.path.expanduser('~')
-    PATH = os.path.join(homedir, '/home/deepwave/Research/DSTL/dstl/dstl_transformer/model_cp')
+    PATH = os.path.join(homedir, '/home/deepwave/Research/DSTL/dstl/TPrime_transformer/model_cp')
     model_file_name = 'model.best_sm.pt' if slice_len == 64 else 'model.best_lg.pt'
     model_path = os.path.join(PATH, model_file_name)
     checkpoint = torch.load(model_path)
