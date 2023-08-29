@@ -1,4 +1,4 @@
-program: DSTL_torch_train.py
+program: TPrime_torch_train.py
 method: grid
 metric:
   goal: minimize
@@ -11,7 +11,7 @@ parameters:
   channel:
    values: ['TGn', 'TGax', 'Rayleigh']
   raw_path:
-    value: '/home/belgiovinem/Research/DSTL/DSTL_DATASET_1_1'
+    value: 'DEFINE_PATH'
   cp_path:
     value: 'results_slice512/'
   raw_data_ratio:

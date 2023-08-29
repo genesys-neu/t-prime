@@ -11,7 +11,7 @@ num_feats = 1
 slice_len = 128
 snr_dBs = [30]
 
-PATH = '/home/mauro/Research/DSTL/dstl/cnn_baseline/results/SNR30/'
+PATH = './results/SNR30/'
 model_file_name = 'model.best.pt'
 model_path = os.path.join(PATH, model_file_name)
 
