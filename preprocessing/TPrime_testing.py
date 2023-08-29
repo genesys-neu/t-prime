@@ -9,13 +9,13 @@ proj_root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardi
 import sys
 sys.path.append(proj_root_dir)
 import argparse
-from dstl_transformer.model_transformer import TransformerModel
+from TPrime_transformer.model_transformer import TransformerModel
 from cnn_baseline.model_cnn1d import Baseline_CNN1D
 from tqdm import tqdm
 # CONFIG
-TEST_DATA_PATH = '/home/miquelsirera/Desktop/dstl/data/DSTL_DATASET_1_1_TEST'
-TRANS_PATH = '/home/miquelsirera/Desktop/dstl/dstl_transformer/model_cp'
-CNN_PATH = '/home/miquelsirera/Desktop/dstl/cnn_baseline/results_slice512'
+TEST_DATA_PATH = '../data/DSTL_DATASET_1_1_TEST'
+TRANS_PATH = '../TPrime_transformer/model_cp'
+CNN_PATH = '../cnn_baseline/results_slice512'
 MODELS = ["Trans. (64 x 128) [6.8M params]", "Trans. (24 x 64) [1.6M params]", "CNN (1 x 512) [4.1M params]"]
 PROTOCOLS = ['802_11ax', '802_11b_upsampled', '802_11n', '802_11g']
 #CHANNELS = ['None', 'TGn', 'TGax', 'Rayleigh']
@@ -23,9 +23,9 @@ SNR = [-30.0, -25.0, -20.0, -15.0, -10.0, -5.0, 0.0, 5.0, 10.0, 15.0, 20.0, 25.0
 CHANNELS = ['None']
 MODE = 'TensorRT' # choices=['pytorch', 'TensorRT']
 if MODE == 'TensorRT':
-    TEST_DATA_PATH = '/home/deepwave/Research/DSTL/dstl/data/DSTL_DATASET_1_1_TEST'
-    TRANS_PATH = '/home/deepwave/Research/DSTL/dstl/dstl_transformer/model_cp'
-    CNN_PATH = '/home/deepwave/Research/DSTL/dstl/cnn_baseline/results_slice512'
+    TEST_DATA_PATH = '../data/DSTL_DATASET_1_1_TEST'
+    TRANS_PATH = '../dstl_transformer/model_cp'
+    CNN_PATH = '../cnn_baseline/results_slice512'
     import tensorrt as trt
     from preprocessing.inference.onnx2plan import onnx2plan
     from preprocessing.inference.plan_bench import plan_bench

@@ -14,26 +14,26 @@ import streamlit as st
 ############### SSH CONNECTION ###############
 ##############################################
 # Load connection credentials
-try:
-    with open('credentials.json') as f: 
-        creds = json.load(f)
-except FileNotFoundError:
-    print('File credentials.json not found! Please make sure to define it before calling this program.')
+# try:
+#     with open('credentials.json') as f: 
+#         creds = json.load(f)
+# except FileNotFoundError:
+#     print('File credentials.json not found! Please make sure to define it before calling this program.')
 # Open ssh and scp connections
 # ssh_ob = SSHClient()
 # ssh_ob.load_system_host_keys()
 # ssh_ob.connect(creds['host'], username=creds['username'], password=creds['password'])
 # scp = SCPClient(ssh_ob.get_transport())
 # Define the name of the file to extract and where to save
-filename = creds['output_filename']
+filename = 'output.txt' #creds['output_filename']
 cwd = os.getcwd()
 
 #####################################################
 ############### DISPLAY CONFIGURATION ###############
 #####################################################
 # Option to include background class
-back_class = creds['background_class'] == "True" 
-print(back_class)
+back_class = True #creds['background_class'] == "True" 
+print("The model loaded has a background class:", back_class)
 # Index Colors by label
 PROTOCOLS_MAP = {'0':'802_11ax', '1':'802_11b', '2':'802_11n', '3':'802_11g', '4': 'Not known'}
 PROTOCOLS = ['802_11ax', '802_11b', '802_11n', '802_11g', 'noise']

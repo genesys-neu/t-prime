@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from dstl.preprocessing.DSTL_dataset import DSTLDataset
+from dstl.preprocessing.TPrime_dataset import TPrimeDataset
 from model_cnn1d import Baseline_CNN1D
 import os
 
@@ -11,13 +11,13 @@ num_feats = 1
 slice_len = 128
 snr_dBs = [30]
 
-PATH = '/home/mauro/Research/DSTL/dstl/cnn_baseline/results/SNR30/'
+PATH = './results/SNR30/'
 model_file_name = 'model.best.pt'
 model_path = os.path.join(PATH, model_file_name)
 
 
 protocols = ['802_11ax', '802_11b', '802_11n', '802_11g']
-ds_test = DSTLDataset(protocols, ds_type='test', snr_dbs=snr_dBs, slice_len=slice_len, slice_overlap_ratio=0.5, override_gen_map=True)
+ds_test = TPrimeDataset(protocols, ds_type='test', snr_dbs=snr_dBs, slice_len=slice_len, slice_overlap_ratio=0.5, override_gen_map=True)
 
 model = Baseline_CNN1D(classes=Nclass, numChannels=num_channels, slice_len=slice_len)
 checkpoint = torch.load(model_path)

@@ -38,7 +38,7 @@ class FileCache:
         self.access_queue.append(file_path)
 
 
-class DSTLDataset(Dataset):
+class TPrimeDataset(Dataset):
     def __init__(self,
                  protocols: list,  # this list will contain the folder/protocols names to include in the dataset
                  slice_len: int,    # this will define the slice size of each signal that will be input to the model
@@ -48,7 +48,7 @@ class DSTLDataset(Dataset):
                  raw_data_ratio=1.0,        # ratio of the whole raw signal dataset to consider for generation
                  test_ratio=0.2,
                  testing_mode='random_sampling',
-                 ds_path='/home/miquelsirera/Desktop/dstl/data/',
+                 ds_path='../data',
                  file_postfix='',
                  noise_model='AWGN', snr_dbs=[30], seed=4389,
                  apply_noise=True, apply_wchannel=None,
@@ -154,7 +154,7 @@ class DSTLDataset(Dataset):
             if len(self.protocols) == 5:
                 protocols.append('noise') 
         else:
-            sys.exit('[DSTLDataset] protocols folder names  not found at ' + ds_path + '. Aborting...')
+            sys.exit('[TPrimeDataset] protocols folder names  not found at ' + ds_path + '. Aborting...')
         # retrieve the list of signals (.mat) from every folder/protocol specified
         for i, p in enumerate(protocols):
             path = os.path.join(ds_path, p)
@@ -175,7 +175,7 @@ class DSTLDataset(Dataset):
                     mat_list_path.extend(mat_list)
                 else:
                     if p != 'noise' and not ds_path[-3:] == 'dBs': # not all datasets contain noise 
-                        sys.exit('[DSTLDataset] folder ' + power_path + ' not found. Aborting...')
+                        sys.exit('[TPrimeDataset] folder ' + power_path + ' not found. Aborting...')
             examples_map[self.protocols[i]] = dict(
                     zip(
                         list(range(num_mat)),
@@ -198,7 +198,7 @@ class DSTLDataset(Dataset):
         test_ixs_count = 0
         for c in tqdm(examples_map.keys(), desc='Analyzing signal dataset...'):
             nsamples = len(examples_map[c].items())
-            if self.testing_mode == 'inference':
+            if self.testing_mode == 'future':
                 test_threshold = int(nsamples *(1-self.test_ratio))
             else:
                 test_threshold = nsamples
@@ -389,7 +389,7 @@ class DSTLDataset(Dataset):
         proc_sig = self.mateng.eng.step(channel, mat_sig, nargout=1)
         return np.array(proc_sig)
 
-class DSTLDataset_Transformer(DSTLDataset):
+class TPrimeDataset_Transformer(TPrimeDataset):
     
     def __init__(self, seq_len: int, **kwargs):
         self.seq_len = seq_len
@@ -423,7 +423,7 @@ class DSTLDataset_Transformer(DSTLDataset):
         return np.asarray(obs)
     
 
-class DSTLDataset_Transformer_overlap(DSTLDataset_Transformer):
+class TPrimeDataset_Transformer_overlap(TPrimeDataset_Transformer):
     def __init__(self, **kwargs):
         self.mixes = ['b-ax', 'b-g', 'b-n', 'g-ax', 'g-n', 'n-ax']
         super().__init__(**kwargs)
@@ -467,7 +467,7 @@ class DSTLDataset_Transformer_overlap(DSTLDataset_Transformer):
                     mat_list_path.extend(mat_list)
                 else:
                     if p != 'NOISE':
-                        sys.exit('[DSTLDataset] folder ' + path + ' not found. Aborting...')
+                        sys.exit('[TPrimeDataset] folder ' + path + ' not found. Aborting...')
             if num_mat != 0:
                 examples_map[directories[i]] = dict(
                         zip(
@@ -491,7 +491,7 @@ class DSTLDataset_Transformer_overlap(DSTLDataset_Transformer):
         test_ixs_count = 0
         for c in tqdm(examples_map.keys(), desc='Analyzing signal dataset...'):
             nsamples = len(examples_map[c].items())
-            if self.testing_mode == 'inference':
+            if self.testing_mode == 'future':
                 test_threshold = int(nsamples *(1-self.test_ratio))
             else:
                 test_threshold = nsamples
@@ -552,14 +552,14 @@ if __name__ == "__main__":
     parser.add_argument("--protocols", nargs='+', default=['802_11ax', '802_11b_upsampled', '802_11n', '802_11g'],
                         choices=['802_11ax', '802_11b', '802_11b_upsampled', '802_11n', '802_11g'],
                         help="Specify the protocols/classes to be included in the dataset")
-    parser.add_argument('--raw_path', default='/home/mauro/Research/DSTL/DSTL_DATASET_1_0', help='Path where raw signals are stored.')
+    parser.add_argument('--raw_path', default='../data/DSTL_DATASET_1_0', help='Path where raw signals are stored.')
     parser.add_argument('--postfix', default='', help='Postfix to append to dataset file.')
     parser.add_argument('--slicelen', default=128, type=int, help='Signal slice size')
     parser.add_argument('--overlap_ratio', default=0.5, help='Overlap ratio for slices generation')
     parser.add_argument('--raw_data_ratio', default=1.0, type=float, help='Specify the ratio of examples per class to consider while training/testing')
     args, _ = parser.parse_known_args()
 
-    myds = DSTLDataset(protocols=args.protocols, ds_path=args.raw_path, slice_len=args.slicelen, slice_overlap_ratio=args.overlap_ratio, raw_data_ratio=args.raw_data_ratio,
+    myds = TPrimeDataset(protocols=args.protocols, ds_path=args.raw_path, slice_len=args.slicelen, slice_overlap_ratio=args.overlap_ratio, raw_data_ratio=args.raw_data_ratio,
                        apply_wchannel='TGn', file_postfix=args.postfix)    # this case has consistent sampling rates (20 MHz) and applies a specific channel to all signals
 
     import matplotlib.pyplot as plt

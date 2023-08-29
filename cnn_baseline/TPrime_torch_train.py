@@ -3,7 +3,7 @@ import numpy as np
 proj_root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.join(os.pardir, os.pardir)))
 import sys
 sys.path.append(proj_root_dir)
-from dstl.preprocessing.DSTL_dataset import DSTLDataset
+from dstl.preprocessing.TPrime_dataset import TPrimeDataset
 from ray.air import session, Checkpoint
 from typing import Dict
 import torch
@@ -201,33 +201,31 @@ if __name__ == "__main__":
     parser.add_argument("--snr_db", nargs='+', default=[30], help="SNR levels to be considered during training. "
                                                                   "It's possible to define multiple noise levels to be "
                                                                   "chosen at random during input slices generation.")
+    parser.add_argument("--useRay", action='store_true', default=False, help="Run with Ray's Trainer function")
+    parser.add_argument("--num-workers", "-n", type=int, default=2, help="Sets number of workers for training.")
+    parser.add_argument("--use-gpu", action="store_true", default=False, help="Enables GPU training")
+    parser.add_argument("--address", required=False, type=str, help="the address to use for Ray")
     parser.add_argument("--test", action="store_true", default=False, help="Testing the model")
     parser.add_argument("--cp_path", default='./', help='Path to the checkpoint to save/load the model.')
     parser.add_argument("--protocols", nargs='+', default=['802_11ax', '802_11b_upsampled', '802_11n', '802_11g'],
                         choices=['802_11ax', '802_11b', '802_11b_upsampled', '802_11n', '802_11g'], help="Specify the protocols/classes to be included in the training")
     parser.add_argument("--channel", default=None, choices=['TGn', 'TGax', 'Rayleigh', 'relative', 'random', 'None', None], help="Specify the channel models to apply during data generation. ")
-    parser.add_argument('--raw_path', required=True, help='Path where raw signals are stored.')
+    parser.add_argument('--raw_path', default='../data/DSTL_DATASET_1_0', help='Path where raw signals are stored.')
     parser.add_argument('--slicelen', default=128, type=int, help='Signal slice size')
     parser.add_argument('--overlap_ratio', default=0.5, help='Overlap ratio for slices generation')
     parser.add_argument('--postfix', default='', help='Postfix to append to dataset file.')
     parser.add_argument('--raw_data_ratio', default=1.0, type=float, help='Specify the ratio of examples per class to consider while training/testing')
-    parser.add_argument("--normalize", action='store_true', default=True, help=" [DEPRECATED] Use a layer norm as a first layer.")
+    parser.add_argument("--normalize", action='store_true', default=False, help="Use a layer norm as a first layer.")
     parser.add_argument('--model', choices=supported_models, default='baseline_cnn1d', help='Model to be used for training')
     parser.add_argument('--out_mode', choices=supported_outmode, default='real', help='Specify data generator output format')
     parser.add_argument('--debug', default=False, action='store_true', help='It will force run on cpu and disable Wandb.')
-    parser.add_argument("--useRay", action='store_true', default=False,
-                        help="[DEPRECATED] Run with Ray's Trainer function")
-    parser.add_argument("--num-workers", "-n", type=int, default=2,
-                        help=" [DEPRECATED] Sets number of workers for training.")
-    parser.add_argument("--use-gpu", action="store_true", default=True, help="[DEPRECATED] Enables GPU training")
-    parser.add_argument("--address", required=False, type=str, help="[DEPRECATED] the address to use for Ray")
 
     args, _ = parser.parse_known_args()
 
     print('Apply noise:', args.noise)
     args.channel = args.channel if args.channel != 'None' else None
     protocols = args.protocols
-    ds_train = DSTLDataset(protocols,
+    ds_train = TPrimeDataset(protocols,
                            ds_path=args.raw_path,
                            ds_type='train',
                            snr_dbs=args.snr_db,
@@ -239,7 +237,7 @@ if __name__ == "__main__":
                            apply_wchannel=args.channel,
                            apply_noise=args.noise,
                            out_mode=args.out_mode)
-    ds_test = DSTLDataset(protocols,
+    ds_test = TPrimeDataset(protocols,
                           ds_path=args.raw_path,
                           ds_type='test',
                           snr_dbs=args.snr_db,

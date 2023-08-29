@@ -2,7 +2,7 @@ import os
 import numpy as np
 import sys
 sys.path.insert(0, '../')
-from preprocessing.DSTL_dataset import DSTLDataset_Transformer
+from preprocessing.TPrime_dataset import TPrimeDataset_Transformer
 from ray.air import session, Checkpoint
 from typing import Dict
 import torch
@@ -109,7 +109,7 @@ def train_func(config: Dict):
     else:
         worker_batch_size = batch_size // session.get_world_size()
 
-    # Create data loaders.
+    # Create data loaders
     train_dataloader = DataLoader(ds_train, batch_size=worker_batch_size, shuffle=True)
     test_dataloader = DataLoader(ds_test, batch_size=worker_batch_size, shuffle=True)
 
@@ -117,7 +117,7 @@ def train_func(config: Dict):
         train_dataloader = train.torch.prepare_data_loader(train_dataloader)
         test_dataloader = train.torch.prepare_data_loader(test_dataloader)
 
-    # Create model.
+    # Create model
     model = global_model(classes=Nclass, d_model=d_model, seq_len=seq_len, nlayers=transformer_layers, use_pos=pos_encoder)
     if use_ray:
         model = train.torch.prepare_model(model)
@@ -134,15 +134,15 @@ def train_func(config: Dict):
     scheduler = ReduceLROnPlateau(optimizer, 'min', min_lr=0.00001, verbose=True)
     loss_results = []
     best_loss = np.inf
-    wandb.watch(model, log_freq=10)
+    #wandb.watch(model, log_freq=10)
     best_conf_matrix = 0
     for e in range(epochs):
         tr_loss, tr_acc = train_epoch(train_dataloader, model, loss_fn, optimizer, use_ray)
-        wandb.log({'Tr_loss': tr_loss}, step=e)
-        wandb.log({'Tr_acc': tr_acc}, step=e)
+        #wandb.log({'Tr_loss': tr_loss}, step=e)
+        #wandb.log({'Tr_acc': tr_acc}, step=e)
         loss, acc, conf_matrix = validate_epoch(test_dataloader, model, loss_fn, Nclasses=Nclass, use_ray=use_ray)
-        wandb.log({'Val_loss': loss}, step=e)
-        wandb.log({'Val_acc': acc}, step=e)
+        #wandb.log({'Val_loss': loss}, step=e)
+        #wandb.log({'Val_acc': acc}, step=e)
         scheduler.step(loss)
         loss_results.append(loss)
         if use_ray:
@@ -169,7 +169,7 @@ def train_func(config: Dict):
                     'loss': loss,
                 }, os.path.join(logdir, model_name))
     
-    wandb.log({"Num. params": total_params})
+    #wandb.log({"Num. params": total_params})
     fig = plt.figure(figsize=(8,8))
     best_conf_matrix = best_conf_matrix.astype('float') / best_conf_matrix.sum(axis=1)[np.newaxis]
     plt.imshow(best_conf_matrix, interpolation='none', cmap=plt.cm.Blues)
@@ -187,8 +187,6 @@ def train_func(config: Dict):
     plt.ylabel('True label')
     plt.xlabel('Predicted label')
     plt.title(f"Confusion matrix: {args.snr_db[0]} dBs, channel: {args.wchannel}, slice: {slice_len}, seq.: {seq_len}")
-    # return required for backwards compatibility with the old API
-    # TODO(team-ml) clean up and remove return
     return loss_results, fig
 
 if __name__ == "__main__":
@@ -235,9 +233,9 @@ if __name__ == "__main__":
         "Positional encoder": args.Positional_encoder
     }
     protocols = ['802_11ax', '802_11b_upsampled', '802_11n', '802_11g']
-    ds_train = DSTLDataset_Transformer(protocols=protocols, ds_type='train', snr_dbs=args.snr_db, seq_len=exp_config["Sequence length"], slice_len=exp_config["Slice length"], slice_overlap_ratio=0, raw_data_ratio=args.dataset_ratio,
+    ds_train = TPrimeDataset_Transformer(protocols=protocols, ds_type='train', snr_dbs=args.snr_db, seq_len=exp_config["Sequence length"], slice_len=exp_config["Slice length"], slice_overlap_ratio=0, raw_data_ratio=args.dataset_ratio,
             override_gen_map=True, apply_wchannel=args.wchannel, transform=chan2sequence)
-    ds_test = DSTLDataset_Transformer(protocols=protocols, ds_type='test', snr_dbs=args.snr_db, seq_len=exp_config["Sequence length"], slice_len=exp_config["Slice length"], slice_overlap_ratio=0, raw_data_ratio=args.dataset_ratio,
+    ds_test = TPrimeDataset_Transformer(protocols=protocols, ds_type='test', snr_dbs=args.snr_db, seq_len=exp_config["Sequence length"], slice_len=exp_config["Slice length"], slice_overlap_ratio=0, raw_data_ratio=args.dataset_ratio,
             override_gen_map=False, apply_wchannel=args.wchannel, transform=chan2sequence)
 
     if not os.path.isdir(args.cp_path):
@@ -266,24 +264,9 @@ if __name__ == "__main__":
         "snr": args.snr_db[0]
         }
 
-    """
-    if not train_config['isDebug']:
-        import ray
-
-        ray.init(address=args.address)
-        trainer = TorchTrainer(
-            train_func,
-            train_loop_config=train_config,
-            scaling_config=ScalingConfig(num_workers=args.num_workers, use_gpu=args.use_gpu),
-        )
-        result = trainer.fit()
-        print(f"Results: {result.metrics}")
-    else:
-        train_func(train_config)
-    """
-    wandb.init(project="RF_Transformer", config=exp_config)
-    wandb.run.name = f'{args.snr_db[0]} dBs {args.wchannel} sl:{ds_info["slice_len"]} sq:{ds_info["seq_len"]} {postfix}'
+    #wandb.init(project="RF_Transformer", config=exp_config)
+    #wandb.run.name = f'{args.snr_db[0]} dBs {args.wchannel} sl:{ds_info["slice_len"]} sq:{ds_info["seq_len"]} {postfix}'
 
     _, conf_matrix = train_func(train_config)
-    wandb.log({"Confusion Matrix": conf_matrix})
-    wandb.finish()
+    #wandb.log({"Confusion Matrix": conf_matrix})
+    #wandb.finish()

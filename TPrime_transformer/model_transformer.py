@@ -37,21 +37,11 @@ class TransformerModel(nn.Module):
         Returns:
             output classifier label
         """
-        # First we have to reshape the data
-        # This needs to get fixed - or DSTL_dataset
-        # The input is shaped like (batch, channel, len_slice) but
-        # needs to be shaped like (batch, len_slice)
-
-        # We should normalize the input weights by sqrt(d_model)
         #src = src * math.sqrt(self.d_model)
         src = self.norm(src)
-        # ToDo: The positional encoder is changing the dimensions in a way I don't understand
         if self.use_positional_enc:
             src = self.pos_encoder(src).squeeze()
         t_out = self.transformer_encoder(src)
-        # ToDo: Perhaps with a working PE we need to use these to reshape
-        #hidden_state = t_out[0]
-        #pooler = hidden_state[:, 0]
         t_out = torch.flatten(t_out, start_dim=1)
         pooler = self.pre_classifier(t_out)
         pooler = torch.nn.ReLU()(pooler)
@@ -69,11 +59,6 @@ class PositionalEncoding(nn.Module):
 
         position = torch.arange(max_len).unsqueeze(1)
         div_term = torch.exp(torch.arange(0, d_model, 2) * (-math.log(10000.0) / d_model))
-        # ToDo: try the following change
-        # pe = torch.zeros(max_len, 1, d_model)
-        # pe[:, 0, 0::2] = torch.sin(position * div_term)
-        # pe[:, 0, 1::2] = torch.cos(position * div_term)
-        # try the following instead
         pe = torch.zeros(max_len, d_model)
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term)
@@ -121,19 +106,9 @@ class TransformerModel_multiclass_transfer(nn.Module):
         Returns:
             output classifier label
         """
-        # First we have to reshape the data
-        # This needs to get fixed - or DSTL_dataset
-        # The input is shaped like (batch, channel, len_slice) but
-        # needs to be shaped like (batch, len_slice)
-
-        # We should normalize the input weights by sqrt(d_model)
         #src = src * math.sqrt(self.d_model)
         src = self.norm(src)
-        # ToDo: The positional encoder is changing the dimensions in a way I don't understand
         t_out = self.transformer_encoder(src)
-        # ToDo: Perhaps with a working PE we need to use these to reshape
-        #hidden_state = t_out[0]
-        #pooler = hidden_state[:, 0]
         t_out = torch.flatten(t_out, start_dim=1)
         pooler = self.pre_classifier(t_out)
         pooler = torch.nn.ReLU()(pooler)
@@ -172,19 +147,9 @@ class TransformerModel_multiclass(nn.Module):
         Returns:
             output classifier label
         """
-        # First we have to reshape the data
-        # This needs to get fixed - or DSTL_dataset
-        # The input is shaped like (batch, channel, len_slice) but
-        # needs to be shaped like (batch, len_slice)
-
-        # We should normalize the input weights by sqrt(d_model)
         #src = src * math.sqrt(self.d_model)
         src = self.norm(src)
-        # ToDo: The positional encoder is changing the dimensions in a way I don't understand
         t_out = self.transformer_encoder(src)
-        # ToDo: Perhaps with a working PE we need to use these to reshape
-        #hidden_state = t_out[0]
-        #pooler = hidden_state[:, 0]
         t_out = torch.flatten(t_out, start_dim=1)
         pooler = self.pre_classifier(t_out)
         pooler = torch.nn.ReLU()(pooler)
@@ -231,7 +196,6 @@ class TransformerModel_v2(nn.Module):
         cls_tokens = self.cls_token.repeat(src.size(0),1,1)
         src = torch.column_stack((cls_tokens, src))
         src = self.norm(src)
-        # ToDo: The positional encoder is changing the dimensions in a way I don't understand
         if self.use_positional_enc:
             src = self.pos_encoder(src).squeeze()
         t_out = self.transformer_encoder(src)

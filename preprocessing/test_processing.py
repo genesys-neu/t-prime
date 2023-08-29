@@ -7,8 +7,8 @@ import os
 from glob import glob
 import numpy as np
 
-DATA_PATH = '/home/miquelsirera/Desktop/dstl/data/DSTL_DATASET_1_1_TEST'
-TEST_DATA_PATH = '/home/miquelsirera/Desktop/dstl/data/DSTL_DATASET_1_1_TEST'
+DATA_PATH = '../data/DSTL_DATASET_1_1_TEST'
+TEST_DATA_PATH = '../data/DSTL_DATASET_1_1_TEST'
 PROTOCOLS = ['802_11ax', '802_11b_upsampled', '802_11n', '802_11g']
 CHANNELS = ['TGn', 'TGax', 'Rayleigh']
 SNR = [-30.0, -20.0, -10.0, 0.0, 10.0, 20.0, 30.0] # in dBs
@@ -17,7 +17,7 @@ SNR = [-30.0, -20.0, -10.0, 0.0, 10.0, 20.0, 30.0] # in dBs
 def check_test_directory():
     if not os.path.isdir(TEST_DATA_PATH):
         #os.mkdir(TEST_DATA_PATH)
-        raise Exception("No DSTL TEST DATASET found on ", TEST_DATA_PATH)
+        raise Exception("No TPrime TEST DATASET found on ", TEST_DATA_PATH)
 
 
 def apply_AWGN(snr_dbs, sig):
@@ -86,4 +86,4 @@ if __name__ == "__main__":
                 
 
         else:
-            sys.exit('[DSTLDataset] folder ' + path + ' not found. Aborting...')
+            sys.exit('[TPrimeDataset] folder ' + path + ' not found. Aborting...')
