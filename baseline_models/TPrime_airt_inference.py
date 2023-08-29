@@ -39,7 +39,7 @@ snr_dBs = [30]
 
 """
 homedir=os.path.expanduser('~')
-PATH = os.path.join(homedir, 'Research/DSTL/dstl/cnn_baseline/results/Rayleigh_ds11_tiny15/')
+PATH = os.path.join(homedir, 'Research/DSTL/dstl/baseline_models/results/Rayleigh_ds11_tiny15/')
 model_file_name = 'model.best.pt'
 model_path = os.path.join(PATH, model_file_name)
 
@@ -77,7 +77,7 @@ for slice_len in [128, 256, 512]:
     print("Mean (ms):", mean_ms, "Std ", std_ms)
 
 homedir=os.path.expanduser('~')
-PATH = os.path.join(homedir, 'Research/DSTL/dstl/cnn_baseline/results_slice512/sweep_TGn_all20MHz_half/slice512_snr30')
+PATH = os.path.join(homedir, 'Research/DSTL/dstl/baseline_models/results_slice512/sweep_TGn_all20MHz_half/slice512_snr30')
 model_file_name = 'model.best.pt'
 model_path = os.path.join(PATH, model_file_name)
 checkpoint = torch.load(model_path)

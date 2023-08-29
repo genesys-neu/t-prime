@@ -91,7 +91,7 @@ if __name__ == '__main__':
     INPUT_PORT_NAME = ''  # ':0' for tensorflow, '' for pytorch
     """
     # CNN1D configuration
-    ONNX_FILE_NAME = '/home/deepwave/Research/DSTL/dstl/cnn_baseline/dstl_baseline_CNN1D.onnx'  # Name of input CNN onnx file
+    ONNX_FILE_NAME = '/home/deepwave/Research/DSTL/dstl/baseline_models/dstl_baseline_CNN1D.onnx'  # Name of input CNN onnx file
     NCHAN = 2
     INPUT_LEN = 512  # Length of the input buffer (# of elements)
 

@@ -23,13 +23,13 @@ supported_outmode = ['real', 'complex', 'real_invdim', 'real_ampphase'] # has to
 TEST_DATA_PATH = '../data/DSTL_DATASET_1_1_TEST'
 
 TRANS_PATH = '../TPrime_transformer/model_cp'
-CNN_PATH = '../cnn_baseline/results_slice512'
+CNN_PATH = '../baseline_models/results_slice512'
 MODELS = ["Trans. (64 x 128) [6.8M params]", "Trans. (24 x 64) [1.6M params]", "CNN (1 x 512) [4.1M params]"]
 
-RESNET_PATH = '../cnn_baseline/results_ResNet_norm'
-AMCNET_PATH = '../cnn_baseline/results_AMCNet'
-MCFORMER_PATH = '../cnn_baseline/results_MCformer_largekernel'
-#LSTM_PATH = '../cnn_baseline/results_LSTM/'  # this is just random output
+RESNET_PATH = '../baseline_models/results_ResNet_norm'
+AMCNET_PATH = '../baseline_models/results_AMCNet'
+MCFORMER_PATH = '../baseline_models/results_MCformer_largekernel'
+#LSTM_PATH = '../baseline_models/results_LSTM/'  # this is just random output
 MODELS += ["ResNet [13] (1 x 1024) [162K params]", "AMCNet [16] (1 x 128) [462K params]", "MCFormer [8] (1 x 128) [78K params]"]
 
 PROTOCOLS = ['802_11ax', '802_11b_upsampled', '802_11n', '802_11g']
