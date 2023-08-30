@@ -1,7 +1,7 @@
 # Dataset folder
 This is the default folder used to read datasets by training and test scripts provided in this repository.
 
-The complete set of datasets can be found [here](https://northeastern-my.sharepoint.com/:f:/r/personal/sioannidis_northeastern_edu/Documents/DSTL-NU%20OneDrive/Datasets?csf=1&web=1&e=RDViVZ).
+The complete set of datasets can be downloaded [here](https://northeastern-my.sharepoint.com/:f:/r/personal/sioannidis_northeastern_edu/Documents/DSTL-NU%20OneDrive/Datasets?csf=1&web=1&e=RDViVZ).
 
 ## Table of provided datasets
 
