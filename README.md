@@ -13,12 +13,15 @@ conda env create -f ./conda-envs/TPrime_conda_env_training.yaml
 conda activate your-env-name
 ```
 ## Datasets
--All datasets can be found on the shared OneDrive: https://northeastern-my.sharepoint.com/:f:/r/personal/sioannidis_northeastern_edu/Documents/DSTL-NU%20OneDrive/Datasets?csf=1&web=1&e=RDViVZ <br/>
+All datasets can be found on the shared [OneDrive](https://northeastern-my.sharepoint.com/:f:/r/personal/sioannidis_northeastern_edu/Documents/DSTL-NU%20OneDrive/Datasets?csf=1&web=1&e=RDViVZ).
 
--To unzip the dataset folders into the /data folder, use this command:
+The following command can be used to unzip the dataset folders into `data/` folder:
 ```
-unzip DATASET_1_0.zip -d data/
+unzip <dataset filename>.zip -d data/
 ```
+All datasets for provided scripts will be read from `data/` folder.
+
+For more information about provided datasets, refer to dedicated [README](data/README.md) file. 
 
 ## Training and testing
 To train and test our models, it is essential to distinguish between the three types of data at our disposal: simulated data acquired through MATLAB, data collected over the air (OTA), and data encompassing overlapping protocols. This differentiation is crucial because each data type undergoes distinct processing procedures facilitated by separate scripts.
