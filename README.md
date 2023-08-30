@@ -275,7 +275,7 @@ python3 DSTL_overlapped.py --model_path=/PATH/TO/REPOSITORY/tprime/TPrime_transf
 ## Execution Pipeline
 With trained models in hand, this section will guide you through the deployment process on the AIR-T platform for real-time inference. The initial step involves creating the necessary dependency environment to execute the scripts. To achieve this, you can utilize Conda to create the environment and install the required packages. Use the following command to create the Conda environment and install the required packages:
 ```
-conda env create -f ./conda-envs/TPrime_conda_env_training.yaml
+conda env create -f ./conda-envs/TPrime_conda_env_airT.yaml
 conda activate your-env-name
 ```
 The next step is running real time classification. To do so use the following script:
