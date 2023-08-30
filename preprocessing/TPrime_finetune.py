@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 from TPrime_dataset import TPrimeDataset, TPrimeDataset_Transformer
 from TPrime_transformer.model_transformer import TransformerModel, TransformerModel_v2
-from cnn_baseline.model_cnn1d import Baseline_CNN1D
+from baseline_models.model_cnn1d import Baseline_CNN1D
 from preprocessing.model_rmsnorm import RMSNorm
 
 # Function to change the shape of obs

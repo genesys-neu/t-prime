@@ -11,11 +11,12 @@ sys.path.append(proj_root_dir)
 sys.path.insert(0, '../')
 import argparse
 from TPrime_transformer.model_transformer import TransformerModel
-from cnn_baseline.model_cnn1d import Baseline_CNN1D
-from cnn_baseline.model_AMCNet import AMC_Net
-from cnn_baseline.model_ResNet import ResNet
-from cnn_baseline.model_LSTM import LSTM_ap
-from cnn_baseline.model_MCFormer import MCformer
+from baseline_models.model_cnn1d import Baseline_CNN1D
+from baseline_models.model_AMCNet import AMC_Net
+from baseline_models.model_ResNet import ResNet
+from baseline_models.model_MCFormer import MCformer
+from baseline_models.model_LSTM import LSTM_ap
+
 
 supported_outmode = ['real', 'complex', 'real_invdim', 'real_ampphase'] # has to be same as in TPrime_torch_train
 

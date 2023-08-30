@@ -24,7 +24,7 @@ CHANNELS = ['None']
 MODE = 'TensorRT' # choices=['pytorch', 'TensorRT']
 if MODE == 'TensorRT':
     TEST_DATA_PATH = '../data/DSTL_DATASET_1_1_TEST'
-    TRANS_PATH = '../dstl_transformer/model_cp'
+    TRANS_PATH = '../TPrime_transformer/model_cp'
     CNN_PATH = '../baseline_models/results_slice512'
     import tensorrt as trt
     from preprocessing.inference.onnx2plan import onnx2plan
