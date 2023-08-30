@@ -80,7 +80,7 @@ We offer several implementations, both adapted from available Github code or bas
 To reproduce the architectures in the paper, train them using the following commands:
 - CNN 1D 
   ```
-  python3 TPrime_torch_train.py --model= --channel=random --snr_db=range --cp_path=./results_slice512 --postfix=all20MHz --raw_path=../data/DATASET1_1 --slicelen=512
+  python3 TPrime_torch_train.py --model=baseline_cnn1d --channel=random --snr_db=range --cp_path=./results_slice512 --postfix=all20MHz --raw_path=../data/DATASET1_1 --slicelen=512
   ```
 - ResNet
   ```
