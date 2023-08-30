@@ -48,7 +48,7 @@ class TPrimeDataset(Dataset):
                  raw_data_ratio=1.0,        # ratio of the whole raw signal dataset to consider for generation
                  test_ratio=0.2,
                  testing_mode='random_sampling',
-                 ds_path='../data',
+                 ds_path='../data/DATASET1_1',
                  file_postfix='',
                  noise_model='AWGN', snr_dbs=[30], seed=4389,
                  apply_noise=True, apply_wchannel=None,

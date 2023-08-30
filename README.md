@@ -33,19 +33,20 @@ To train and test our models, it is essential to distinguish between the three t
 ##### Transformer models
 All T-PRIME specific transformer models are in the `TPrime_transformer/` folder. The main script `TPrime_transformer_train.py` can be used to train T-PRIME transformer architectures as follows:
 ```
-usage: TPrime_transformer_train.py [-h] [--snr_db SNR_DB [SNR_DB ...]] [--useRay] [--num-workers NUM_WORKERS] [--use-gpu] [--address ADDRESS] [--test] [--wchannel WCHANNEL] [--cp_path CP_PATH]
-                                 [--cls_token] [--dataset_ratio DATASET_RATIO] [--Layers LAYERS] [--Epochs EPOCHS] [--Learning_rate LEARNING_RATE] [--Batch_size BATCH_SIZE]
-                                 [--Slice_length SLICE_LENGTH] [--Sequence_length SEQUENCE_LENGTH] [--Positional_encoder POSITIONAL_ENCODER]
+usage: TPrime_transformer_train.py [-h] [--snr_db SNR_DB [SNR_DB ...]] [--useRay] [--num-workers NUM_WORKERS] [--use-gpu] [--address ADDRESS] [--test] [--wchannel WCHANNEL] 
+                                   [--raw_path RAW_PATH] [--cp_path CP_PATH] [--cls_token] [--dataset_ratio DATASET_RATIO] [--Layers LAYERS] [--Epochs EPOCHS] [--Learning_rate LEARNING_RATE] 
+                                   [--Batch_size BATCH_SIZE] [--Slice_length SLICE_LENGTH] [--Sequence_length SEQUENCE_LENGTH] [--Positional_encoder POSITIONAL_ENCODER]
+
 ```
 
 The Large (LG) and Small (SM) implementations of T-PRIME can be reproduced and trained with the following commands:
 - Large, LG (M=24, S=64)
 ```
-python3 TPrime_transformer_train.py --wchannel=random --snr_db=range --use-gpu --cp_path=./model_cp --Layers=2 --Epochs=5 --Learning_rate=0.0002 --Batch_size=122 --Slice_length=64 --Sequence_length=24 --Positional_encoder=False 
+python3 TPrime_transformer_train.py --wchannel=random --snr_db=range --use-gpu --raw_path=../data/DATASET1_1 --cp_path=./model_cp --Layers=2 --Epochs=5 --Learning_rate=0.0002 --Batch_size=122 --Slice_length=64 --Sequence_length=24 --Positional_encoder=False 
 ```
 - Small, SM (M=64, S=128)
 ```
-python3 TPrime_transformer_train.py --wchannel=random --snr_db=range --use-gpu --cp_path=./model_cp --Layers=2 --Epochs=5 --Learning_rate=0.0002 --Batch_size=122 --Slice_length=128 --Sequence_length=64 --Positional_encoder=False
+python3 TPrime_transformer_train.py --wchannel=random --snr_db=range --use-gpu --raw_path=../data/DATASET1_1 --cp_path=./model_cp --Layers=2 --Epochs=5 --Learning_rate=0.0002 --Batch_size=122 --Slice_length=128 --Sequence_length=64 --Positional_encoder=False
 ```
 ###### Arguments description
 ```
@@ -59,6 +60,7 @@ python3 TPrime_transformer_train.py --wchannel=random --snr_db=range --use-gpu -
   --address ADDRESS     the address to use for Ray (default: None)
   --test                Testing the model (default: False)
   --wchannel WCHANNEL   Wireless channel to be applied, it can beTGn, TGax, Rayleigh, relative or random. (default: None)
+  --raw_path RAW_PATH   Path where raw signals are stored. (default: ../data/DATASET1_1)
   --cp_path CP_PATH     Path to the checkpoint to save/load the model. (default: ./model_cp)
   --cls_token           Use the Transformer v2 (default: False)
   --dataset_ratio DATASET_RATIO
