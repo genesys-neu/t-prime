@@ -5,12 +5,15 @@ This repository is dedicated to the T-PRIME project, aimed at waveform classific
 Before getting started, make sure you have the required dependencies installed. To set up the necessary environment, follow these steps:
 1. Clone this repository to your local machine:
 ```
-git clone https://github.com/your-username/t-prime.git
+git clone https://github.com/genesys-neu/t-prime.git
 ```
 2. Create a Conda environment and install the required packages:
 ```
-conda env create -f ./conda-envs/TPrime_conda_env_training.yaml
-conda activate your-env-name
+conda create --name t-prime --file ./conda-envs/TPrime_conda_env_training.yaml
+```
+3. Activate the newly created Conda environment:
+```
+conda activate t-prime
 ```
 ## Datasets
 All datasets can be found on the shared [OneDrive](https://northeastern-my.sharepoint.com/:f:/r/personal/sioannidis_northeastern_edu/Documents/DSTL-NU%20OneDrive/Datasets?csf=1&web=1&e=RDViVZ).
@@ -77,19 +80,19 @@ We offer several implementations, both adapted from available Github code or bas
 To reproduce the architectures in the paper, train them using the following commands:
 - CNN 1D 
   ```
-  python3 TPrime_torch_train.py --model= --channel=random --snr_db=range --cp_path=./results_slice512 --postfix=all20MHz --raw_path=/home/<user>/DSTL/DSTL_DATASET_1_1 --slicelen=512
+  python3 TPrime_torch_train.py --model= --channel=random --snr_db=range --cp_path=./results_slice512 --postfix=all20MHz --raw_path=../data/DSTL_DATASET_1_1 --slicelen=512
   ```
 - ResNet
   ```
-  python3 TPrime_torch_train.py --model=ResNet --out_mode=real_invdim --channel=random --snr_db=range --cp_path=./results_ResNet --postfix=all20MHz --raw_path=/home/<user>/DSTL/DSTL_DATASET_1_1 --slicelen=1024
+  python3 TPrime_torch_train.py --model=ResNet --out_mode=real_invdim --channel=random --snr_db=range --cp_path=./results_ResNet --postfix=all20MHz --raw_path=../data/DSTL_DATASET_1_1 --slicelen=1024
   ```
 - AMCNet
   ```
-  python3 TPrime_torch_train.py --model=AMCNet --channel=random --snr_db=range --cp_path=./results_AMCNet --postfix=all20MHz --raw_path=/home/<user>/DSTL/DSTL_DATASET_1_1 --slicelen=128
+  python3 TPrime_torch_train.py --model=AMCNet --channel=random --snr_db=range --cp_path=./results_AMCNet --postfix=all20MHz --raw_path=../data/DSTL_DATASET_1_1 --slicelen=128
   ```
 - MCFormer
   ```
-   python3 TPrime_torch_train.py --model=MCformer --channel=random --snr_db=range --cp_path=./results_MCformer_largekernel --postfix=all20MHz_half --raw_data_ratio=0.5 --raw_path=/home/<user>/DSTL/DSTL_DATASET_1_1 --slicelen=128 --debug
+   python3 TPrime_torch_train.py --model=MCformer --channel=random --snr_db=range --cp_path=./results_MCformer_largekernel --postfix=all20MHz --raw_path=../data/DSTL/DSTL_DATASET_1_1 --slicelen=128 --debug
   ```
 
 The main script `TPrime_torch_train.py` can be used in order to select what protocols to train on, what channel models (specific channels or random) to be applied, levels of noise, baseband signal ratio to be used to generate the dataset etc. Note that this code differs from the transformer one in the way slices are generated with a sequence lengt of 1 (i.e. M = 1). The script is used as follows:
