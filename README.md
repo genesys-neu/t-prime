@@ -75,24 +75,24 @@ python3 TPrime_transformer_train.py --wchannel=random --snr_db=range --use-gpu -
 ```
 
 ##### Other models (CNN, ResNet, AMCNet, MCFormer)
-We offer several implementations, both adapted from available Github code or based on paper descriptions. The code to train all models (except transformers) is in `cnn_baseline/`.
+We offer several implementations, both adapted from available Github code or based on paper descriptions. The code to train all baseline models (except transformers) is in `baseline_model/`.
 
 To reproduce the architectures in the paper, train them using the following commands:
 - CNN 1D 
   ```
-  python3 TPrime_torch_train.py --model= --channel=random --snr_db=range --cp_path=./results_slice512 --postfix=all20MHz --raw_path=../data/DSTL_DATASET_1_1 --slicelen=512
+  python3 TPrime_torch_train.py --model= --channel=random --snr_db=range --cp_path=./results_slice512 --postfix=all20MHz --raw_path=../data/DATASET1_1 --slicelen=512
   ```
 - ResNet
   ```
-  python3 TPrime_torch_train.py --model=ResNet --out_mode=real_invdim --channel=random --snr_db=range --cp_path=./results_ResNet --postfix=all20MHz --raw_path=../data/DSTL_DATASET_1_1 --slicelen=1024
+  python3 TPrime_torch_train.py --model=ResNet --out_mode=real_invdim --channel=random --snr_db=range --cp_path=./results_ResNet --postfix=all20MHz --raw_path=../data/DATASET1_1 --slicelen=1024
   ```
 - AMCNet
   ```
-  python3 TPrime_torch_train.py --model=AMCNet --channel=random --snr_db=range --cp_path=./results_AMCNet --postfix=all20MHz --raw_path=../data/DSTL_DATASET_1_1 --slicelen=128
+  python3 TPrime_torch_train.py --model=AMCNet --channel=random --snr_db=range --cp_path=./results_AMCNet --postfix=all20MHz --raw_path=../data/DATASET1_1 --slicelen=128
   ```
 - MCFormer
   ```
-   python3 TPrime_torch_train.py --model=MCformer --channel=random --snr_db=range --cp_path=./results_MCformer_largekernel --postfix=all20MHz --raw_path=../data/DSTL/DSTL_DATASET_1_1 --slicelen=128 --debug
+   python3 TPrime_torch_train.py --model=MCformer --channel=random --snr_db=range --cp_path=./results_MCformer_largekernel --postfix=all20MHz --raw_path=../data/DATASET1_1 --slicelen=128 --debug
   ```
 
 The main script `TPrime_torch_train.py` can be used in order to select what protocols to train on, what channel models (specific channels or random) to be applied, levels of noise, baseband signal ratio to be used to generate the dataset etc. Note that this code differs from the transformer one in the way slices are generated with a sequence lengt of 1 (i.e. M = 1). The script is used as follows:
