@@ -1,6 +1,6 @@
 import os
 import numpy as np
-proj_root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.join(os.pardir, os.pardir)))
+proj_root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
 import sys
 sys.path.append(proj_root_dir)
 from preprocessing.TPrime_dataset import TPrimeDataset
