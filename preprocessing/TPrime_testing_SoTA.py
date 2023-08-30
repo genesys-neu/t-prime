@@ -278,96 +278,159 @@ if __name__ == "__main__":
     
     elif args.experiment == '3': # Evaluate the models trained for general noise and channel conditions
         # Load the three models only one time
-        model_lg = TransformerModel(classes=len(PROTOCOLS), d_model=128*2, seq_len=64, nlayers=2, use_pos=False)
-        model_lg.load_state_dict(torch.load(f"{TRANS_PATH}/modelrandom_lg.pt", map_location=device)['model_state_dict'])
-        model_lg.eval()
-        model_sm = TransformerModel(classes=len(PROTOCOLS), d_model=64*2, seq_len=24, nlayers=2, use_pos=False)
-        model_sm.load_state_dict(torch.load(f"{TRANS_PATH}/modelrandom_sm.pt", map_location=device)['model_state_dict'])
-        model_sm.eval()
+        models_loaded = [False] * 6
+        print("The models that have not been loaded will appear as empty lists in the results.")
+        try:
+            model_lg = TransformerModel(classes=len(PROTOCOLS), d_model=128*2, seq_len=64, nlayers=2, use_pos=False)
+            model_lg.load_state_dict(torch.load(f"{TRANS_PATH}/modelrandom_lg.pt", map_location=device)['model_state_dict'])
+            model_lg.eval()
+            if args.use_gpu:
+                model_lg.cuda()
+            models_loaded[0] = True
+        except: 
+            print(f"LG model not found, the model name should be modelrandom_lg.pt and be placed at {TRANS_PATH}.")
+        try:
+            model_sm = TransformerModel(classes=len(PROTOCOLS), d_model=64*2, seq_len=24, nlayers=2, use_pos=False)
+            model_sm.load_state_dict(torch.load(f"{TRANS_PATH}/modelrandom_sm.pt", map_location=device)['model_state_dict'])
+            model_sm.eval()
+            if args.use_gpu:
+                model_sm.cuda()
+            models_loaded[1] = True
+        except: 
+            print(f"SM model not found, the model name should be modelrandom_sm.pt and be placed at {TRANS_PATH}.")
         # CNN Baseline
         cnn_slicelen = 512
-        cnn = Baseline_CNN1D(classes=len(PROTOCOLS), numChannels=2, slice_len=cnn_slicelen, normalize=args.normalize)
-        cnn.load_state_dict(torch.load(f"{CNN_PATH}/model.cnn.random{norm_flag}.range.pt", map_location=device)['model_state_dict'])
-        cnn.eval()
+        try:
+            cnn = Baseline_CNN1D(classes=len(PROTOCOLS), numChannels=2, slice_len=cnn_slicelen, normalize=args.normalize)
+            cnn.load_state_dict(torch.load(f"{CNN_PATH}/model.cnn.random{norm_flag}.range.pt", map_location=device)['model_state_dict'])
+            cnn.eval()
+            if args.use_gpu:
+                cnn.cuda()
+            models_loaded[2] = True
+        except: 
+            print(f"CNN model not found, the model name should be model.cnn.random{norm_flag}.range.pt and be placed at {CNN_PATH}.")
         # ResNet
         resnet_slicelen = 1024
-        resnet = ResNet(num_classes=len(PROTOCOLS), num_samples=resnet_slicelen, iq_dim=2, kernel_size=3, pool_size=2)
-        resnet.load_state_dict(torch.load(f"{RESNET_PATH}/model.ResNet.random.range.pt", map_location=device)['model_state_dict'])
-        resnet.eval()
+        try:
+            resnet = ResNet(num_classes=len(PROTOCOLS), num_samples=resnet_slicelen, iq_dim=2, kernel_size=3, pool_size=2)
+            resnet.load_state_dict(torch.load(f"{RESNET_PATH}/model.ResNet.random.range.pt", map_location=device)['model_state_dict'])
+            resnet.eval()
+            if args.use_gpu:
+                resnet.cuda()
+            models_loaded[3] = True
+        except: 
+            print(f"ResNet model not found, the model name should be model.ResNet.random.range.pt and be placed at {RESNET_PATH}.")
+            
         # AMCNet
         amcnet_slicelen = 128
-        amcnet = AMC_Net(num_classes=len(PROTOCOLS))
-        amcnet.load_state_dict(torch.load(f"{AMCNET_PATH}/model.AMCNet.random.range.pt", map_location=device)['model_state_dict'])
-        amcnet.eval()
-        # MCformer
-        #mcformer_slicelen = 128
-        #mcformer = MCformer()
-        #mcformer.load_state_dict(torch.load(f"{MCFORMER_PATH}/model.MCformer.random.range.pt", map_location=device)['model_state_dict'])
-        #mcformer.eval()
+        try:
+            amcnet = AMC_Net(num_classes=len(PROTOCOLS))
+            amcnet.load_state_dict(torch.load(f"{AMCNET_PATH}/model.AMCNet.random.range.pt", map_location=device)['model_state_dict'])
+            amcnet.eval()
+            if args.use_gpu:
+                amcnet.cuda()
+            models_loaded[4] = True
+        except: 
+            print(f"AMCNet model not found, the model name should be model.AMCNet.random.range.pt and be placed at {AMCNET_PATH}.")
 
-        if args.use_gpu:
-            model_lg.cuda()
-            model_sm.cuda()
-            cnn.cuda()
-            resnet.cuda()
-            amcnet.cuda()
-            #mcformer.cuda()
+        # MCformer
+        mcformer_slicelen = 128
+        try:
+            mcformer = MCformer()
+            mcformer.load_state_dict(torch.load(f"{MCFORMER_PATH}/model.MCformer.random.range.pt", map_location=device)['model_state_dict'])
+            mcformer.eval()
+            if args.use_gpu:
+                mcformer.cuda()
+            models_loaded[5] = True
+        except: 
+            print(f"MCformer model not found, the model name should be model.MCformer.random.range.pt and be placed at {MCFORMER_PATH}.")
+
         y_trans_lg, y_trans_sm, y_cnn = [], [], []
         y_resnet, y_amcnet, y_mcformer = [], [], []
         for channel in CHANNELS:
-            y_trans_lg.append(validate(model_lg, class_map, seq_len=64, sli_len=128, channel=channel))
-            print(f'Accuracy values for channel {channel} and large architecture are: ', y_trans_lg[-1])
-            y_trans_sm.append(validate(model_sm, class_map, seq_len=24, sli_len=64, channel=channel))
-            print(f'Accuracy values for channel {channel} and small architecture are: ', y_trans_sm[-1])
-            y_cnn.append(validate(cnn, class_map, seq_len=1, sli_len=cnn_slicelen, channel=channel, cnn=True))
-            print(f'Accuracy values for channel {channel} and cnn architecture are: ', y_cnn[-1])
-            y_resnet.append(validate(resnet, class_map, seq_len=1, sli_len=resnet_slicelen, channel=channel, cnn=True, out_mode='real_invdim'))
-            print(f'Accuracy values for channel {channel} and ResNet architecture are: ', y_resnet[-1])
-            y_amcnet.append(validate(amcnet, class_map, seq_len=1, sli_len=amcnet_slicelen, channel=channel, cnn=True))
-            print(f'Accuracy values for channel {channel} and AMCNet architecture are: ', y_amcnet[-1])
-            #y_mcformer.append(validate(mcformer, class_map, seq_len=1, sli_len=mcformer_slicelen, channel=channel, cnn=True))
-            #print(f'Accuracy values for channel {channel} and MCformer architecture are: ', y_mcformer[-1])
+            if models_loaded[0]:
+                y_trans_lg.append(validate(model_lg, class_map, seq_len=64, sli_len=128, channel=channel))
+                print(f'Accuracy values for channel {channel} and large architecture are: ', y_trans_lg[-1])
+            if models_loaded[1]:
+                y_trans_sm.append(validate(model_sm, class_map, seq_len=24, sli_len=64, channel=channel))
+                print(f'Accuracy values for channel {channel} and small architecture are: ', y_trans_sm[-1])
+            if models_loaded[2]:
+                y_cnn.append(validate(cnn, class_map, seq_len=1, sli_len=cnn_slicelen, channel=channel, cnn=True))
+                print(f'Accuracy values for channel {channel} and cnn architecture are: ', y_cnn[-1])
+            if models_loaded[3]:
+                y_resnet.append(validate(resnet, class_map, seq_len=1, sli_len=resnet_slicelen, channel=channel, cnn=True, out_mode='real_invdim'))
+                print(f'Accuracy values for channel {channel} and ResNet architecture are: ', y_resnet[-1])
+            if models_loaded[4]:
+                y_amcnet.append(validate(amcnet, class_map, seq_len=1, sli_len=amcnet_slicelen, channel=channel, cnn=True))
+                print(f'Accuracy values for channel {channel} and AMCNet architecture are: ', y_amcnet[-1])
+            if models_loaded[5]:
+                y_mcformer.append(validate(mcformer, class_map, seq_len=1, sli_len=mcformer_slicelen, channel=channel, cnn=True))
+                print(f'Accuracy values for channel {channel} and MCformer architecture are: ', y_mcformer[-1])
 
         
         with open(f'test_results_uniformdist_onemodel{norm_flag}.txt', 'w') as f:
-            f.write(str(y_trans_lg) + '%' + str(y_trans_sm) + '%' + str(y_cnn) + '%' + str(y_resnet) + '%' + str(y_amcnet))
+            f.write(str(y_trans_lg) + '%' + str(y_trans_sm) + '%' + str(y_cnn) + '%' + str(y_resnet) + '%' + str(y_amcnet) + '%' + str(y_mcformer))
     
     else: # Experiment 4: # Inference time analysis for each of the model architectures
         print('Using protocol 802.11ax and 10 dBs as a sample input.')
         # Load the three models only one time
-        model_lg = TransformerModel(classes=len(PROTOCOLS), d_model=128*2, seq_len=64, nlayers=2, use_pos=False)
-        model_lg.load_state_dict(torch.load(f"{TRANS_PATH}/modelrandom_lg.pt", map_location=device)['model_state_dict'])
-        model_lg.eval()
-        model_sm = TransformerModel(classes=len(PROTOCOLS), d_model=64*2, seq_len=24, nlayers=2, use_pos=False)
-        model_sm.load_state_dict(torch.load(f"{TRANS_PATH}/modelrandom_sm.pt", map_location=device)['model_state_dict'])
-        model_sm.eval()
-        cnn = Baseline_CNN1D(classes=len(PROTOCOLS), numChannels=2, slice_len=512, normalize=args.normalize)
-        cnn.load_state_dict(torch.load(f"{CNN_PATH}/model.cnn.random{norm_flag}.range.pt", map_location=device)['model_state_dict'])
-        cnn.eval()
-        if args.use_gpu:
-            model_lg.cuda()
-            model_sm.cuda()
-            cnn.cuda()
+        models_loaded = [False] * 3
+        print("The models that have not been loaded will not appear in the results.")
+        try:
+            model_lg = TransformerModel(classes=len(PROTOCOLS), d_model=128*2, seq_len=64, nlayers=2, use_pos=False)
+            model_lg.load_state_dict(torch.load(f"{TRANS_PATH}/modelrandom_lg.pt", map_location=device)['model_state_dict'])
+            model_lg.eval()
+            if args.use_gpu:
+                model_lg.cuda()
+            models_loaded[0] = True
+        except: 
+            print(f"LG model not found, the model name should be modelrandom_lg.pt and be placed at {TRANS_PATH}.")
+        try:
+            model_sm = TransformerModel(classes=len(PROTOCOLS), d_model=64*2, seq_len=24, nlayers=2, use_pos=False)
+            model_sm.load_state_dict(torch.load(f"{TRANS_PATH}/modelrandom_sm.pt", map_location=device)['model_state_dict'])
+            model_sm.eval()
+            if args.use_gpu:
+                model_sm.cuda()
+            models_loaded[1] = True
+        except: 
+            print(f"SM model not found, the model name should be modelrandom_sm.pt and be placed at {TRANS_PATH}.")
+        # CNN Baseline
+        cnn_slicelen = 512
+        try:
+            cnn = Baseline_CNN1D(classes=len(PROTOCOLS), numChannels=2, slice_len=cnn_slicelen, normalize=args.normalize)
+            cnn.load_state_dict(torch.load(f"{CNN_PATH}/model.cnn.random{norm_flag}.range.pt", map_location=device)['model_state_dict'])
+            cnn.eval()
+            if args.use_gpu:
+                cnn.cuda()
+            models_loaded[2] = True
+        except: 
+            print(f"CNN model not found, the model name should be model.cnn.random{norm_flag}.range.pt and be placed at {CNN_PATH}.")
         y_trans_lg_time, y_trans_sm_time, y_cnn_time = [], [], []
         y_trans_lg_sd, y_trans_sm_sd, y_cnn_sd = [], [], []
         for channel in CHANNELS:
-            lg_ch_time, lg_ch_sd = timing_inference_GPU(device, channel=channel, seq_len=64, sli_len=128, model=model_lg)
-            y_trans_lg_time.append(lg_ch_time)
-            y_trans_lg_sd.append(lg_ch_sd)
-            print(f'Inference time mean and sd for channel {channel} and large architecture are: ', lg_ch_time, ' +- ', lg_ch_sd)
-            sm_ch_time, sm_ch_sd = timing_inference_GPU(device, channel=channel, seq_len=24, sli_len=64, model=model_sm)
-            y_trans_sm_time.append(sm_ch_time)
-            y_trans_sm_sd.append(sm_ch_sd)
-            print(f'Inference time mean and sd for channel {channel} and small architecture are: ', sm_ch_time, ' +- ', sm_ch_sd)
-            cnn_ch_time, cnn_ch_sd = timing_inference_GPU(device, channel=channel, seq_len=1, sli_len=512, model=cnn)
-            y_cnn_time.append(cnn_ch_time)
-            y_cnn_sd.append(cnn_ch_sd)
-            print(f'Inference time mean and sd for channel {channel} and cnn architecture are: ', cnn_ch_time, ' +- ', cnn_ch_sd)
+            if models_loaded[0]:
+                lg_ch_time, lg_ch_sd = timing_inference_GPU(device, channel=channel, seq_len=64, sli_len=128, model=model_lg)
+                y_trans_lg_time.append(lg_ch_time)
+                y_trans_lg_sd.append(lg_ch_sd)
+                print(f'Inference time mean and sd for channel {channel} and large architecture are: ', lg_ch_time, ' +- ', lg_ch_sd)
+            if models_loaded[1]:
+                sm_ch_time, sm_ch_sd = timing_inference_GPU(device, channel=channel, seq_len=24, sli_len=64, model=model_sm)
+                y_trans_sm_time.append(sm_ch_time)
+                y_trans_sm_sd.append(sm_ch_sd)
+                print(f'Inference time mean and sd for channel {channel} and small architecture are: ', sm_ch_time, ' +- ', sm_ch_sd)
+            if models_loaded[2]:
+                cnn_ch_time, cnn_ch_sd = timing_inference_GPU(device, channel=channel, seq_len=1, sli_len=512, model=cnn)
+                y_cnn_time.append(cnn_ch_time)
+                y_cnn_sd.append(cnn_ch_sd)
+                print(f'Inference time mean and sd for channel {channel} and cnn architecture are: ', cnn_ch_time, ' +- ', cnn_ch_sd)
         print('---------------------------------------------')
         # Calculate total mean and sd
-        mean, sd = calculate_avg_time(np.array(y_trans_lg_time), np.array(y_trans_lg_sd))
-        print(f'Average inference time mean and sd for large architecture are: ', mean, ' +- ', sd)
-        mean, sd = calculate_avg_time(np.array(y_trans_sm_time), np.array(y_trans_sm_sd))
-        print(f'Average inference time mean and sd for small architecture are: ', mean, ' +- ', sd)
-        mean, sd = calculate_avg_time(np.array(y_cnn_time), np.array(y_cnn_sd))
-        print(f'Average inference time mean and sd for cnn architecture are: ', mean, ' +- ', sd)
+        if models_loaded[0]:
+            mean, sd = calculate_avg_time(np.array(y_trans_lg_time), np.array(y_trans_lg_sd))
+            print(f'Average inference time mean and sd for large architecture are: ', mean, ' +- ', sd)
+        if models_loaded[1]:
+            mean, sd = calculate_avg_time(np.array(y_trans_sm_time), np.array(y_trans_sm_sd))
+            print(f'Average inference time mean and sd for small architecture are: ', mean, ' +- ', sd)
+        if models_loaded[2]:
+            mean, sd = calculate_avg_time(np.array(y_cnn_time), np.array(y_cnn_sd))
+            print(f'Average inference time mean and sd for cnn architecture are: ', mean, ' +- ', sd)
