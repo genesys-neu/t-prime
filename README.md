@@ -24,9 +24,8 @@ unzip DATASET_1_0.zip -d data/
 To train and test our models, it is essential to distinguish between the three types of data at our disposal: simulated data acquired through MATLAB, data collected over the air (OTA), and data encompassing overlapping protocols. This differentiation is crucial because each data type undergoes distinct processing procedures facilitated by separate scripts.
 ### Simulated data
 #### Training procedure
-All T-PRIME specific transformer models are in the `TPrime_transformer/` folder.
 ##### Transformer models
-The main script `TPrime_transformer_train.py` can be used to train T-PRIME transformer architectures as follows:
+All T-PRIME specific transformer models are in the `TPrime_transformer/` folder. The main script `TPrime_transformer_train.py` can be used to train T-PRIME transformer architectures as follows:
 ```
 usage: TPrime_transformer_train.py [-h] [--snr_db SNR_DB [SNR_DB ...]] [--useRay] [--num-workers NUM_WORKERS] [--use-gpu] [--address ADDRESS] [--test] [--wchannel WCHANNEL] [--cp_path CP_PATH]
                                  [--cls_token] [--dataset_ratio DATASET_RATIO] [--Layers LAYERS] [--Epochs EPOCHS] [--Learning_rate LEARNING_RATE] [--Batch_size BATCH_SIZE]
@@ -138,13 +137,13 @@ optional arguments:
 - MCFormer: adapted from [official code](https://github.com/InterDigitalInc/Fireball/blob/8c98a40e6baba489ac9c028aa4fe71b2ae782f79/Playgrounds/MCformer/MCformer.ipynb)
 
 #### Testing procedure
-The script `preprocessing/TPrime_testing_SoTA.py`serves for testing all the different (T-PRIME LG and SM, CNN1D, AMCNet, ResNet and MCFormer) models with simulated data generated through MATLAB. It is used as follows:
+The script `preprocessing/TPrime_testing_SoTA.py` serves for testing all the different (T-PRIME LG and SM, CNN1D, ResNet, AMCNet, and MCFormer) models with simulated data generated through MATLAB. It is used as follows:
 ```
 TPrime_testing_SoTA.py [-h] [--experiment EXPERIMENT] [--normalize] [--use_gpu]
 ```
 The results will be saved in a file named test_results[experiment_extension].txt. The results for each architecture will be separated by the '%' character to facilitate later processing. For each architecture's results, you will find the testing accuracy for all four explored channel conditions (No channel, TGn, TGax, and Rayleigh) at different noise levels within the range of -30.0 to 30.0 dBs with 5.0 dBs increments. The order of the architectures in the results is the following: T-PRIME LG Trans., T-PRIME SM Trans., CNN1D, ResNet, AMCNet and MCFormer.
 
-An example of how to use this code is the following command:
+An example of how to use this script is the following command:
 ```
 TPrime_testing_SoTA.py --experiment 3 --normalize --use_gpu
 ```
@@ -161,7 +160,7 @@ optional arguments:
 
 ### OTA data
 To train and test the models with OTA data the script ```preprocessing/TPrime_finetune.py``` needs to be used. This option can only be used with T-PRIME models. There are two options for training the models with OTA data. These are training the model from scratch with this data, or fine-tuning a preexisting model. To fine-tune a model provide the correct path to the model and include the ```--retrain``` flag.
-ç#### Training procedure
+#### Training procedure
 The usage is described as follows:
 ```
 usage: TPrime_finetune.py [-h] [--model_path MODEL_PATH] [--ds_path DS_PATH]
@@ -176,12 +175,13 @@ usage: TPrime_finetune.py [-h] [--model_path MODEL_PATH] [--ds_path DS_PATH]
 The Large (LG) and Small (SM) implementations of T-PRIME can now be trained with OTA data with the following commands:
 - Large, LG (M=24, S=64)
 ```
-python3 TPrime_finetune.py --model_path=/PATH/TO/REPOSITORY/tprime/TPrime_transformer/model_cp/model_lg.pt --ds_path=/PATH/TO/REPOSITORY/tprime/data --datasets RM_573C_1 RM_573C_2 RM_142_1 RM_572C_1 RM_572C_2 --use_gpu --transformer_version v1 --transformer lg --test_mode=future --retrain --ota_dataset=otatag --RMSNorm --back_class 
+python3 TPrime_finetune.py --model_path=/PATH/TO/REPOSITORY/tprime/TPrime_transformer/model_cp/model_lg.pt --ds_path=/PATH/TO/REPOSITORY/tprime/data --datasets RM_573C_1 RM_573C_2 RM_142_1 RM_572C_1 RM_572C_2 --use_gpu --transformer_version v1 --transformer lg --test_mode=future --ota_dataset=otatag --RMSNorm --back_class 
 ```
 - Small, SM (M=64, S=128)
 ```
-python3 TPrime_finetune.py --model_path=/PATH/TO/REPOSITORY/tprime/TPrime_transformer/model_cp/model_lg.pt --ds_path=/PATH/TO/REPOSITORY/tprime/data --datasets RM_573C_1 RM_573C_2 RM_142_1 RM_572C_1 RM_572C_2 --use_gpu --transformer_version v1 --transformer sm --test_mode=future --retrain --ota_dataset=otatag --RMSNorm --back_class
+python3 TPrime_finetune.py --model_path=/PATH/TO/REPOSITORY/tprime/TPrime_transformer/model_cp/model_lg.pt --ds_path=/PATH/TO/REPOSITORY/tprime/data --datasets RM_573C_1 RM_573C_2 RM_142_1 RM_572C_1 RM_572C_2 --use_gpu --transformer_version v1 --transformer sm --test_mode=future --ota_dataset=otatag --RMSNorm --back_class
 ```
+Notice these two models would be trained from scratch as the ```--retrain``` option is not included.
 ###### Optional arguments
 ```
   -h, --help            show this help message and exit
