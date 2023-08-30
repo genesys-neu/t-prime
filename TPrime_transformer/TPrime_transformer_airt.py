@@ -4,7 +4,7 @@ import os
 proj_root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.join(os.pardir, os.pardir)))
 import sys
 sys.path.append(proj_root_dir)
-from dstl.preprocessing.TPrime_dataset import TPrimeDataset
+from preprocessing.TPrime_dataset import TPrimeDataset
 from model_transformer import TransformerModel
 
 def timing_inference_GPU(dummy_input, model):
@@ -57,14 +57,14 @@ for slice_len in [64, 128]:
     print("Mean (ms):", mean_ms, "Std ", std_ms)
 
     homedir=os.path.expanduser('~')
-    PATH = os.path.join(homedir, '/home/deepwave/Research/DSTL/dstl/TPrime_transformer/model_cp')
+    PATH = os.path.join(homedir, '/home/deepwave/Research/DSTL/t-prime/TPrime_transformer/model_cp')
     model_file_name = 'model.best_sm.pt' if slice_len == 64 else 'model.best_lg.pt'
     model_path = os.path.join(PATH, model_file_name)
     checkpoint = torch.load(model_path)
     model.load_state_dict(checkpoint['model_state_dict'])
     model.eval()
     SIZE = 'SMALL' if slice_len == 64 else 'LARGE'
-    ONNX_FILE_NAME = 'dstl_baseline_transformer_'+str(SIZE)+'.onnx'  # File name to save network
+    ONNX_FILE_NAME = 'TPrime_baseline_transformer_'+str(SIZE)+'.onnx'  # File name to save network
     INPUT_NODE_NAME = 'input_buffer'  # User defined name of input node
     OUTPUT_NODE_NAME = 'output_buffer'  # User defined name of output node
     ONNX_VERSION = 10  # the ONNX version to export the model to

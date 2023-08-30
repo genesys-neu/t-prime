@@ -2,7 +2,7 @@ import math
 import os
 from tempfile import TemporaryDirectory
 from typing import Tuple
-from dstl.preprocessing.TPrime_dataset import TPrimeDataset
+from preprocessing.TPrime_dataset import TPrimeDataset
 import torch
 from torch import nn, Tensor
 import torch.nn.functional as F

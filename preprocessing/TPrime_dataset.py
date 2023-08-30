@@ -118,7 +118,7 @@ class TPrimeDataset(Dataset):
             self.possible_channels = ['TGn', 'TGax', 'Rayleigh', 'relative', 'random']
             assert(self.apply_wchannel in self.possible_channels)
             self.channel_map = {}
-            from dstl.preprocessing.matutils import matutils
+            from preprocessing.matutils import matutils
             self.mateng = matutils.MatlabEngine()  # todo check if we need any custom paths
             # initialize each channel object for each protocol used
             self.chan_models = {}
