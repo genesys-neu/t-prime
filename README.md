@@ -43,11 +43,11 @@ usage: TPrime_transformer_train.py [-h] [--snr_db SNR_DB [SNR_DB ...]] [--useRay
 The Large (LG) and Small (SM) implementations of T-PRIME can be reproduced and trained with the following commands:
 - Large, LG (M=24, S=64)
 ```
-python3 TPrime_transformer_train.py --wchannel=random --snr_db=range --use-gpu --raw_path=../data/DATASET1_1 --cp_path=./model_cp --Layers=2 --Epochs=5 --Learning_rate=0.0002 --Batch_size=122 --Slice_length=64 --Sequence_length=24 --Positional_encoder=False 
+python3 TPrime_transformer_train.py --wchannel=random --snr_db=range --use-gpu --postfix=TransformerLG --raw_path=../data/DATASET1_1 --cp_path=./model_cp --Layers=2 --Epochs=5 --Learning_rate=0.0002 --Batch_size=122 --Slice_length=64 --Sequence_length=24 --Positional_encoder=False 
 ```
 - Small, SM (M=64, S=128)
 ```
-python3 TPrime_transformer_train.py --wchannel=random --snr_db=range --use-gpu --raw_path=../data/DATASET1_1 --cp_path=./model_cp --Layers=2 --Epochs=5 --Learning_rate=0.0002 --Batch_size=122 --Slice_length=128 --Sequence_length=64 --Positional_encoder=False
+python3 TPrime_transformer_train.py --wchannel=random --snr_db=range --use-gpu --postfix=TransformerSM --raw_path=../data/DATASET1_1 --cp_path=./model_cp --Layers=2 --Epochs=5 --Learning_rate=0.0002 --Batch_size=122 --Slice_length=128 --Sequence_length=64 --Positional_encoder=False
 ```
 ###### Arguments description
 ```
