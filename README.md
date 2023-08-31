@@ -292,6 +292,8 @@ With trained models in hand, this section will guide you through the deployment 
 conda env create -f ./conda-envs/TPrime_conda_env_airT.yaml
 conda activate your-env-name
 ```
+
+Additional instructions and environments are available from [DeepWave documentation](https://github.com/deepwavedigital/airstack-examples/tree/master/conda/environments).
 The next step is running real time classification. To do so use the following script:
 ```
 python3 Tprime_airT_run.py [--frequency] [--timeout] [--model_path] [--model_size] [--RMSNorm] [--tensorRT] [--protocols]
