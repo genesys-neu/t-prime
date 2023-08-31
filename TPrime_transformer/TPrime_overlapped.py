@@ -361,7 +361,7 @@ if __name__ == "__main__":
                     f"At least one detected: {(100 * any_correct):>0.1f}%, "
                     f"AUC: {roc_auc_score(trues, preds)} \n"
                     f"NOISE classifications: {(100 * sum(np.array(noise_preds))/len(noise_preds))} \n"
-                    f"Classification report: {classification_report(trues, convert(preds), labels=np.arange(5), target_names=labels, zero_division=0)}"
+                    f"Classification report: {classification_report(trues, convert(preds), labels=np.arange(len(labels)), target_names=labels, zero_division=0)}"
                 )
             elif ds_names[ds_ix].split(' ')[0] == 'DATASET3_2':
                 print(
@@ -370,14 +370,14 @@ if __name__ == "__main__":
                     f"At least one detected: {(100 * any_correct):>0.1f}%, "
                     f"AUC: {roc_auc_score([row[:4] for row in trues], [row[:4] for row in preds])} \n"
                     #no noise
-                    f"Classification report: {classification_report(trues, convert(preds), labels=np.arange(5), target_names=labels, zero_division=0)}"
+                    f"Classification report: {classification_report(trues, convert(preds), labels=np.arange(len(labels)), target_names=labels, zero_division=0)}"
                 )
             else:
                 print(
                     f"\n\nTest Error for dataset {ds_names[ds_ix]}: \n "
                     f"Exact accuracy: {(100 * correct):>0.1f}%, "
                     f"AUC: '-' \n"
-                    f"Classification report: {classification_report(trues, convert(preds), labels=np.arange(5), target_names=labels, zero_division=0)}"
+                    f"Classification report: {classification_report(trues, convert(preds), labels=np.arange(len(labels)), target_names=labels, zero_division=0)}"
                 )
             print('-------------------------------------------')
             print('-------------------------------------------')
@@ -392,8 +392,8 @@ if __name__ == "__main__":
                 f"At least one detected: {(100 * global_any_correct):>0.1f}%\n "
                 f"AUC: {roc_auc_score(global_trues, global_preds)} \n"
                 f"NOISE classifications: {(100 * sum(np.array(global_noise_preds))/len(global_noise_preds))} \n"
-                f"Classification report: {classification_report(global_trues, convert(global_preds), labels=np.arange(5), target_names=labels, zero_division=0)}"
-                f"Confusion matrices: {multilabel_confusion_matrix(global_trues, convert(global_preds), labels=np.arange(5))}"
+                f"Classification report: {classification_report(global_trues, convert(global_preds), labels=np.arange(len(labels)), target_names=labels, zero_division=0)}"
+                f"Confusion matrices: {multilabel_confusion_matrix(global_trues, convert(global_preds), labels=np.arange(len(labels)))}"
             )
             print('-------------------------------------------')
     else:
