@@ -163,7 +163,7 @@ def finetune(model, config, trained_model=None):
                     'model_state_dict': model.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
                     'loss': loss,
-                }, os.path.join(PATH, MODEL_NAME + '_overlap.pt')) #+ OTA_DATASET + '_' + TEST_FLAG + '_' + RMS_FLAG + NOISE_FLAG + '_ft.pt'))
+                }, os.path.join(PATH, MODEL_NAME + '.pt')) #+ '_overlap.pt')) #+ OTA_DATASET + '_' + TEST_FLAG + '_' + RMS_FLAG + NOISE_FLAG + '_ft.pt'))
             #best_cm = conf_matrix
         if epochs_wo_improvement > 12: # early stopping
             print('------------------------------------')
