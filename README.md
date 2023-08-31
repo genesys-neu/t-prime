@@ -189,11 +189,11 @@ usage: TPrime_finetune.py [-h] [--model_path MODEL_PATH] [--ds_path DS_PATH]
 The Large (LG) and Small (SM) implementations of T-PRIME can now be trained with OTA data with the following commands:
 - Large, LG (M=24, S=64)
 ```
-python3 TPrime_finetune.py --model_path=/PATH/TO/REPOSITORY/t-prime/TPrime_transformer/model_cp/model_lg.pt --ds_path=../data/DATASET3_0 --datasets RM_573C_1 RM_573C_2 RM_142_1 RM_572C_1 RM_572C_2 --use_gpu --transformer_version v1 --transformer lg --test_mode=future --ota_dataset=otatag --RMSNorm --back_class 
+python3 TPrime_finetune.py --model_path=/PATH/TO/REPOSITORY/t-prime/TPrime_transformer/model_cp/tprime_lg.pt --ds_path=../data/DATASET3_0 --datasets RM_573C_1 RM_573C_2 RM_142_1 RM_572C_1 RM_572C_2 --use_gpu --transformer_version v1 --transformer lg --test_mode=future --ota_dataset=ota_training --RMSNorm --back_class 
 ```
 - Small, SM (M=64, S=128)
 ```
-python3 TPrime_finetune.py --model_path=/PATH/TO/REPOSITORY/t-prime/TPrime_transformer/model_cp/model_lg.pt --ds_path=../data/DATASET3_0 --datasets RM_573C_1 RM_573C_2 RM_142_1 RM_572C_1 RM_572C_2 --use_gpu --transformer_version v1 --transformer sm --test_mode=future --ota_dataset=otatag --RMSNorm --back_class
+python3 TPrime_finetune.py --model_path=/PATH/TO/REPOSITORY/t-prime/TPrime_transformer/model_cp/tprime_sm.pt --ds_path=../data/DATASET3_0 --datasets RM_573C_1 RM_573C_2 RM_142_1 RM_572C_1 RM_572C_2 --use_gpu --transformer_version v1 --transformer sm --test_mode=future --ota_dataset=ota_training --RMSNorm --back_class
 ```
 Notice these two models would be trained from scratch as the ```--retrain``` option is not included.
 ###### Optional arguments
@@ -225,11 +225,11 @@ Notice these two models would be trained from scratch as the ```--retrain``` opt
 When using this script for testing, use the ```--test``` flag and avoid the ```--retrain``` one. The results will be saved in a file named results_finetune[dataset_and_model_flags].pdf. So the resulting commands are now:
 - Large, LG (M=24, S=64)
 ```
-python3 TPRIME_finetune.py --model_path=/PATH/TO/REPOSITORY/t-prime/TPrime_transformer/model_cp/model_lg.pt --ds_path=../data/DATASET3_0 --datasets RM_573C_1 RM_573C_2 RM_142_1 RM_572C_1 RM_572C_2 --use_gpu --transformer_version v1 --transformer lg --test_mode=future --ota_dataset=ota_tag --test --RMSNorm --back_class 
+python3 TPRIME_finetune.py --model_path=/PATH/TO/REPOSITORY/t-prime/TPrime_transformer/model_cp/tprime_lg.pt --ds_path=../data/DATASET3_0 --datasets RM_573C_1 RM_573C_2 RM_142_1 RM_572C_1 RM_572C_2 --use_gpu --transformer_version v1 --transformer lg --test_mode=future --ota_dataset=ota_testing --test --RMSNorm --back_class 
 ```
 - Small, SM (M=64, S=128)
 ```
-python3 TPrime_finetune.py --model_path=/PATH/TO/REPOSITORY/t-prime/TPrime_transformer/model_cp/model_lg.pt --ds_path=../data/DATASET3_0 --datasets RM_573C_1 RM_573C_2 RM_142_1 RM_572C_1 RM_572C_2 --use_gpu --transformer_version v1 --transformer sm --test_mode=future --ota_dataset=ota_tag --test --RMSNorm --back_class
+python3 TPrime_finetune.py --model_path=/PATH/TO/REPOSITORY/t-prime/TPrime_transformer/model_cp/tprime_sm.pt --ds_path=../data/DATASET3_0 --datasets RM_573C_1 RM_573C_2 RM_142_1 RM_572C_1 RM_572C_2 --use_gpu --transformer_version v1 --transformer sm --test_mode=future --ota_dataset=ota_testing --test --RMSNorm --back_class
 ```
 ### Overlapping data
 For the overlapping case, the script necessary to train and test is ```TPrime_transformer/TPrime_overlapped.py```. This option can only be used with T-PRIME transformer models. There are two options for training the models with overlapping data. These are training the model from scratch with this data, or fine-tuning a preexisting model. To fine-tune a model provide the correct path to the model and include the ```--retrain``` flag.
@@ -247,11 +247,11 @@ usage: TPrime_overlapped.py [-h] [--model_path MODEL_PATH] [--ds_path DS_PATH]
 The Large (LG) and Small (SM) implementations of T-PRIME can be trained with the overlapping data with the following commands:
 - Large, LG (M=24, S=64)
 ```
-python3 DSTL_overlapped.py --model_path=/PATH/TO/REPOSITORY/t-prime/TPrime_transformer/model_cp/model_lg_name.pt --ds_path=../data --datasets DATASET3_1 DATASET3_0/RM_573C_1 DATASET3_0/RM_573C_2 DATASET3_0/RM_573C_power DATASET3_0/RM_142_1 DATASET3_0/RM_142_2 DATASET3_0/RM_572C_1 DATASET3_0/RM_572C_2 --use_gpu --transformer lg --test_mode=future --ota_dataset=ota_tag --RMSNorm --back_class
+python3 DSTL_overlapped.py --model_path=/PATH/TO/REPOSITORY/t-prime/TPrime_transformer/model_cp/tprime_lg_ov.pt --ds_path=../data --datasets DATASET3_2 DATASET3_1 DATASET3_0/RM_573C_1 DATASET3_0/RM_573C_2 DATASET3_0/RM_573C_power DATASET3_0/RM_142_1 DATASET3_0/RM_142_2 DATASET3_0/RM_572C_1 DATASET3_0/RM_572C_2 --use_gpu --transformer lg --test_mode=future --ota_dataset=ota_overlap_training --RMSNorm --back_class
 ```
 - Small, SM (M=64, S=128)
 ```
-python3 DSTL_overlapped.py --model_path=/PATH/TO/REPOSITORY/t-prime/TPrime_transformer/model_cp/model_lg_name.pt --ds_path=../data --datasets DATASET3_1 DATASET3_0/RM_573C_1 DATASET3_0/RM_573C_2 DATASET3_0/RM_573C_power DATASET3_0/RM_142_1 DATASET3_0/RM_142_2 DATASET3_0/RM_572C_1 DATASET3_0/RM_572C_2 --use_gpu --transformer sm --test_mode=future --ota_dataset=ota_tag --RMSNorm --back_class
+python3 DSTL_overlapped.py --model_path=/PATH/TO/REPOSITORY/t-prime/TPrime_transformer/model_cp/tprime_sm_ov.pt --ds_path=../data --datasets DATASET3_2 DATASET3_1 DATASET3_0/RM_573C_1 DATASET3_0/RM_573C_2 DATASET3_0/RM_573C_power DATASET3_0/RM_142_1 DATASET3_0/RM_142_2 DATASET3_0/RM_572C_1 DATASET3_0/RM_572C_2 --use_gpu --transformer sm --test_mode=future --ota_dataset=ota_overlap_training --RMSNorm --back_class
 ```
 ###### Optional arguments
 ```
@@ -279,11 +279,11 @@ python3 DSTL_overlapped.py --model_path=/PATH/TO/REPOSITORY/t-prime/TPrime_trans
 When using this script for testing, use the ```--test``` flag and avoid the ```--retrain``` one. The results will be outputed in the terminal. Since it is the overlapping case several metrics can be evaluated. These are: AUC of the classifier, exact accuracy (prediction and ground truth is exactly the same), soft accuracy (detecting at least one protocol correctly) and other metrics per class. The resulting commands are:
 - Large, LG (M=24, S=64)
 ```
-python3 DSTL_overlapped.py --model_path=/PATH/TO/REPOSITORY/t-prime/TPrime_transformer/model_cp/model_lg_name.pt --ds_path=../data --datasets DATASET3_1 DATASET3_0/RM_573C_1 DATASET3_0/RM_573C_2 DATASET3_0/RM_573C_power DATASET3_0/RM_142_1 DATASET3_0/RM_142_2 DATASET3_0/RM_572C_1 DATASET3_0/RM_572C_2 --use_gpu --transformer lg --test_mode=future --ota_dataset=ota_tag --test --RMSNorm --back_class
+python3 DSTL_overlapped.py --model_path=/PATH/TO/REPOSITORY/t-prime/TPrime_transformer/model_cp/tprime_lg_ov.pt --ds_path=../data --datasets DATASET3_2 DATASET3_1 DATASET3_0/RM_573C_1 DATASET3_0/RM_573C_2 DATASET3_0/RM_573C_power DATASET3_0/RM_142_1 DATASET3_0/RM_142_2 DATASET3_0/RM_572C_1 DATASET3_0/RM_572C_2 --use_gpu --transformer lg --test_mode=future --ota_dataset=ota_overlap_testing --test --RMSNorm --back_class
 ```
 - Small, SM (M=64, S=128)
 ```
-python3 DSTL_overlapped.py --model_path=/PATH/TO/REPOSITORY/t-prime/TPrime_transformer/model_cp/model_lg_name.pt --ds_path=../data --datasets DATASET3_1 DATASET3_0/RM_573C_1 DATASET3_0/RM_573C_2 DATASET3_0/RM_573C_power DATASET3_0/RM_142_1 DATASET3_0/RM_142_2 DATASET3_0/RM_572C_1 DATASET3_0/RM_572C_2 --use_gpu --transformer sm --test_mode=future --ota_dataset=ota_tag --test --RMSNorm --back_class
+python3 DSTL_overlapped.py --model_path=/PATH/TO/REPOSITORY/t-prime/TPrime_transformer/model_cp/tprime_sm_ov.pt --ds_path=../data --datasets DATASET3_2 DATASET3_1 DATASET3_0/RM_573C_1 DATASET3_0/RM_573C_2 DATASET3_0/RM_573C_power DATASET3_0/RM_142_1 DATASET3_0/RM_142_2 DATASET3_0/RM_572C_1 DATASET3_0/RM_572C_2 --use_gpu --transformer sm --test_mode=future --ota_dataset=ota_overlap_testing --test --RMSNorm --back_class
 ```
 
 ## Execution Pipeline
