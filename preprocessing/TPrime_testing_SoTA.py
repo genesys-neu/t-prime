@@ -21,8 +21,6 @@ from baseline_models.model_LSTM import LSTM_ap
 supported_outmode = ['real', 'complex', 'real_invdim', 'real_ampphase'] # has to be same as in TPrime_torch_train
 
 # CONFIG
-TEST_DATA_PATH = '../data/DSTL_DATASET_1_1_TEST'
-
 TRANS_PATH = '../TPrime_transformer/model_cp'
 CNN_PATH = '../baseline_models/results_slice512'
 MODELS = ["Trans. (64 x 128) [6.8M params]", "Trans. (24 x 64) [1.6M params]", "CNN (1 x 512) [4.1M params]"]
@@ -216,7 +214,9 @@ if __name__ == "__main__":
                          specific noise and channel conditions, 2 is for models specifically trained for a channel, 3 is for single model for all channel and noise conditions (with SoTA models comparison) and 4 is for inference time analysis")
     parser.add_argument("--normalize", action='store_true', default=False, help="Use a layer norm as a first layer for CNN")
     parser.add_argument("--use_gpu", action='store_true', default=False, help="Use gpu for inference")
+    parser.add_argument("--test_path", default='../data/DATASET1_1_TEST', help="Path to the dataset that will be used for testing. DATASET1_1_TEST contains the necessary data to test these models.")
     args, _ = parser.parse_known_args()
+    TEST_DATA_PATH = args.test_path
     class_map = dict(zip(PROTOCOLS, range(len(PROTOCOLS))))
     norm_flag = '.norm' if args.normalize else ''
     device = torch.device("cuda" if torch.cuda.is_available() and args.use_gpu else "cpu")
