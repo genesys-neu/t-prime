@@ -19,4 +19,16 @@ Overview of all datasets (DS) collected in this work. DS 1.0 and DS 1.1 consist 
 | 3.4 | OTA        | NI-API / AIR-T   | Single protocol | 700 for each protocol                 | Additional OTA collection (excluded from results)     | [DATASET3_4_1.zip](https://northeastern-my.sharepoint.com/:u:/r/personal/sioannidis_northeastern_edu/Documents/DSTL-NU%20OneDrive/Datasets/DATASET3_4_1.zip?csf=1&web=1&e=e5ogGL) [DATASET3_4_2.zip](https://northeastern-my.sharepoint.com/:u:/r/personal/sioannidis_northeastern_edu/Documents/DSTL-NU%20OneDrive/Datasets/DATASET3_4_2.zip?csf=1&web=1&e=gi364u) |
 
 
-
+Once the desired dataset .zip file has been downloade, the following command can be used to unzip the dataset folders into `data/` folder:
+```
+unzip <dataset filename>.zip -d data/
+```
+The resulting structure of `data/` will look like this:
+```
+data/
+├── ...
+├── DATASET1_1
+├── DATASET1_1_TEST
+├── ...
+└── README.md
+```
