@@ -72,11 +72,10 @@ def train(model, criterion, optimizer, dataloader, RMSnorm_layer=None):
     correct /= size
     return correct*100.0, total_loss
 
-def validate(model, criterion, dataloader, nclasses, RMSnorm_layer=None):
+def validate(model, criterion, dataloader, RMSnorm_layer=None):
     size = len(dataloader.dataset)
     model.eval()
     test_loss, correct = 0, 0
-    #conf_matrix = np.zeros((nclasses, nclasses))
     with torch.no_grad():
         for X, y in dataloader:
             X = X.to(device)
@@ -150,7 +149,7 @@ def finetune(model, config, trained_model=None):
         acc, loss = train(model, criterion, optimizer, train_dataloader, RMSnorm_layer=RMSNorm_l)
         train_acc.append(acc)
         print(f'| epoch {epoch:03d} | train accuracy={acc:.1f}%, train loss={loss:.2f}')
-        acc, loss = validate(model, criterion, test_dataloader, config['nClasses'], RMSnorm_layer=RMSNorm_l)
+        acc, loss = validate(model, criterion, test_dataloader, RMSnorm_layer=RMSNorm_l)
         test_acc.append(acc)
         print(f'| epoch {epoch:03d} | valid accuracy={acc:.1f}%, valid loss={loss:.2f} (test)')
         scheduler.step(loss)
@@ -225,7 +224,6 @@ if __name__ == "__main__":
         'batchSize': 122,
         'lr': 0.00002,
         'epochs': 100,
-        'nClasses': 7, #len(PROTOCOLS),
         'retrain': args.retrain,
         'RMSNorm': args.RMSNorm
     }
