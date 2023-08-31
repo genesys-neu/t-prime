@@ -6,6 +6,7 @@ Before getting started, make sure you have the required dependencies installed. 
 1. Clone this repository to your local machine:
 ```
 git clone https://github.com/genesys-neu/t-prime.git
+cd t-prime/
 ```
 2. Create a Conda environment and install the required packages:
 ```
