@@ -225,7 +225,7 @@ Notice these two models would be trained from scratch as the ```--retrain``` opt
 When using this script for testing, use the ```--test``` flag and avoid the ```--retrain``` one. The results will be saved in a file named results_finetune[dataset_and_model_flags].pdf. So the resulting commands are now:
 - Large, LG (M=24, S=64)
 ```
-python3 TPRIME_finetune.py --model_path=/PATH/TO/REPOSITORY/t-prime/TPrime_transformer/model_cp/tprime_lg.pt --ds_path=../data/DATASET3_0 --datasets RM_573C_1 RM_573C_2 RM_142_1 RM_572C_1 RM_572C_2 --use_gpu --transformer_version v1 --transformer lg --test_mode=future --ota_dataset=ota_testing --test --RMSNorm --back_class 
+python3 TPrime_finetune.py --model_path=/PATH/TO/REPOSITORY/t-prime/TPrime_transformer/model_cp/tprime_lg.pt --ds_path=../data/DATASET3_0 --datasets RM_573C_1 RM_573C_2 RM_142_1 RM_572C_1 RM_572C_2 --use_gpu --transformer_version v1 --transformer lg --test_mode=future --ota_dataset=ota_testing --test --RMSNorm --back_class 
 ```
 - Small, SM (M=64, S=128)
 ```
