@@ -204,6 +204,7 @@ if __name__ == "__main__":
     parser.add_argument("--wchannel", default=None, help="Wireless channel to be applied, it can be"
                                                          "TGn, TGax, Rayleigh, relative or random.")
     parser.add_argument('--raw_path', default='../data/DATASET1_1', help='Path where raw signals are stored.')
+    parser.add_argument('--postfix', default='', help='Postfix to append to dataset file.')
     parser.add_argument("--cp_path", default='./model_cp', help='Path to the checkpoint to save/load the model.')
     parser.add_argument("--cls_token", action="store_true", default=False, help="Use the Transformer v2")
     parser.add_argument("--dataset_ratio", default=1.0, type=float, help="Portion of the dataset used for training and validation.")
@@ -235,9 +236,9 @@ if __name__ == "__main__":
         "Positional encoder": args.Positional_encoder
     }
     protocols = ['802_11ax', '802_11b_upsampled', '802_11n', '802_11g']
-    ds_train = TPrimeDataset_Transformer(protocols=protocols, ds_type='train', ds_path=exp_config["raw_path"], snr_dbs=args.snr_db, seq_len=exp_config["Sequence length"], slice_len=exp_config["Slice length"], slice_overlap_ratio=0, raw_data_ratio=args.dataset_ratio,
+    ds_train = TPrimeDataset_Transformer(protocols=protocols, ds_type='train', file_postfix=args.postfix, ds_path=exp_config["raw_path"], snr_dbs=args.snr_db, seq_len=exp_config["Sequence length"], slice_len=exp_config["Slice length"], slice_overlap_ratio=0, raw_data_ratio=args.dataset_ratio,
             override_gen_map=True, apply_wchannel=args.wchannel, transform=chan2sequence)
-    ds_test = TPrimeDataset_Transformer(protocols=protocols, ds_type='test', ds_path=exp_config["raw_path"], snr_dbs=args.snr_db, seq_len=exp_config["Sequence length"], slice_len=exp_config["Slice length"], slice_overlap_ratio=0, raw_data_ratio=args.dataset_ratio,
+    ds_test = TPrimeDataset_Transformer(protocols=protocols, ds_type='test', file_postfix=args.postfix, ds_path=exp_config["raw_path"], snr_dbs=args.snr_db, seq_len=exp_config["Sequence length"], slice_len=exp_config["Slice length"], slice_overlap_ratio=0, raw_data_ratio=args.dataset_ratio,
             override_gen_map=False, apply_wchannel=args.wchannel, transform=chan2sequence)
 
     if not os.path.isdir(args.cp_path):
