@@ -148,13 +148,13 @@ optional arguments:
 #### Testing procedure
 The script `preprocessing/TPrime_testing_SoTA.py` serves for testing all the different (T-PRIME LG and SM, CNN1D, ResNet, AMCNet, and MCFormer) models with simulated data generated through MATLAB. It is used as follows:
 ```
-TPrime_testing_SoTA.py [-h] [--experiment EXPERIMENT] [--normalize] [--use_gpu]
+TPrime_testing_SoTA.py [-h] [--experiment EXPERIMENT] [--normalize] [--use_gpu] [--test_path]
 ```
 The results will be saved in a file named test_results[experiment_extension].txt. The results for each architecture will be separated by the '%' character to facilitate later processing. For each architecture's results, you will find the testing accuracy for all four explored channel conditions (No channel, TGn, TGax, and Rayleigh) at different noise levels within the range of -30.0 to 30.0 dBs with 5.0 dBs increments. The order of the architectures in the results is the following: T-PRIME LG Trans., T-PRIME SM Trans., CNN1D, ResNet, AMCNet and MCFormer.
 
 An example of how to use this script is the following command:
 ```
-TPrime_testing_SoTA.py --experiment 3 --normalize --use_gpu
+TPrime_testing_SoTA.py --experiment 3 --normalize --use_gpu --test_path ../data/DATASET1_1_TEST
 ```
 ###### Arguments description
 When selecting the experiment number, 1 and 2 and 4 are only implemented to work with T-PRIME architectures.
@@ -165,6 +165,7 @@ optional arguments:
                         3 is for single model for all channel and noise conditions (with SoTA models comparison) and 4 is for inference time analysis (default: 3)
   --normalize           Use a layer norm as a first layer for CNN (default: False)
   --use-gpu             [DEPRECATED] Use gpu for inference (default: True)
+  --test_path           Path to the dataset that will be used for testing. DATASET1_1_TEST contains the necessary data to test these models (default: '../data/DATASET1_1_TEST')
 ```
 
 ### OTA data
