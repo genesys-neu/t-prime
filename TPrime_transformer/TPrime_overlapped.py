@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 from preprocessing.TPrime_dataset import TPrimeDataset_Transformer, TPrimeDataset_Transformer_overlap
 from TPrime_transformer.model_transformer import TransformerModel, TransformerModel_multiclass, TransformerModel_multiclass_transfer
-from cnn_baseline.model_cnn1d import Baseline_CNN1D
+from baseline_models.model_cnn1d import Baseline_CNN1D
 from preprocessing.model_rmsnorm import RMSNorm
 from sklearn.metrics import roc_auc_score, classification_report, multilabel_confusion_matrix
 
