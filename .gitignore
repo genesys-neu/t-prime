@@ -1,3 +1,15 @@
 /baseline_models/wandb/
 /dstl_transformer/
 /baseline_models/wandb/latest-run/
+/baseline_models/best_baseline_models/
+/baseline_models/results_AMCNet/
+/baseline_models/results_MCformer_largekernel/
+/baseline_models/results_ResNet/
+/baseline_models/results_slice512/
+/baseline_models/__pycache__/
+/data/
+/preprocessing/__pycache__/
+/TPrime_transformer/__pycache__/
+/TPrime_transformer/best_t-prime/
+/TPrime_transformer/wandb/
+
