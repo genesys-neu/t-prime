@@ -9,6 +9,7 @@
 /baseline_models/__pycache__/
 /data/
 /preprocessing/__pycache__/
+/preprocessing/matutils/__pycache__/
 /TPrime_transformer/__pycache__/
 /TPrime_transformer/best_t-prime/
 /TPrime_transformer/wandb/
