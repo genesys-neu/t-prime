@@ -86,7 +86,7 @@ class MCformer(nn.Module):
         #x = x[:, :4, :].contiguous().view(-1, 128 * 32)
         x = x[:, :, :4]
         x = self.flatten(x)
-        # print(x.shape)
+        
         # Fully connected layers
         x = self.fc1(x)
         x = self.selu(x)

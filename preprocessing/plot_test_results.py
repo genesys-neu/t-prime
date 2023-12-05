@@ -6,19 +6,29 @@ import seaborn as sns
 import os
 
 os.makedirs('plots', exist_ok=True)
+test_path = './test_results/'
+
+dir_list = os.listdir(test_path)
+
+cnn_path = test_path + [s for s in dir_list if 'cnn' in s][0]
+lg_path = test_path + [s for s in dir_list if 'lg' in s][0]
+sm_path = test_path + [s for s in dir_list if 'sm' in s][0]
+amcnet_path = test_path + [s for s in dir_list if 'amcnet' in s][0]
+resnet_path = test_path + [s for s in dir_list if 'resnet' in s][0]
+mcformer_path = test_path + [s for s in dir_list if 'mcformer' in s][0]
 
 # Load the results
-with open('test_results_uniformdist_onemodel_lg.norm.pkl', 'rb') as f:
+with open(lg_path, 'rb') as f:
     lg = pickle.load(f)
-with open('test_results_uniformdist_onemodel_sm.norm.pkl', 'rb') as f:
+with open(sm_path, 'rb') as f:
     sm = pickle.load(f)
-with open('test_results_uniformdist_onemodel_cnn.norm.pkl', 'rb') as f:
+with open(cnn_path, 'rb') as f:
     cnn = pickle.load(f)
-with open('test_results_uniformdist_onemodel_resnet.norm.pkl', 'rb') as f:
+with open(resnet_path, 'rb') as f:
     resnet = pickle.load(f)
-with open('test_results_uniformdist_onemodel_amcnet.norm.pkl', 'rb') as f:
+with open(amcnet_path, 'rb') as f:
     amcnet = pickle.load(f)
-with open('test_results_uniformdist_onemodel_mcformer.norm.pkl', 'rb') as f:
+with open(mcformer_path, 'rb') as f:
     mcformer = pickle.load(f)
 
 total_lg = np.sum(lg, axis=1)/len(lg.columns)

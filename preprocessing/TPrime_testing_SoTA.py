@@ -306,9 +306,9 @@ if __name__ == "__main__":
         print("The models that have not been loaded will appear as empty lists in the results.")
         try:
             # model_lg = TransformerModel(classes=len(PROTOCOLS), d_model=128*2, seq_len=256, nlayers=2, use_pos=False)
-            # model_lg.load_state_dict(torch.load(f"{TRANS_PATH}/modelrandom_range_large_best.pt", map_location=device)['model_state_dict'])
+            # model_lg.load_state_dict(torch.load(f"{TRANS_PATH}/modelrandom_range_best.pt", map_location=device)['model_state_dict'])
             model_lg = TransformerModel(classes=len(PROTOCOLS), d_model=128*2, seq_len=64, nlayers=2, use_pos=False)
-            model_lg.load_state_dict(torch.load(f"{TRANS_PATH}/modelrandom_range_large_final_best.pt", map_location=device)['model_state_dict'])
+            model_lg.load_state_dict(torch.load(f"{TRANS_PATH}/modelrandom_range_lg.pt", map_location=device)['model_state_dict'])
             
             model_lg.eval()
             if args.use_gpu:
@@ -318,7 +318,7 @@ if __name__ == "__main__":
             print(f"LG model not found, the model name should be modelrandom_lg.pt and be placed at {TRANS_PATH}.")
         try:
             model_sm = TransformerModel(classes=len(PROTOCOLS), d_model=64*2, seq_len=24, nlayers=2, use_pos=False)
-            model_sm.load_state_dict(torch.load(f"{TRANS_PATH}/modelrandom_range_small_best.pt", map_location=device)['model_state_dict'])
+            model_sm.load_state_dict(torch.load(f"{TRANS_PATH}/modelrandom_range_sm.pt", map_location=device)['model_state_dict'])
             model_sm.eval()
             if args.use_gpu:
                 model_sm.cuda()
@@ -409,12 +409,17 @@ if __name__ == "__main__":
         amcnet = pd.DataFrame(y_amcnet, index=CHANNELS, columns=SNR).transpose()
         mcformer = pd.DataFrame(y_mcformer, index=CHANNELS, columns=SNR).transpose()
 
-        lg.to_pickle(f'test_results_uniformdist_onemodel_lg{norm_flag}.pkl')
-        sm.to_pickle(f'test_results_uniformdist_onemodel_sm{norm_flag}.pkl')
-        cnn.to_pickle(f'test_results_uniformdist_onemodel_cnn{norm_flag}.pkl')
-        resnet.to_pickle(f'test_results_uniformdist_onemodel_resnet{norm_flag}.pkl')
-        amcnet.to_pickle(f'test_results_uniformdist_onemodel_amcnet{norm_flag}.pkl')
-        mcformer.to_pickle(f'test_results_uniformdist_onemodel_mcformer{norm_flag}.pkl')
+        save_path = f'./test_results/'
+
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
+        
+        lg.to_pickle(f'{save_path}test_results_uniformdist_onemodel_lg{norm_flag}.pkl')
+        sm.to_pickle(f'{save_path}test_results_uniformdist_onemodel_sm{norm_flag}.pkl')
+        cnn.to_pickle(f'{save_path}test_results_uniformdist_onemodel_cnn{norm_flag}.pkl')
+        resnet.to_pickle(f'{save_path}test_results_uniformdist_onemodel_resnet{norm_flag}.pkl')
+        amcnet.to_pickle(f'{save_path}test_results_uniformdist_onemodel_amcnet{norm_flag}.pkl')
+        mcformer.to_pickle(f'{save_path}test_results_uniformdist_onemodel_mcformer{norm_flag}.pkl')
 
         # with open(f'test_results_uniformdist_onemodel{norm_flag}.txt', 'w') as f:
         #     f.write(str(y_trans_lg) + '%' + str(y_trans_sm) + '%' + str(y_cnn) + '%' + str(y_resnet) + '%' + str(y_amcnet) + '%' + str(y_mcformer))
