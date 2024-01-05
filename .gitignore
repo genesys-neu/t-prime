@@ -10,6 +10,7 @@
 /data/
 /preprocessing/__pycache__/
 /preprocessing/matutils/__pycache__/
+/preprocessing/plots/
 /TPrime_transformer/__pycache__/
 /TPrime_transformer/best_t-prime/
 /TPrime_transformer/wandb/
