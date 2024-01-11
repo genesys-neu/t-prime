@@ -17,7 +17,7 @@ conda env create --name t-prime --file ./conda-envs/TPrime_conda_env_training.ym
 conda activate t-prime
 ```
 ## Datasets
-All datasets can be found on the shared [OneDrive](https://northeastern-my.sharepoint.com/:f:/r/personal/sioannidis_northeastern_edu/Documents/DSTL-NU%20OneDrive/Datasets?csf=1&web=1&e=RDViVZ).
+All [datasets](https://repository.library.northeastern.edu/collections/neu:h989s847q) have been publicly released on Northeastern University's Digital Repository Service.
 
 The following command can be used to unzip the dataset folders into `data/` folder:
 ```
