@@ -10,7 +10,7 @@ cd t-prime/
 ```
 2. Create a Conda environment and install the required packages:
 ```
-conda env create --name t-prime --file ./conda-envs/TPrime_conda_env_training.yml
+conda env create --name t-prime --file ./conda-envs/TPrime_conda_env_training__nobuilds.yaml
 ```
 3. Activate the newly created Conda environment:
 ```
