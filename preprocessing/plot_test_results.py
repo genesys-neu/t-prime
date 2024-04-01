@@ -7,6 +7,8 @@ import os
 
 os.makedirs('plots', exist_ok=True)
 test_path = './test_results/'
+title_size = 68
+ticks_size = 54
 
 dir_list = os.listdir(test_path)
 
@@ -55,12 +57,12 @@ for channel in lg.columns:
     plt.plot(amcnet[channel], label='AMCNet', color='darkslategray', marker='P', linestyle='--', markersize=24)
     plt.plot(resnet[channel], label='ResNet', color='indigo', marker='d', linestyle='--', markersize=24)
     plt.plot(mcformer[channel], label='MCFormer', color='mediumseagreen', marker='X', linestyle='--', markersize=24)
-    plt.title(channel, fontsize=72)
+    plt.title(channel, fontsize=title_size)
     plt.grid()
-    plt.xticks(fontsize=54)
-    plt.yticks(np.arange(0, 101, 50), fontsize=54)
-    plt.xlabel('SNR(dBs)', fontsize=54)
-    plt.ylabel('Accuracy(%)', fontsize=54)
+    plt.xticks(fontsize=ticks_size)
+    plt.yticks(np.arange(0, 101, 50), fontsize=ticks_size)
+    plt.xlabel('SNR(dBs)', fontsize=ticks_size)
+    plt.ylabel('Accuracy(%)', fontsize=ticks_size)
     plt.legend(loc="lower center", ncol=6, bbox_to_anchor=(0.5, 0), fontsize=21)
     if channel == 'No channel applied':
         plt.savefig(f'plots/no_channel.pdf', format="pdf", bbox_inches="tight")
@@ -76,12 +78,12 @@ plt.plot(total_cnn, label='CNN', color='goldenrod', marker='o', markersize=24)
 plt.plot(total_amcnet, label='AMCNet', color='darkslategray', marker='P', linestyle='--', markersize=24)
 plt.plot(total_resnet, label='ResNet', color='indigo', marker='d', linestyle='--', markersize=24)
 plt.plot(total_mcformer, label='MCFormer', color='mediumseagreen', marker='X', linestyle='--', markersize=24)
-plt.title('Avg. of all channels', fontsize=72)
+plt.title('Avg. of all channels', fontsize=title_size/2)
 plt.grid()
-plt.xticks(fontsize=54)
-plt.yticks(np.arange(0, 101, 20), fontsize=54)
-plt.xlabel('SNR(dBs)', fontsize=54)
-plt.ylabel('Accuracy(%)', fontsize=54)
+plt.xticks(fontsize=ticks_size/2)
+plt.yticks(np.arange(0, 101, 20), fontsize=ticks_size/2)
+plt.xlabel('SNR(dBs)', fontsize=ticks_size/2)
+plt.ylabel('Accuracy(%)', fontsize=ticks_size/2)
 plt.legend(loc="lower center", ncol=6, bbox_to_anchor=(0.5, 0), fontsize=21)
 plt.savefig(f'plots/average.pdf', format="pdf", bbox_inches="tight")
 
