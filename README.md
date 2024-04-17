@@ -318,4 +318,50 @@ streamlit run GUI.py
 ```
 
 
+## OTA Data Capture and Processing Script
+
+This Python script captures radio frequency (RF) signals using the AIR-T software-defined radio (SDR) device and processes them for further analysis. The captured data can be used for various purposes such as wireless communication research, signal analysis, and machine learning.
+
+### Requirements
+
+- Python 3.x
+- SoapySDR library
+- NumPy
+- SciPy
+- Matplotlib
+
+### Usage
+
+The script `OTA_capture.py` provides functionalities to capture RF signals and save them to files for later analysis. Below are the available options:
+
+- **-nf, --nfiles**: Number of files to capture, each file is approximately 10ms long.
+- **-fq, --frequency**: Center frequency for capturing signals. Default is set to 2.457 GHz.
+- **-p, --plot**: Flag to plot a spectrogram of the last file captured.
+- **-s, --standard**: Specify the 802.11 standard. Results will be saved to a specific directory based on the standard.
+- **-d, --directory**: Directory to save captures. Default is `/home/deepwave/Research/DSTL/OTA_dataset`.
+
+Example usage:
+
+```
+python capture_and_process.py --nfiles 10 --frequency 2.4e9 --plot
+```
+This command will capture 10 files, each approximately 10ms long, at a center frequency of 2.4 GHz and plot the spectrogram of the last captured file.
+
+### File Structure
+
+The captured files are saved in binary format (.bin) and named with a timestamp prefix. The files are saved in the specified directory, with subdirectories created based on the specified 802.11 standard.
+
+### Signal Processing
+
+The script performs the following signal processing steps:
+
+1. **Receive Signal**: Initializes the AIR-T receiver using SoapyAIRT, sets up the stream, and starts streaming samples.
+2. **Process Signal**: Converts received samples to complex numbers, applies a low-pass filter, and resamples the signal.
+3. **Save Signal**: Saves the processed signal to binary files in the specified directory.
+4. **Plot Spectrogram**: If the `--plot` option is enabled, plots the spectrogram of the captured signal using Matplotlib.
+
+### Notes
+
+- Ensure that the AIR-T device is properly connected and configured before running the script.
+- Adjust the script parameters according to your specific requirements, such as the number of files to capture and the center frequency.
 
