@@ -2,15 +2,16 @@
 %model, just vanilla signal. 2k samples for each. Run from
 %/home/genesys/Downloads/Stratis_Kaushik_Proposal/dataset1_0' directory 
 
-% trainDir = fullfile(pwd,'802_11ax');
-trainDir = fullfile('/media/genesys/Seagate Portable Drive/test_data_1_1/802_11ax');
+trainDir = fullfile(pwd,'802_11ax');
+mkdir(trainDir);
+%trainDir = fullfile('/media/genesys/Seagate Portable Drive/test_data_1_1/802_11ax');
 frameNo = 1;
 row_count = 1;
 
 % Generating 802.11ax waveform
 % 802.11ax configuration
 for frameNo = 1:250 % first 1000 is 1/2 rate , 2nd 1000 is 3/4 rate
-
+    % default GuardInterval 3.2 us
     heSUCfg = wlanHESUConfig('ChannelBandwidth', 'CBW20', ...
         'NumTransmitAntennas', 1, ...
         'NumSpaceTimeStreams', 1, ...

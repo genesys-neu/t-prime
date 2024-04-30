@@ -4,7 +4,9 @@
 %model, just vanilla signal. 2k samples for each. Run from
 %/home/genesys/Downloads/Stratis_Kaushik_Proposal/dataset1_0' directory 
 
-trainDir = fullfile('/media/genesys/Seagate Portable Drive/test_data_1_1/802_11g');
+trainDir = fullfile(pwd,'802_11g');
+mkdir(trainDir);
+%trainDir = fullfile('/media/genesys/Seagate Portable Drive/test_data_1_1/802_11g');
 frameNo = 1;
 row_count = 1;
 
