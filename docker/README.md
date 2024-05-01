@@ -38,5 +38,22 @@ Once the docker container has started, run the following command to resolve the 
 ```
 source docker/setup_env.sh
 ```
-
+If USRP is connected via USB (i.e., B200, B210), run the following command to enable USB connection:
+```
+sh docker/setup_usb.sh
+```
+Test visibility of USRP device with following command:
+```
+$ uhd_find_devices 
+[INFO] [UHD] linux; GNU C++ version 11.4.0; Boost_107400; DPDK_21.11; UHD_4.5.0.HEAD-0-g471af98f
+--------------------------------------------------
+-- UHD Device 0
+--------------------------------------------------
+Device Address:
+    serial: 30AF824
+    name: 
+    product: B205mini
+    type: b200
+```
+ 
 

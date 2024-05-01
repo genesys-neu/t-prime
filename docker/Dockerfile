@@ -22,4 +22,8 @@ RUN ldconfig
 
 #install SoapyUHD
 RUN cd $HOME/workarea && git clone https://github.com/pothosware/SoapyUHD.git && cd SoapyUHD && mkdir build && cd build && cmake .. && make -j `nproc` && make install -j`nproc`
+# missing dependency for T-PRIME
 RUN pip install pycuda
+RUN apt install -y usbutils
+
+RUN uhd_images_downloader
