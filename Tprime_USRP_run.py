@@ -42,7 +42,7 @@ t_out = 60
 def receiver(rx_driver, rx_type):
     rx_chan = 0  # RX1 = 0, RX2 = 1
 
-    use_agc = True  # Use or don't use the AGC
+    use_agc = False  # Use or don't use the AGC
     timeout_us = int(5e6)
     time_avg = 0
 
@@ -51,10 +51,12 @@ def receiver(rx_driver, rx_type):
     #enumerate devices
     results = SoapySDR.Device.enumerate()   # TODO UHD device don't show up, but it shows up in the normal terminal with ipython
     for result in results: print(result)
+    print("[RECEIVER] RX_DRIVER:", rx_driver, "RX_TYPE", rx_type)
     args_soapy = dict(driver=rx_driver, type=rx_type) #e.g. driver="uhd", type="b200"
     sdr = SoapySDR.Device(args_soapy)
     sdr.setSampleRate(SOAPY_SDR_RX, 0, fs)  # Set sample rate
-    sdr.setGainMode(SOAPY_SDR_RX, 0, use_agc)  # Set the gain mode
+    if use_agc:
+        sdr.setGainMode(SOAPY_SDR_RX, 0, use_agc)  # Set the gain mode
     sdr.setFrequency(SOAPY_SDR_RX, 0, freq)  # Tune the LO
 
     # Create data buffer and start streaming samples to it
@@ -223,7 +225,7 @@ def machinelearning_tensorRT():
     batch_size = 1
     INPUT_NODE_NAME = 'input_buffer'  # (for TensorRT) User defined name of input node
     OUTPUT_NODE_NAME = 'output_buffer'  # User defined name of output node
-    ONNX_VERSION = 10  # the ONNX version to export the model to
+    ONNX_VERSION = 14  # the ONNX version to export the model to
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     Nclasses = len(PROTOCOLS)
     # Setup the pyCUDA context
@@ -381,6 +383,9 @@ if __name__ == '__main__':
     
     # if MODEL_SIZE == 'sm': #this causes more frequent buffer overflows in the receiver thread
     #     N = 2500
+
+    RX_DRIVER = args.rx_driver
+    RX_TYPE = args.rx_type
 
     rec = threading.Thread(target=receiver, args=(args.rx_driver, args.rx_type))
     rec.start()
