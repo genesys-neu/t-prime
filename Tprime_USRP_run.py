@@ -42,7 +42,7 @@ t_out = 60
 def receiver(rx_driver, rx_type):
     rx_chan = 0  # RX1 = 0, RX2 = 1
 
-    use_agc = False  # Use or don't use the AGC
+    use_agc = True  # Use or don't use the AGC
     timeout_us = int(5e6)
     time_avg = 0
 
@@ -225,7 +225,7 @@ def machinelearning_tensorRT():
     batch_size = 1
     INPUT_NODE_NAME = 'input_buffer'  # (for TensorRT) User defined name of input node
     OUTPUT_NODE_NAME = 'output_buffer'  # User defined name of output node
-    ONNX_VERSION = 14  # the ONNX version to export the model to
+    ONNX_VERSION = 14  # the ONNX version to export the model to newer GPU architecture
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     Nclasses = len(PROTOCOLS)
     # Setup the pyCUDA context

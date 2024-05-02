@@ -10,7 +10,7 @@ Navigate to the root folder of T-PRIME repository and run the following commands
 cd docker/
 sudo docker build -t <user>/t-prime-rx .
 ```
-## Setup static IP interface for USRPs
+## Setup static IP interface for USRPs (only for USRP with Ethernet connection)
 In order to communicate via Ethernet with the USRP, we need to run the following command:
 ```
 bash docker/setup_x310s_default.sh --device <NIC_ID>:192.168.XX.1
@@ -30,12 +30,13 @@ OPTIONS includes:
    -i | --image_dl - download the FPGA images compatible with current UHD driver. Use in case of image version mismatch error.
 ```
 ## Run T-PRIME docker image
-Run the following command to start the T-PRIME Docker container
+From the root of the repository, run the following command to start the T-PRIME Docker container
 ```
-sudo docker run -ti --rm --gpus all --network host --privileged -v `pwd`:/root/t-prime <user>/t-prime-rx
+sudo docker run -ti --rm --gpus all --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 --network host --privileged -v `pwd`:/root/t-prime <user>/t-prime-rx
 ```
 Once the docker container has started, run the following command to resolve the missing libraries (needed for `nvcr.io/nvidia/pytorch:24.04-py3` image):
 ```
+cd ~/t-prime
 source docker/setup_env.sh
 ```
 If USRP is connected via USB (i.e., B200, B210), run the following command to enable USB connection:
@@ -56,4 +57,7 @@ Device Address:
     type: b200
 ```
  
-
+To run the receiver scrip, use the following command within the docker:
+```
+python Tprime_USRP_run.py -fq 2.427e9 -t 180 --model_path TPrime_transformer/model_cp/model_lg_otaglobal_inf_RMSn_bckg_ft.pt --model_size lg --RMSNorm --rx_type b200
+```
