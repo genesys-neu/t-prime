@@ -56,8 +56,8 @@ Device Address:
     product: B205mini
     type: b200
 ```
- 
-To run the receiver scrip, use the following command within the docker:
+If `uhd_find_devices` outputs an error, restarting the docker and repeating the commands above seem to solve the issue.
+To run the receiver script, use the following command within the docker:
 ```
 python Tprime_USRP_run.py -fq 2.427e9 -t 180 --model_path TPrime_transformer/model_cp/model_lg_otaglobal_inf_RMSn_bckg_ft.pt --model_size lg --RMSNorm --rx_type b200
 ```
