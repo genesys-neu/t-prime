@@ -11,6 +11,7 @@
 /preprocessing/__pycache__/
 /preprocessing/matutils/__pycache__/
 /preprocessing/plots/
+/preprocessing/training/
 /preprocessing/test_results/
 /TPrime_transformer/__pycache__/
 /TPrime_transformer/best_t-prime/
