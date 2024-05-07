@@ -89,7 +89,7 @@ class TPrimeDataset(Dataset):
         if not ota:
             info_filename = 'ds_info__'+file_postfix+'slice'+str(slice_len)+'_'+str(len(protocols))+testing_mode+'class.pkl'
         else: # over the air
-            if calib_data == 0.0:
+            if calib_ratio == 0.0:
                 info_filename = 'ds_info__'+file_postfix+'slice'+str(slice_len)+'_'+str(len(protocols))+testing_mode+'class_ota.pkl'
             else: # Calibration included in dataset
                 info_filename = 'ds_info__'+file_postfix+'slice'+str(slice_len)+'_'+str(len(protocols))+'_calib_'+testing_mode+'class_ota.pkl'
@@ -268,9 +268,9 @@ class TPrimeDataset(Dataset):
                 i_label = labels_ixs.pop(i)
                 test_labels_ixs[i] = i_label
 
-            # Remaining data_ixs and labels_ixs now represent the training set
-            train_data_ixs = data_ixs
-            train_labels_ixs = labels_ixs
+        # Remaining data_ixs and labels_ixs now represent the training set
+        train_data_ixs = data_ixs
+        train_labels_ixs = labels_ixs
 
         # Create maps from linear indexes (used by torch when retrieving data from dataset)
         train_ixs = dict(zip(range(len(train_data_ixs.keys())), list(train_data_ixs.keys())))
@@ -596,9 +596,9 @@ class TPrimeDataset_Transformer_overlap(TPrimeDataset_Transformer):
                 i_label = labels_ixs.pop(i)
                 test_labels_ixs[i] = i_label
 
-            # Remaining data_ixs and labels_ixs now represent the training set
-            train_data_ixs = data_ixs
-            train_labels_ixs = labels_ixs
+        # Remaining data_ixs and labels_ixs now represent the training set
+        train_data_ixs = data_ixs
+        train_labels_ixs = labels_ixs
 
         # Create maps from linear indexes (used by torch when retrieving data from dataset)
         train_ixs = dict(zip(range(len(train_data_ixs.keys())), list(train_data_ixs.keys())))
