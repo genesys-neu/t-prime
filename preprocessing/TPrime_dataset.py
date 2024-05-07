@@ -89,7 +89,10 @@ class TPrimeDataset(Dataset):
         if not ota:
             info_filename = 'ds_info__'+file_postfix+'slice'+str(slice_len)+'_'+str(len(protocols))+testing_mode+'class.pkl'
         else: # over the air
-            info_filename = 'ds_info__'+file_postfix+'slice'+str(slice_len)+'_'+str(len(protocols))+testing_mode+'class_ota.pkl'
+            if calib_data == 0.0:
+                info_filename = 'ds_info__'+file_postfix+'slice'+str(slice_len)+'_'+str(len(protocols))+testing_mode+'class_ota.pkl'
+            else: # Calibration included in dataset
+                info_filename = 'ds_info__'+file_postfix+'slice'+str(slice_len)+'_'+str(len(protocols))+'_calib_'+testing_mode+'class_ota.pkl'
         ds_info_path = os.path.join(self.ds_path, info_filename)
         do_gen_info = True
         if os.path.exists(ds_info_path) and (not override_gen_map):
