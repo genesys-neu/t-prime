@@ -6,11 +6,8 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import ReduceLROnPlateau
-import random
 import numpy as np
 from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix as conf_mat
-from torch.utils.data import Subset
-from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from preprocessing.TPrime_dataset import TPrimeDataset_Transformer, TPrimeDataset_Transformer_overlap
@@ -33,6 +30,9 @@ def get_model_name(name):
 
 def target_transform(labels):
     return torch.stack([torch.tensor([x, y]) for x, y in zip(labels[0], labels[1])])
+    #if type(label) is not list:
+    #    return [label, label]
+    #return label
 
 def one_hot_encode(index_list):
     num_classes = len(PROTOCOLS)
@@ -115,22 +115,10 @@ def load_params(model, trained):
 def convert(predictions):
     return [[round(x) for x in sublist] for sublist in predictions]
 
-def train_val_dataset(dataset, val_split=0.2):
-    train_idx, val_idx = train_test_split(list(range(len(dataset))), test_size=val_split)
-    datasets = {}
-    datasets['train'] = Subset(dataset, train_idx)
-    datasets['val'] = Subset(dataset, val_idx)
-    return datasets
-
 def finetune(model, config, trained_model=None):
-    # Set seeds
-    torch.manual_seed(config['seed'])
-    random.seed(config['seed'])
-    # Val-Train split
-    dataset = train_val_dataset(ds_train)
     # Create data loaders
-    train_dataloader = DataLoader(dataset['train'], batch_size=config['batchSize'], shuffle=True)
-    val_dataloader = DataLoader(dataset['val'], batch_size=config['batchSize'], shuffle=True)
+    train_dataloader = DataLoader(ds_train, batch_size=config['batchSize'], shuffle=True)
+    test_dataloader = DataLoader(ds_test, batch_size=config['batchSize'], shuffle=True)
     # If we part from an already trained model, load the params into the new one and freeze them
     if config['retrain'] and trained_model is not None:
         model = load_params(model, trained_model)
@@ -144,7 +132,7 @@ def finetune(model, config, trained_model=None):
         if p.requires_grad:
             print(name)
     optimizer = torch.optim.Adam(non_frozen_parameters, lr=config['lr']) # CHANGE FOR FINE TUNE
-    scheduler = ReduceLROnPlateau(optimizer, 'min', min_lr=0.00001)
+    scheduler = ReduceLROnPlateau(optimizer, 'min', min_lr=0.00001, verbose=True)
     train_acc = []
     test_acc = []
     best_acc = 0
@@ -161,9 +149,9 @@ def finetune(model, config, trained_model=None):
         acc, loss = train(model, criterion, optimizer, train_dataloader, RMSnorm_layer=RMSNorm_l)
         train_acc.append(acc)
         print(f'| epoch {epoch:03d} | train accuracy={acc:.1f}%, train loss={loss:.2f}')
-        acc, loss = validate(model, criterion, val_dataloader, RMSnorm_layer=RMSNorm_l)
+        acc, loss = validate(model, criterion, test_dataloader, RMSnorm_layer=RMSNorm_l)
         test_acc.append(acc)
-        print(f'| epoch {epoch:03d} | valid accuracy={acc:.1f}%, valid loss={loss:.2f} (validation)')
+        print(f'| epoch {epoch:03d} | valid accuracy={acc:.1f}%, valid loss={loss:.2f} (test)')
         scheduler.step(loss)
         epochs_wo_improvement += 1
         if acc > best_acc:
@@ -181,7 +169,23 @@ def finetune(model, config, trained_model=None):
             print('Early termination implemented at epoch:', epoch+1)
             print('------------------------------------')
             break
-
+    # best_cm = best_cm.astype('float')
+    # for r in range(best_cm.shape[0]):  # for each row in the confusion matrix
+    #     sum_row = np.sum(best_cm[r, :])
+    #     best_cm[r, :] = best_cm[r, :] / sum_row  * 100.0 # compute in percentage
+    # print('------------------- Best confusion matrix (%) -------------------')
+    # print(np.around(best_cm, decimals=2))
+    # prot_display = ['ax', 'b', 'n', 'g'] #PROTOCOLS
+    # if len(PROTOCOLS) > 4: # We need to add noise class
+    #     prot_display.append('noise')
+    # #prot_display[1] = '802_11b'
+    # disp = ConfusionMatrixDisplay(confusion_matrix=best_cm, display_labels=prot_display)
+    # disp.plot(cmap="Blues", values_format='.2f')
+    # disp.ax_.get_images()[0].set_clim(0, 100)
+    # plt.title(f'Conf. Matrix (%): Total Acc. {(best_acc):>0.1f}%')
+    # plt.savefig(f"Results_finetune_{MODEL_NAME}_ft.{OTA_DATASET}.{TEST_FLAG}.{RMS_FLAG}{NOISE_FLAG}.pdf")
+    # plt.clf()
+    # print('-----------------------------------------------------------------')
     return
 
 if __name__ == "__main__":
@@ -221,8 +225,7 @@ if __name__ == "__main__":
         'lr': 0.00002,
         'epochs': 100,
         'retrain': args.retrain,
-        'RMSNorm': args.RMSNorm,
-        'seed': 1234
+        'RMSNorm': args.RMSNorm
     }
     font = {'size': 15}
     plt.rc('font', **font)
@@ -245,7 +248,7 @@ if __name__ == "__main__":
         model = global_model(classes=len(PROTOCOLS), d_model=64*2, seq_len=24, nlayers=2)
         # Load over the air dataset
         for ds in datasets:
-            if (os.path.basename(ds) == 'DATASET3_1' or os.path.basename(ds) == 'DATASET3_2' or ds.split('/')[0] == 'DATASET3_3'):
+            if (os.path.basename(ds) == 'DATASET3_1' or os.path.basename(ds) == 'DATASET3_2'):
                 ds_train.append(TPrimeDataset_Transformer_overlap(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds, 'OVERLAP25'), ds_type='train', seq_len=24, slice_len=64, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
                                                 raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence))
                 ds_test.append(TPrimeDataset_Transformer_overlap(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds, 'OVERLAP25'), ds_type='test', seq_len=24, slice_len=64, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
@@ -267,7 +270,7 @@ if __name__ == "__main__":
             tr_model = TransformerModel(classes=len(PROTOCOLS), d_model=128*2, seq_len=64, nlayers=2, use_pos=False)
         model = global_model(classes=len(PROTOCOLS), d_model=128*2, seq_len=64, nlayers=2)
         for ds in datasets:
-            if (os.path.basename(ds) == 'DATASET3_1' or os.path.basename(ds) == 'DATASET3_2' or ds.split('/')[0] == 'DATASET3_3'):
+            if (os.path.basename(ds) == 'DATASET3_1' or os.path.basename(ds) == 'DATASET3_2'):
                 ds_train.append(TPrimeDataset_Transformer_overlap(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds, 'OVERLAP25'), ds_type='train', seq_len=64, slice_len=128, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
                                                 raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence))
                 ds_test.append(TPrimeDataset_Transformer_overlap(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds, 'OVERLAP25'), ds_type='test', seq_len=64, slice_len=128, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
