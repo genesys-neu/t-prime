@@ -42,11 +42,12 @@ class TPrimeDataset(Dataset):
     def __init__(self,
                  protocols: list,  # this list will contain the folder/protocols names to include in the dataset
                  slice_len: int,    # this will define the slice size of each signal that will be input to the model
-                 ds_type='train',  # either 'train' or 'test'
+                 ds_type='train',  # either 'train', 'calib' or 'test'
                  slice_overlap_ratio=0.5,   # this is the overlap ratio for each slice generated from a signal
                                             # this value will affect the number of slices that is possible to create from each signal
                  raw_data_ratio=1.0,        # ratio of the whole raw signal dataset to consider for generation
                  test_ratio=0.2,
+                 calib_ratio=0.1,
                  testing_mode='random_sampling',
                  ds_path='../data/DATASET1_1',
                  file_postfix='',
@@ -88,7 +89,10 @@ class TPrimeDataset(Dataset):
         if not ota:
             info_filename = 'ds_info__'+file_postfix+'slice'+str(slice_len)+'_'+str(len(protocols))+testing_mode+'class.pkl'
         else: # over the air
-            info_filename = 'ds_info__'+file_postfix+'slice'+str(slice_len)+'_'+str(len(protocols))+testing_mode+'class_ota.pkl'
+            if calib_ratio == 0.0:
+                info_filename = 'ds_info__'+file_postfix+'slice'+str(slice_len)+'_'+str(len(protocols))+testing_mode+'class_ota.pkl'
+            else: # Calibration included in dataset
+                info_filename = 'ds_info__'+file_postfix+'slice'+str(slice_len)+'_'+str(len(protocols))+'_calib_'+testing_mode+'class_ota.pkl'
         ds_info_path = os.path.join(self.ds_path, info_filename)
         do_gen_info = True
         if os.path.exists(ds_info_path) and (not override_gen_map):
@@ -97,7 +101,7 @@ class TPrimeDataset(Dataset):
             do_gen_info = False
 
         if do_gen_info:
-            self.ds_info = self.generate_ds_map(ds_path, info_filename, test_ratio)
+            self.ds_info = self.generate_ds_map(ds_path, info_filename, test_ratio, calib_ratio)
         else:
             self.ds_info = pickle.load(open(ds_info_path, 'rb'))
 
@@ -143,7 +147,7 @@ class TPrimeDataset(Dataset):
     def generate_windows(self, len_sig):
         return list(range(0, len_sig-self.slice_len, self.overlap))
 
-    def generate_ds_map(self, ds_path, filename, test_ratio=0.2):
+    def generate_ds_map(self, ds_path, filename, test_ratio=0.2, calib_ratio=0.1):
         examples_map = {}
         class_map = dict(zip(self.protocols, range(len(self.protocols))))
         # check if folders are names with _ or .
@@ -196,10 +200,15 @@ class TPrimeDataset(Dataset):
         test_data_ixs = {}
         test_labels_ixs = {}
         test_ixs_count = 0
+        # CALIBRATION DATA
+        calib_data_ixs = {}
+        calib_labels_ixs = {}
+        calib_ixs_count = 0
         for c in tqdm(examples_map.keys(), desc='Analyzing signal dataset...'):
             nsamples = len(examples_map[c].items())
             if self.testing_mode == 'future':
-                test_threshold = int(nsamples *(1-self.test_ratio))
+                test_threshold = int(nsamples * (1-test_ratio-calib_ratio))
+                calib_threshold = int(nsamples * (1-calib_ratio))
             else:
                 test_threshold = nsamples
             for ix, path in examples_map[c].items():
@@ -219,6 +228,11 @@ class TPrimeDataset(Dataset):
                         data_ixs[ixs_count] = {'path': path, 'sample_ix': w}
                         labels_ixs[ixs_count] = class_map[c]
                         ixs_count += 1
+                elif ix <= calib_threshold:
+                    for w in window_ixs:
+                        calib_data_ixs[calib_ixs_count] = {'path': path, 'sample_ix': w}
+                        calib_labels_ixs[calib_ixs_count] = class_map[c]
+                        calib_ixs_count += 1
                 else:
                     for w in window_ixs:
                         test_data_ixs[test_ixs_count] = {'path': path, 'sample_ix': w}
@@ -226,17 +240,43 @@ class TPrimeDataset(Dataset):
                         test_ixs_count += 1
 
 
-        # lastly, we separate the training and testing dataset by randomly sampling a certain % of data samples indexes
+        # lastly, we separate the training, testing, and calibration datasets by randomly sampling a certain % of data sample indices
         if self.testing_mode == 'random_sampling':
-            test_ixs = np.random.choice(ixs_count, size=int(ixs_count*test_ratio), replace=False)
+            total_count = ixs_count
+            # First, randomly sample indices for the calibration set
+            calib_ixs = np.random.choice(total_count, size=int(total_count * calib_ratio), replace=False)
+            remaining_ixs = list(set(range(total_count)) - set(calib_ixs))
+            
+            # Then, from the remaining indices, sample indices for the test set
+            test_ixs = np.random.choice(remaining_ixs, size=int(len(remaining_ixs) * (test_ratio / (1 - calib_ratio))), replace=False)
+            train_ixs = list(set(remaining_ixs) - set(test_ixs))
+
+            # Update dictionaries to reflect the sampled indices for train, test, and calibration datasets
+            calib_data_ixs = {}
+            calib_labels_ixs = {}
+            for i in calib_ixs.tolist():
+                i_data = data_ixs.pop(i)
+                calib_data_ixs[i] = i_data
+                i_label = labels_ixs.pop(i)
+                calib_labels_ixs[i] = i_label
+
+            test_data_ixs = {}
+            test_labels_ixs = {}
             for i in test_ixs.tolist():
                 i_data = data_ixs.pop(i)
                 test_data_ixs[i] = i_data
                 i_label = labels_ixs.pop(i)
                 test_labels_ixs[i] = i_label
-        # we also need to store a map from linear indexes (used by ray when retrieving data from dataset)
-        train_ixs = dict(zip(range(len(data_ixs.keys())), list(data_ixs.keys())))
+
+        # Remaining data_ixs and labels_ixs now represent the training set
+        train_data_ixs = data_ixs
+        train_labels_ixs = labels_ixs
+
+        # Create maps from linear indexes (used by torch when retrieving data from dataset)
+        train_ixs = dict(zip(range(len(train_data_ixs.keys())), list(train_data_ixs.keys())))
         test_ixs = dict(zip(range(len(test_data_ixs.keys())), list(test_data_ixs.keys())))
+        calib_ixs = dict(zip(range(len(calib_data_ixs.keys())), list(calib_data_ixs.keys())))
+
 
 
         # after creating class map and examples map, let's store this information for future use
@@ -246,9 +286,10 @@ class TPrimeDataset(Dataset):
             'ds_indexes':
                 {
                     'train': {'data': data_ixs, 'labels': labels_ixs},
-                    'test': {'data': test_data_ixs, 'labels': test_labels_ixs}
+                    'test': {'data': test_data_ixs, 'labels': test_labels_ixs},
+                    'calib': {'data': calib_data_ixs, 'labels': calib_labels_ixs}
                 },
-            'ixs_maps': {'train': train_ixs, 'test': test_ixs}  # linear indexes maps (used by ray/torch)
+            'ixs_maps': {'train': train_ixs, 'test': test_ixs, 'calib': calib_ixs}  # linear indexes maps (used by ray/torch)
             }
         pickle.dump(ds_info, open(ds_info_path, 'wb'))
 
@@ -258,7 +299,8 @@ class TPrimeDataset(Dataset):
         ds_info = {
             'slice_len': self.slice_len,
             'numsamps': {'train' : len(self.ds_info['ds_indexes']['train']['data'].keys()),
-                         'test': len(self.ds_info['ds_indexes']['test']['data'].keys())},
+                         'test': len(self.ds_info['ds_indexes']['test']['data'].keys()), 
+                         'calib': len(self.ds_info['ds_indexes']['calib']['data'].keys())},
             'nclasses': len(self.protocols),
             'nchans': 2,    # real and imag components are separated on different channels
         }
@@ -405,7 +447,8 @@ class TPrimeDataset_Transformer(TPrimeDataset):
             'seq_len': self.seq_len,
             'slice_len': self.slice_len,
             'numsamps': {'train' : len(self.ds_info['ds_indexes']['train']['data'].keys()),
-                         'test': len(self.ds_info['ds_indexes']['test']['data'].keys())},
+                         'test': len(self.ds_info['ds_indexes']['test']['data'].keys()),
+                         'calib': len(self.ds_info['ds_indexes']['test']['data'].keys())},
             'nclasses': len(self.protocols),
             'nchans': 2,    # real and imag components are separated on different channels
         }
@@ -444,7 +487,7 @@ class TPrimeDataset_Transformer_overlap(TPrimeDataset_Transformer):
             final_labels.append(3)
         return final_labels
 
-    def generate_ds_map(self, ds_path, filename, test_ratio=0.2):
+    def generate_ds_map(self, ds_path, filename, test_ratio=0.2, calib_ratio=0.1):
         examples_map = {}
         class_map = dict(zip(self.protocols, range(len(self.protocols))))
         directories = self.mixes + ['NOISE']
@@ -489,10 +532,15 @@ class TPrimeDataset_Transformer_overlap(TPrimeDataset_Transformer):
         test_data_ixs = {}
         test_labels_ixs = {}
         test_ixs_count = 0
+        # CALIBRATION DATA
+        calib_data_ixs = {}
+        calib_labels_ixs = {}
+        calib_ixs_count = 0
         for c in tqdm(examples_map.keys(), desc='Analyzing signal dataset...'):
             nsamples = len(examples_map[c].items())
             if self.testing_mode == 'future':
-                test_threshold = int(nsamples *(1-self.test_ratio))
+                test_threshold = int(nsamples * (1-test_ratio-calib_ratio))
+                calib_threshold = int(nsamples * (1-calib_ratio))
             else:
                 test_threshold = nsamples
             for ix, path in examples_map[c].items():
@@ -508,6 +556,11 @@ class TPrimeDataset_Transformer_overlap(TPrimeDataset_Transformer):
                         data_ixs[ixs_count] = {'path': path, 'sample_ix': w}
                         labels_ixs[ixs_count] = self.mix_to_labels(c)
                         ixs_count += 1
+                elif ix <= calib_threshold:
+                    for w in window_ixs:
+                        calib_data_ixs[calib_ixs_count] = {'path': path, 'sample_ix': w}
+                        calib_labels_ixs[calib_ixs_count] = self.mix_to_labels(c)
+                        calib_ixs_count += 1
                 else:
                     for w in window_ixs:
                         test_data_ixs[test_ixs_count] = {'path': path, 'sample_ix': w}
@@ -515,32 +568,59 @@ class TPrimeDataset_Transformer_overlap(TPrimeDataset_Transformer):
                         test_ixs_count += 1
 
 
-        # lastly, we separate the training and testing dataset by randomly sampling a certain % of data samples indexes
+        # lastly, we separate the training, testing, and calibration datasets by randomly sampling a certain % of data sample indices
         if self.testing_mode == 'random_sampling':
-            test_ixs = np.random.choice(ixs_count, size=int(ixs_count*test_ratio), replace=False)
+            total_count = ixs_count
+            # First, randomly sample indices for the calibration set
+            calib_ixs = np.random.choice(total_count, size=int(total_count * calib_ratio), replace=False)
+            remaining_ixs = list(set(range(total_count)) - set(calib_ixs))
+            
+            # Then, from the remaining indices, sample indices for the test set
+            test_ixs = np.random.choice(remaining_ixs, size=int(len(remaining_ixs) * (test_ratio / (1 - calib_ratio))), replace=False)
+            train_ixs = list(set(remaining_ixs) - set(test_ixs))
+
+            # Update dictionaries to reflect the sampled indices for train, test, and calibration datasets
+            calib_data_ixs = {}
+            calib_labels_ixs = {}
+            for i in calib_ixs.tolist():
+                i_data = data_ixs.pop(i)
+                calib_data_ixs[i] = i_data
+                i_label = labels_ixs.pop(i)
+                calib_labels_ixs[i] = i_label
+
+            test_data_ixs = {}
+            test_labels_ixs = {}
             for i in test_ixs.tolist():
                 i_data = data_ixs.pop(i)
                 test_data_ixs[i] = i_data
                 i_label = labels_ixs.pop(i)
                 test_labels_ixs[i] = i_label
-        # we also need to store a map from linear indexes (used by ray when retrieving data from dataset)
-        train_ixs = dict(zip(range(len(data_ixs.keys())), list(data_ixs.keys())))
+
+        # Remaining data_ixs and labels_ixs now represent the training set
+        train_data_ixs = data_ixs
+        train_labels_ixs = labels_ixs
+
+        # Create maps from linear indexes (used by torch when retrieving data from dataset)
+        train_ixs = dict(zip(range(len(train_data_ixs.keys())), list(train_data_ixs.keys())))
         test_ixs = dict(zip(range(len(test_data_ixs.keys())), list(test_data_ixs.keys())))
+        calib_ixs = dict(zip(range(len(calib_data_ixs.keys())), list(calib_data_ixs.keys())))
+
 
 
         # after creating class map and examples map, let's store this information for future use
         ds_info_path = os.path.join(ds_path, filename)
         ds_info = {
             'class_map': class_map, 'examples_map': examples_map,
-            'overlapping_samples': True,
             'ds_indexes':
                 {
                     'train': {'data': data_ixs, 'labels': labels_ixs},
-                    'test': {'data': test_data_ixs, 'labels': test_labels_ixs}
+                    'test': {'data': test_data_ixs, 'labels': test_labels_ixs},
+                    'calib': {'data': calib_data_ixs, 'labels': calib_labels_ixs}
                 },
-            'ixs_maps': {'train': train_ixs, 'test': test_ixs}  # linear indexes maps (used by ray/torch)
+            'ixs_maps': {'train': train_ixs, 'test': test_ixs, 'calib': calib_ixs}  # linear indexes maps (used by ray/torch)
             }
         pickle.dump(ds_info, open(ds_info_path, 'wb'))
+
 
         return ds_info
 
