@@ -33,9 +33,6 @@ def get_model_name(name):
 
 def target_transform(labels):
     return torch.stack([torch.tensor([x, y]) for x, y in zip(labels[0], labels[1])])
-    #if type(label) is not list:
-    #    return [label, label]
-    #return label
 
 def one_hot_encode(index_list):
     num_classes = len(PROTOCOLS)
@@ -147,7 +144,7 @@ def finetune(model, config, trained_model=None):
         if p.requires_grad:
             print(name)
     optimizer = torch.optim.Adam(non_frozen_parameters, lr=config['lr']) # CHANGE FOR FINE TUNE
-    scheduler = ReduceLROnPlateau(optimizer, 'min', min_lr=0.00001, verbose=True)
+    scheduler = ReduceLROnPlateau(optimizer, 'min', min_lr=0.00001)
     train_acc = []
     test_acc = []
     best_acc = 0
@@ -248,7 +245,7 @@ if __name__ == "__main__":
         model = global_model(classes=len(PROTOCOLS), d_model=64*2, seq_len=24, nlayers=2)
         # Load over the air dataset
         for ds in datasets:
-            if (os.path.basename(ds) == 'DATASET3_1' or os.path.basename(ds) == 'DATASET3_2'):
+            if (os.path.basename(ds) == 'DATASET3_1' or os.path.basename(ds) == 'DATASET3_2' or ds.split('/')[0] == 'DATASET3_3'):
                 ds_train.append(TPrimeDataset_Transformer_overlap(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds, 'OVERLAP25'), ds_type='train', seq_len=24, slice_len=64, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
                                                 raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence))
                 ds_test.append(TPrimeDataset_Transformer_overlap(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds, 'OVERLAP25'), ds_type='test', seq_len=24, slice_len=64, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
@@ -270,7 +267,7 @@ if __name__ == "__main__":
             tr_model = TransformerModel(classes=len(PROTOCOLS), d_model=128*2, seq_len=64, nlayers=2, use_pos=False)
         model = global_model(classes=len(PROTOCOLS), d_model=128*2, seq_len=64, nlayers=2)
         for ds in datasets:
-            if (os.path.basename(ds) == 'DATASET3_1' or os.path.basename(ds) == 'DATASET3_2'):
+            if (os.path.basename(ds) == 'DATASET3_1' or os.path.basename(ds) == 'DATASET3_2' or ds.split('/')[0] == 'DATASET3_3'):
                 ds_train.append(TPrimeDataset_Transformer_overlap(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds, 'OVERLAP25'), ds_type='train', seq_len=64, slice_len=128, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
                                                 raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence))
                 ds_test.append(TPrimeDataset_Transformer_overlap(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds, 'OVERLAP25'), ds_type='test', seq_len=64, slice_len=128, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
