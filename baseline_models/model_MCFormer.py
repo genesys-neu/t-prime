@@ -52,7 +52,7 @@ class SelfAttentionTransformerBERT(nn.Module):
 
 
 class MCformer(nn.Module):
-    def __init__(self, hidden_size=32, kernel_size=65, num_heads=4):
+    def __init__(self, hidden_size=32, kernel_size=65, num_heads=4, num_classes=4):
         super(MCformer, self).__init__()
 
         # Convolutional layer with SELU activation
@@ -66,7 +66,7 @@ class MCformer(nn.Module):
         self.flatten = nn.Flatten()
         # Fully connected layers
         self.fc1 = nn.Linear(128, 128)
-        self.fc2 = nn.Linear(128, 4)
+        self.fc2 = nn.Linear(128, num_classes)
 
     def forward(self, x):
         x = x.unsqueeze(-1) # unsqueeze the last dimension
