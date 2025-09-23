@@ -187,6 +187,7 @@ class AMC_Net(nn.Module):
         )
 
     def forward(self, x):
+        #print(f"Input x shape: {x.shape}")
         # x = x / x.norm(p=2, dim=-1, keepdim=True)
         x = x.unsqueeze(1)
         x = self.ACM(x)

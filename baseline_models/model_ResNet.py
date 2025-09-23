@@ -70,7 +70,7 @@ class ResNet(nn.Module):
         self.norm = nn.LayerNorm([num_samples, iq_dim])
 
     def forward(self, x):
-
+        x = x.transpose(-2, -1)
         x = x.unsqueeze(1)
         x = self.norm(x)
         x = self.res_stack1(x)

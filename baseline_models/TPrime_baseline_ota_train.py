@@ -93,7 +93,7 @@ def create_model(model_name, nclasses, slice_len=512, normalize=False):
     if model_name == 'baseline_cnn1d':
         return Baseline_CNN1D(classes=nclasses, numChannels=2, slice_len=slice_len, normalize=normalize)
     elif model_name == 'AMCNet':
-        return AMC_Net(num_classes=nclasses)
+        return AMC_Net(num_classes=nclasses, sig_len=slice_len)
     elif model_name == 'ResNet':
         return ResNet(num_classes=nclasses, num_samples=slice_len, iq_dim=2, kernel_size=3, pool_size=2)
     elif model_name == 'LSTM':
@@ -416,7 +416,7 @@ def main():
             ota=True, 
             apply_wchannel=None, 
             apply_noise=False, 
-            add_noise=args.back_class
+            #add_noise=args.back_class
         ))
         
         # Test dataset
@@ -434,7 +434,7 @@ def main():
             ota=True, 
             apply_wchannel=None, 
             apply_noise=False, 
-            add_noise=args.back_class
+            #add_noise=args.back_class
         ))
     
     # Concatenate datasets
