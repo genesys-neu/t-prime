@@ -10,6 +10,7 @@ from tqdm import tqdm
 proj_root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.join(os.pardir, os.pardir)))
 import sys
 sys.path.append(proj_root_dir)
+import tensorflow as tf
 
 class FileCache:
     def __init__(self, max_size):
@@ -113,33 +114,36 @@ class TPrimeDataset(Dataset):
 
         self.signal_cache = FileCache(max_size=20e3)
 
-        # let's initialize Matlab engine
+        # let's initialize Sionna engine
         if not (self.apply_wchannel is None):
             self.possible_channels = ['TGn', 'TGax', 'Rayleigh', 'relative', 'random']
             assert(self.apply_wchannel in self.possible_channels)
             self.channel_map = {}
-            from preprocessing.matutils import matutils
-            self.mateng = matutils.MatlabEngine()  # todo check if we need any custom paths
-            # initialize each channel object for each protocol used
             self.chan_models = {}
+            try:
+                from preprocessing.sionnaChannels import TGnModelB_Exact, TGaxModelB_Exact, RayleighFIR_Exact
+            except ImportError:
+                from sionnaChannels import TGnModelB_Exact, TGaxModelB_Exact, RayleighFIR_Exact
             for ix, p in enumerate(protocols[0:4]):
                 if p == '802_11n':
-                    tgn = self.mateng.eng.wlanTGnChannel('SampleRate', float(20e6), 'DelayProfile', 'Model-B', 'LargeScaleFadingEffect', 'Pathloss', 'PathGainsOutputPort', True)
+                         # Exact TGn Model-B + TGn path loss + taps out (parity w/ your MATLAB settings)
+                    tgn = TGnModelB_Exact(sample_rate_hz=20e6, carrier_frequency_hz=5.18e9,distance_m=1.0, apply_shadowing=False, seed=0)
                     self.chan_models[ix] = tgn
                     self.channel_map['TGn'] = ix
                 elif p == '802_11ax':
-                    tgax = self.mateng.eng.wlanTGaxChannel('SampleRate', float(20e6), 'ChannelBandwidth', 'CBW20', 'DelayProfile', 'Model-B', 'LargeScaleFadingEffect', 'Pathloss', 'PathGainsOutputPort', True)
+                    tgax = TGaxModelB_Exact(sample_rate_hz=20e6,channel_bandwidth='CBW20',carrier_frequency_hz=5.25e9,distance_m=3.0,num_floors=0,num_walls=0,wall_loss_db=5.0,apply_shadowing=False,seed=0)
                     self.chan_models[ix] = tgax
                     self.channel_map['TGax'] = ix
                 elif p == '802_11b':
-                    rayleighB = self.mateng.eng.comm.RayleighChannel('SampleRate', float(11e6), 'PathDelays', float(1.5e-9), 'AveragePathGains', float(-3), 'PathGainsOutputPort', True)
+                    rayleighB = RayleighFIR_Exact(sample_rate_hz=11e6,path_delays_s=1.5e-9,avg_path_gains_db=-3.0,max_doppler_hz=0.0, seed=0)
                     self.chan_models[ix] = rayleighB
                     self.channel_map['RayleighB'] = ix
-                elif (p == '802_11b_upsampled') or (p == '802_11g'):
-                    rayleigh = self.mateng.eng.comm.RayleighChannel('SampleRate', float(20e6), 'PathDelays', float(1.5e-9), 'AveragePathGains', float(-3), 'PathGainsOutputPort', True)
+               	elif (p == '802_11b_upsampled') or (p == '802_11g'):
+                    rayleigh = RayleighFIR_Exact(sample_rate_hz=20e6,path_delays_s=1.5e-9,avg_path_gains_db=-3.0,max_doppler_hz=0.0, seed=0)
                     self.chan_models[ix] = rayleigh
                     self.channel_map['Rayleigh'] = ix
-    
+
+
     def generate_windows(self, len_sig):
         return list(range(0, len_sig-self.slice_len, self.overlap))
 
@@ -307,18 +311,34 @@ class TPrimeDataset(Dataset):
                 obs_info = dataset['data'][s_idx]
             if not self.ota:
                 mat_dict = sio.loadmat(obs_info['path'])
-                self.signal_cache.put(obs_info['path'], {'np': mat_dict['waveform'], \
-                            'mat': self.mateng.py2mat_array(mat_dict['waveform']) if not (self.apply_wchannel is None) else ''})
+                sig_np = mat_dict['waveform']  # expected shape [T, 1} complex
             else:
-                mat_dict = np.fromfile(obs_info['path'], dtype=np.complex128)
-                mat_dict = np.expand_dims(mat_dict, axis=1)
-                self.signal_cache.put(obs_info['path'], {'np': mat_dict, 'mat': ''}) # WCHANNEL SHOULD ALWAYS BE NONE WITH OTA SAMPLES
+                sig_np = np.fromfile(obs_info['path'], dtype=np.complex128)
+                sig_np = np.expand_dims(mat_dict, axis=1)
+ 
 
+# Prepare TF tensor for channel only if needed
+            if self.apply_wchannel is not None:
+                x_tf = tf.convert_to_tensor(sig_np.astype(np.complex64))
+                if len(x_tf.shape) == 1:         # [T] -> [1, T, 1]
+                    x_tf = x_tf[None, :, None]
+                elif len(x_tf.shape) == 2:       # [T, N_tx] -> [1, T, N_tx]
+                    x_tf = x_tf[None, :, :]
+            else:
+                x_tf = ''
+
+            self.signal_cache.put(
+                obs_info['path'],
+                {
+                    'np': sig_np,
+                    'tf': x_tf
+                }
+            )
             sig_dict = self.signal_cache.get(obs_info['path'])
 
         label = dataset['labels'][s_idx]
         # apply wireless channel and noise if required
-        chan_sig = self.apply_wchan(sig_dict['mat'], label) if not (self.apply_wchannel is None) else sig_dict['np']
+        chan_sig = self.apply_wchan(sig_dict['tf'], label) if not (self.apply_wchannel is None) else sig_dict['np']
         noisy_sig = self.apply_AWGN(chan_sig) if self.apply_noise else chan_sig
 
         # then, retrieve the relative slice of the requested dataset sample
@@ -368,7 +388,7 @@ class TPrimeDataset(Dataset):
         noisy_sig = sig + noise_samples
         return noisy_sig
 
-    def apply_wchan(self, mat_sig, label):
+    def apply_wchan(self, x_tf, label):
         if self.apply_wchannel == 'relative':
             # in this case we apply the channel relative to the protocol used
             channel = self.chan_models[label]
@@ -381,13 +401,14 @@ class TPrimeDataset(Dataset):
                 # It is important that the protocols are in the following order 802_11ax, 802_11b_upsampled, 802_11n, 802_11g
                 chan_ix = np.random.randint(4)
                 if chan_ix == 3: # no channel applied
-                    return np.array(mat_sig)
+                    return x_tf.numpy()[0, :, :]
             else:
                 chan_ix = self.channel_map[self.apply_wchannel]
             channel = self.chan_models[chan_ix]
-
-        proc_sig = self.mateng.eng.step(channel, mat_sig, nargout=1)
-        return np.array(proc_sig)
+# Run the Sionna channel
+        y_tf, _ = channel(x_tf)       # [1, T, 1] complex64
+        y_np = y_tf.numpy()[0, :, :]  # -> [T, 1] numpy complex
+        return y_np
 
 class TPrimeDataset_Transformer(TPrimeDataset):
     
