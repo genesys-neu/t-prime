@@ -215,6 +215,7 @@ if __name__ == "__main__":
     parser.add_argument("--Slice_length", type=int, default=128, help="Slice length in which a sequence is divided.")
     parser.add_argument("--Sequence_length", type=int, default=64, help="Sequence length to input to the transformer.")
     parser.add_argument("--Positional_encoder")
+    parser.add_argument('--protocols', nargs='+', default=None, help='Folder names to use as classes under --raw_path (e.g., BOTH WIFI CLEAN BLUE). If omitted, auto-detect subfolders.')
     args, _ = parser.parse_known_args()
     args.wchannel = args.wchannel if args.wchannel != 'None' else None
     args.Positional_encoder = args.Positional_encoder in {'True', 'true'}
@@ -235,7 +236,13 @@ if __name__ == "__main__":
         "Input field of view": args.Sequence_length*args.Slice_length,
         "Positional encoder": args.Positional_encoder
     }
-    protocols = ['802_11ax', '802_11b_upsampled', '802_11n', '802_11g']
+import os
+
+def _autodetect_protocols(root):
+    return sorted([d for d in os.listdir(root)
+                   if os.path.isdir(os.path.join(root, d)) and not d.startswith('.')])
+
+    protocols = args.protocols if args.protocols else _autodetect_protocols(args.raw_path)  # Change protocols to argument or auto
     ds_train = TPrimeDataset_Transformer(protocols=protocols, ds_type='train', file_postfix=args.postfix, ds_path=exp_config["raw_path"], snr_dbs=args.snr_db, seq_len=exp_config["Sequence length"], slice_len=exp_config["Slice length"], slice_overlap_ratio=0, raw_data_ratio=args.dataset_ratio,
             override_gen_map=True, apply_wchannel=args.wchannel, transform=chan2sequence)
     ds_test = TPrimeDataset_Transformer(protocols=protocols, ds_type='test', file_postfix=args.postfix, ds_path=exp_config["raw_path"], snr_dbs=args.snr_db, seq_len=exp_config["Sequence length"], slice_len=exp_config["Slice length"], slice_overlap_ratio=0, raw_data_ratio=args.dataset_ratio,

@@ -27,6 +27,23 @@ def get_model_name(name):
     name = name.split("/")[-1]
     return '.'.join(name.split(".")[0:-1])
 
+# === NEW: checkpoint helpers ===
+def _save_checkpoint(path_dir, model_name_prefix, tag, model, optimizer, epoch, acc, loss, extra=None):
+    """Write a checkpoint with tag suffix, e.g. <prefix>_last.pt or <prefix>_best.pt."""
+    os.makedirs(path_dir, exist_ok=True)
+    ckpt_path = os.path.join(path_dir, f"{model_name_prefix}_{tag}.pt")
+    payload = {
+        "epoch": epoch,
+        "model_state_dict": model.state_dict(),
+        "optimizer_state_dict": optimizer.state_dict(),
+        "acc": acc,
+        "loss": loss,
+    }
+    if extra:
+        payload.update(extra)
+    torch.save(payload, ckpt_path)
+    print(f"[ckpt] saved {tag}: {ckpt_path}")
+
 def train(model, criterion, optimizer, dataloader, RMSnorm_layer=None):
     size = len(dataloader.dataset)
     model.train()
@@ -48,8 +65,8 @@ def train(model, criterion, optimizer, dataloader, RMSnorm_layer=None):
         optimizer.step()
         total_loss += loss.detach().item()
         if batch % 50 == 0:
-            loss, current = loss.item(), batch * len(X)
-            print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
+            loss_val, current = loss.item(), batch * len(X)
+            print(f"loss: {loss_val:>7f}  [{current:>5d}/{size:>5d}]")
     total_loss /= len(dataloader)
     correct /= size
     return correct*100.0, total_loss
@@ -83,11 +100,11 @@ def finetune(model, config):
     print('Initiating fine-tuning...')
     # Define loss, optimizer and scheduler for training
     criterion = nn.NLLLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=config['lr']) # CHANGE FOR FINE TUNE
+    optimizer = torch.optim.Adam(model.parameters(), lr=config['lr']) # CHANGE FOR FINE TUNE
     scheduler = ReduceLROnPlateau(optimizer, 'min', min_lr=0.00001, verbose=True)
     train_acc = []
     test_acc = []
-    best_acc = 0
+    best_acc = 0.0
     best_cm = 0 # best confusion matrix
     epochs_wo_improvement = 0
 
@@ -98,39 +115,50 @@ def finetune(model, config):
 
     # Training loop
     for epoch in range(config['epochs']):
-        acc, loss = train(model, criterion, optimizer, train_dataloader, RMSnorm_layer=RMSNorm_l)
-        train_acc.append(acc)
-        print(f'| epoch {epoch:03d} | train accuracy={acc:.1f}%, train loss={loss:.2f}')
-        acc, loss, conf_matrix = validate(model, criterion, test_dataloader, config['nClasses'], RMSnorm_layer=RMSNorm_l)
-        test_acc.append(acc)
-        print(f'| epoch {epoch:03d} | valid accuracy={acc:.1f}%, valid loss={loss:.2f} (test)')
-        scheduler.step(loss)
+        acc_tr, loss_tr = train(model, criterion, optimizer, train_dataloader, RMSnorm_layer=RMSNorm_l)
+        train_acc.append(acc_tr)
+        print(f'| epoch {epoch:03d} | train accuracy={acc_tr:.1f}%, train loss={loss_tr:.2f}')
+
+        acc_va, loss_va, conf_matrix = validate(model, criterion, test_dataloader, config['nClasses'], RMSnorm_layer=RMSNorm_l)
+        test_acc.append(acc_va)
+        print(f'| epoch {epoch:03d} | valid accuracy={acc_va:.1f}%, valid loss={loss_va:.2f} (test)')
+        scheduler.step(loss_va)
+
+        # === NEW: always save _last each epoch
+        _save_checkpoint(PATH, MODEL_NAME, "last", model, optimizer, epoch, acc_va, loss_va)
+
         epochs_wo_improvement += 1
-        if acc > best_acc:
-            best_acc = acc
+        if acc_va > best_acc:
+            best_acc = acc_va
             epochs_wo_improvement = 0
-            # Save model and metrics
-            torch.save({
-                    'model_state_dict': model.state_dict(),
-                    'optimizer_state_dict': optimizer.state_dict(),
-                    'loss': loss,
-                }, os.path.join(PATH, MODEL_NAME + '.pt')) # + '_' + OTA_DATASET + '_' + TEST_FLAG + '_' + RMS_FLAG + NOISE_FLAG + '_ft.pt'))
             best_cm = conf_matrix
-        if epochs_wo_improvement > 12: # early stopping
+
+            # === NEW: save _best
+            _save_checkpoint(PATH, MODEL_NAME, "best", model, optimizer, epoch, acc_va, loss_va)
+
+            # Back-compat: also save to original single file when new best occurs
+            torch.save({
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'loss': loss_va,
+            }, os.path.join(PATH, MODEL_NAME + '.pt'))
+            print(f"[ckpt] saved best (legacy path): {os.path.join(PATH, MODEL_NAME + '.pt')}")
+
+        if epochs_wo_improvement > 12: # early stopping
             print('------------------------------------')
             print('Early termination implemented at epoch:', epoch+1)
             print('------------------------------------')
             break
+
     best_cm = best_cm.astype('float')
     for r in range(best_cm.shape[0]):  # for each row in the confusion matrix
         sum_row = np.sum(best_cm[r, :])
         best_cm[r, :] = best_cm[r, :] / sum_row  * 100.0 # compute in percentage
     print('------------------- Best confusion matrix (%) -------------------')
     print(np.around(best_cm, decimals=2))
-    prot_display = ['ax', 'b', 'n', 'g'] #PROTOCOLS
+    prot_display = ['ax', 'b', 'n', 'g'] # PROTOCOLS
     if len(PROTOCOLS) > 4: # We need to add noise class
         prot_display.append('noise')
-    #prot_display[1] = '802_11b'
     disp = ConfusionMatrixDisplay(confusion_matrix=best_cm, display_labels=prot_display)
     disp.plot(cmap="Blues", values_format='.2f')
     disp.ax_.get_images()[0].set_clim(0, 100)
@@ -164,13 +192,13 @@ if __name__ == "__main__":
     # Config
     MODEL_NAME = get_model_name(args.model_path)
     PATH = '/'.join(args.model_path.split('/')[0:-1])
-    PROTOCOLS = ['802_11ax', '802_11b_upsampled', '802_11n', '802_11g']
+    PROTOCOLS = args.datasets
     CHANNELS = ['None', 'TGn', 'TGax', 'Rayleigh']
     TEST_FLAG = 'rsg' if args.test_mode == 'random_sampling' else 'fut'
     RMS_FLAG = 'RMSn' if args.RMSNorm else ''
     NOISE_FLAG = '_bckg' if args.back_class else ''
     if args.back_class:
-        PROTOCOLS.append('noise') 
+        PROTOCOLS.append('noise')
     OTA_DATASET = args.ota_dataset
     train_config = {
         'batchSize': 122,
@@ -189,10 +217,9 @@ if __name__ == "__main__":
     if args.transformer == 'CNN':
         global_model = Baseline_CNN1D
         model = global_model(classes=len(PROTOCOLS), numChannels=2, slice_len=512)
-        for ds in datasets:
-            ds_train.append(TPrimeDataset(PROTOCOLS, ds_path=os.path.join(args.ds_path, ds), ds_type='train', slice_len=512, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
+        ds_train.append(TPrimeDataset(PROTOCOLS, ds_path=args.ds_path, ds_type='train', slice_len=512, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
                             raw_data_ratio=args.dataset_ratio, file_postfix='', override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, add_noise=args.back_class))
-            ds_test.append(TPrimeDataset(PROTOCOLS, ds_path=os.path.join(args.ds_path, ds), ds_type='test', slice_len=512, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
+        ds_test.append(TPrimeDataset(PROTOCOLS, ds_path=args.ds_path, ds_type='test', slice_len=512, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
                                 raw_data_ratio=args.dataset_ratio, file_postfix='', override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, add_noise=args.back_class))
     else:
         # choose correct version
@@ -205,16 +232,16 @@ if __name__ == "__main__":
             model = global_model(classes=len(PROTOCOLS), d_model=64*2, seq_len=24, nlayers=2, use_pos=False)
             # Load over the air dataset
             for ds in datasets:
-                ds_train.append(TPrimeDataset_Transformer(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds), ds_type='train', seq_len=24, slice_len=64, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
+                ds_train.append(TPrimeDataset_Transformer(protocols=PROTOCOLS, ds_path=args.ds_path, ds_type='train', seq_len=24, slice_len=64, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
                                                raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence))
-                ds_test.append(TPrimeDataset_Transformer(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds), ds_type='test', seq_len=24, slice_len=64, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
+                ds_test.append(TPrimeDataset_Transformer(protocols=PROTOCOLS, ds_path=args.ds_path, ds_type='test', seq_len=24, slice_len=64, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
                                               raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence))
         else: # lg
             model = global_model(classes=len(PROTOCOLS), d_model=128*2, seq_len=64, nlayers=2, use_pos=False)
             for ds in datasets:
-                ds_train.append(TPrimeDataset_Transformer(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds), ds_type='train', seq_len=64, slice_len=128, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
+                ds_train.append(TPrimeDataset_Transformer(protocols=PROTOCOLS, ds_path=args.ds_path, ds_type='train', seq_len=64, slice_len=128, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
                                                raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence))
-                ds_test.append(TPrimeDataset_Transformer(protocols=PROTOCOLS, ds_path=os.path.join(args.ds_path, ds), ds_type='test', seq_len=64, slice_len=128, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
+                ds_test.append(TPrimeDataset_Transformer(protocols=PROTOCOLS, ds_path=args.ds_path, ds_type='test', seq_len=64, slice_len=128, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
                                               raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence))
     # concat all loaded datasets
     ds_train = torch.utils.data.ConcatDataset(ds_train)
@@ -277,11 +304,9 @@ if __name__ == "__main__":
                 sum_row = np.sum(conf_matrix[r, :])
                 conf_matrix[r, :] = conf_matrix[r, :] / sum_row  * 100.0 # compute in percentage
             conf_matrix[np.isnan(conf_matrix)] = 0
-            # plt.figure(figsize=(10,7))
-            prot_display = ['ax', 'b', 'n', 'g']#PROTOCOLS
+            prot_display = ['ax', 'b', 'n', 'g'] # PROTOCOLS
             if len(PROTOCOLS) > 4: # We need to add noise class
                 prot_display.append('noise')
-            #prot_display[1] = '802_11b'
             disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=prot_display)
             disp.plot(cmap="Blues", values_format='.2f')
             disp.ax_.get_images()[0].set_clim(0, 100)

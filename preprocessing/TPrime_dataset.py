@@ -170,7 +170,8 @@ class TPrimeDataset(Dataset):
             num_mat = 0
             for power_path in paths:     
                 if os.path.isdir(power_path):
-                    mat_list = sorted(glob(os.path.join(power_path, '*.bin'))) if self.ota else sorted(glob(os.path.join(power_path, '*.mat')))
+                    mat_list = sorted(glob(os.path.join(power_path, '*.bin')) + glob(os.path.join(power_path,'**', '*.dat'), recursive = True)) if self.ota else sorted(glob(os.path.join(power_path, '*.mat')))
+                    print(f"[DEBUG] Found {len(mat_list)} files in {power_path}")
                     self.n_sig_per_class[self.protocols[i]] = int(
                         len(mat_list) * self.raw_data_ratio)  # for each protocol, we save the amount of raw signals to retain
 
@@ -301,20 +302,44 @@ class TPrimeDataset(Dataset):
         sig_dict = self.signal_cache.get(obs_info['path'])
         self.last_file_loaded = obs_info['path']
         if sig_dict is None:
-            if not os.path.exists(dataset['data'][s_idx]['path']):
+            # Resolve the source path (and fix it if cached path points to old location)
+            src_path = dataset['data'][s_idx]['path']
+            if not os.path.exists(src_path):
                 # substitute the original path with the new raw source dir
-                fullpath, filename = os.path.split(obs_info['path'])
+                fullpath, filename = os.path.split(src_path)
                 orig_raw_source, dirname = os.path.split(fullpath)
-                # update the entry in the dictionary
-                dataset['data'][s_idx]['path'] = os.path.join(self.ds_path, dirname, filename)
-                # re-obtain the observation info dict
-                obs_info = dataset['data'][s_idx]
+                new_path = os.path.join(self.ds_path, dirname, filename)
+                dataset['data'][s_idx]['path'] = new_path
+                src_path = new_path  # update
+
+            # Load the file -> sig_np: np.ndarray with shape [N, 1], dtype complex
             if not self.ota:
-                mat_dict = sio.loadmat(obs_info['path'])
-                sig_np = mat_dict['waveform']  # expected shape [T, 1} complex
+                mat = sio.loadmat(src_path)
+                # expect .mat to have key 'waveform' shaped [T,1] complex
+                sig_np = mat['waveform']
+                if sig_np.ndim == 1:
+                    sig_np = sig_np[:, None]
             else:
-                sig_np = np.fromfile(obs_info['path'], dtype=np.complex128)
-                sig_np = np.expand_dims(mat_dict, axis=1)
+                # OTA: support .dat (float32 interleaved IQ -> complex64) and .bin (complex128)
+                if src_path.lower().endswith('.dat'):
+                    raw = np.fromfile(src_path, dtype=np.float32)
+                    if raw.size % 2:  # ensure even length for I/Q
+                        raw = raw[:-1]
+                    iq = raw.view(np.complex64)  # reinterpret as complex64 (I,Q interleaved)
+                    # Optional normalization; comment these two lines if you want truly raw:
+                    mean = iq.mean()
+                    std = iq.std() + 1e-8
+                    iq = (iq - mean) / std
+                    sig_np = iq[:, None]  # [N, 1]
+                elif src_path.lower().endswith('.bin'):
+                    sig_np = np.fromfile(src_path, dtype=np.complex128)[:, None]
+                else:
+                    raise ValueError(f"[TPrimeDataset] Unsupported OTA file extension: {src_path}")
+
+            # Cache and retrieve dict
+            self.signal_cache.put(src_path, {'np': sig_np, 'mat': ''})
+            sig_dict = self.signal_cache.get(src_path)
+         
  
 
 # Prepare TF tensor for channel only if needed
@@ -433,15 +458,43 @@ class TPrimeDataset_Transformer(TPrimeDataset):
         return ds_info
 
     def retrieve_obs(self, noisy_sig, obs_info):
-        obs = noisy_sig[obs_info['sample_ix']:obs_info['sample_ix'] + self.overlap*(self.seq_len-1) + self.slice_len, 0]
-        obs = np.stack((obs.real, obs.imag))
+    # total window length (in complex samples)
+        win_len = self.overlap * (self.seq_len - 1) + self.slice_len
+        start = obs_info['sample_ix']
+        end   = start + win_len
 
-        if self.transform:
-            obs = self.transform(obs)
+    # complex window [win_len]
+        cplx = noisy_sig[start:end, 0]
 
-        slice_ixs = list(range(0, obs.size-self.slice_len*2+1, self.overlap*2))
-        obs = [obs[i:i+self.slice_len*2] for i in slice_ixs]
-        return np.asarray(obs)
+    # interleave real/imag into flat 1D: [2*win_len]
+        ri = np.empty(cplx.size * 2, dtype=np.float32)
+        ri[0::2] = cplx.real
+        ri[1::2] = cplx.imag
+
+    # slice parameters in interleaved domain
+        slice_w = self.slice_len * 2
+        step    = self.overlap * 2
+
+    # build start indices
+        last_start = ri.size - slice_w
+        if last_start < 0:
+        # not enough samples (shouldn't happen with valid windows)
+            return np.zeros((self.seq_len, slice_w), dtype=np.float32)
+
+        starts = list(range(0, last_start + 1, step))
+
+    # force exactly seq_len slices (trim or pad by repeating last)
+        if len(starts) >= self.seq_len:
+            starts = starts[:self.seq_len]
+        else:
+            if starts:
+                starts += [starts[-1]] * (self.seq_len - len(starts))
+            else:
+                starts = [0] * self.seq_len
+
+    # gather slices → shape (seq_len, 2*slice_len)
+        out = np.stack([ri[s:s + slice_w] for s in starts], axis=0)
+        return out
     
 
 class TPrimeDataset_Transformer_overlap(TPrimeDataset_Transformer):
@@ -479,7 +532,7 @@ class TPrimeDataset_Transformer_overlap(TPrimeDataset_Transformer):
             num_mat = 0
             for path in paths:
                 if os.path.isdir(path):
-                    mat_list = sorted(glob(os.path.join(path, '*.bin')))
+                    mat_list = (sorted(glob(os.path.join(power_path, '*.bin'))) + sorted(glob(os.path.join(power_path, '**', '*.dat'), recursive = True))) if self.ota else sorted(glob(os.path.join(power_path, '*.mat')))
                     self.n_sig_per_class[directories[i]] = int(
                         len(mat_list) * self.raw_data_ratio)  # for each mix, we save the amount of raw signals to retain
 
