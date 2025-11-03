@@ -11,6 +11,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 # repo imports (your files)
 from TPrime_dataset import TPrimeDataset_Transformer
 from TPrime_transformer.model_transformer import TransformerModel  # small v1
+from preprocessing.model_rmsnorm import RMSNorm
 
 # ---------------------------- helpers ----------------------------
 
@@ -55,7 +56,7 @@ def build_dataset(val_root: Path, classes_wo_noise, seq_len=24, slice_len=64):
     )
     return ds
 
-def evaluate(model, device, loader, nclasses_global):
+def evaluate(model, device, loader, nclasses_global, rms_layer=None):
     model.eval()
     criterion = nn.CrossEntropyLoss()
     total, correct, loss_sum = 0, 0, 0.0
@@ -64,6 +65,8 @@ def evaluate(model, device, loader, nclasses_global):
     with torch.no_grad():
         for X, y in loader:
             X = X.to(device).float()
+            if rms_layer is not None:
+                X = rms_layer(X)
             y = y.to(device).long()
             logits = model(X)
             loss_sum += criterion(logits, y).item() * y.size(0)
@@ -96,6 +99,7 @@ def main():
     # model basics (small v1)
     ap.add_argument("--nhead", type=int, default=4)
     ap.add_argument("--nlayers", type=int, default=2)
+    ap.add_argument("--rmsnorm", action="store_true", help="Apply training-time RMS normalization to inputs.")
     args = ap.parse_args()
 
     val_root = Path(args.val_root)
@@ -131,6 +135,8 @@ def main():
     # build model (small v1) with correct kwargs to avoid dropout=64 bug
     state = load_state_dict_from_ckpt(args.model_path)
     model = TransformerModel(classes=nclasses_global, d_model=64*2, seq_len=24, nlayers=2, use_pos=False).to(device)
+    rms_layer = RMSNorm(model="Transformer").to(device) if args.rmsnorm else None
+
 
     # load weights (non-strict in case you trained with different head size)
     missing, unexpected = model.load_state_dict(state, strict=False)
@@ -140,7 +146,7 @@ def main():
         print("[warn] unexpected keys:", len(unexpected))
 
     # eval
-    acc, loss, cm = evaluate(model, device, loader, nclasses_global)
+    acc, loss, cm = evaluate(model, device, loader, nclasses_global, rms_layer)
     print("\n=== EVAL SUMMARY ===")
     print(f"Model   : {args.model_path}")
     print(f"Root    : {val_root}")
