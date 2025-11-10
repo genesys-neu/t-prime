@@ -179,7 +179,6 @@ def train_func(config: Dict):
     plt.colorbar(fraction=0.046, pad=0.04)
     plt.clim(0, 1)
     tick_marks = np.arange(Nclass)
-    config['protocols'][1] = '802_11b_up'
     plt.xticks(tick_marks, config['protocols'])
     plt.yticks(tick_marks, config['protocols'])
     plt.tight_layout()
@@ -242,41 +241,41 @@ def _autodetect_protocols(root):
     return sorted([d for d in os.listdir(root)
                    if os.path.isdir(os.path.join(root, d)) and not d.startswith('.')])
 
-    protocols = args.protocols if args.protocols else _autodetect_protocols(args.raw_path)  # Change protocols to argument or auto
-    ds_train = TPrimeDataset_Transformer(protocols=protocols, ds_type='train', file_postfix=args.postfix, ds_path=exp_config["raw_path"], snr_dbs=args.snr_db, seq_len=exp_config["Sequence length"], slice_len=exp_config["Slice length"], slice_overlap_ratio=0, raw_data_ratio=args.dataset_ratio,
-            override_gen_map=True, apply_wchannel=args.wchannel, transform=chan2sequence)
-    ds_test = TPrimeDataset_Transformer(protocols=protocols, ds_type='test', file_postfix=args.postfix, ds_path=exp_config["raw_path"], snr_dbs=args.snr_db, seq_len=exp_config["Sequence length"], slice_len=exp_config["Slice length"], slice_overlap_ratio=0, raw_data_ratio=args.dataset_ratio,
-            override_gen_map=False, apply_wchannel=args.wchannel, transform=chan2sequence)
+protocols = args.protocols if args.protocols else _autodetect_protocols(args.raw_path)  # Change protocols to argument or auto
+ds_train = TPrimeDataset_Transformer(protocols=protocols, ds_type='train', file_postfix=args.postfix, ds_path=exp_config["raw_path"], snr_dbs=args.snr_db, seq_len=exp_config["Sequence length"], slice_len=exp_config["Slice length"], slice_overlap_ratio=0, raw_data_ratio=args.dataset_ratio,
+        override_gen_map=True, apply_wchannel=args.wchannel, transform=chan2sequence)
+ds_test = TPrimeDataset_Transformer(protocols=protocols, ds_type='test', file_postfix=args.postfix, ds_path=exp_config["raw_path"], snr_dbs=args.snr_db, seq_len=exp_config["Sequence length"], slice_len=exp_config["Slice length"], slice_overlap_ratio=0, raw_data_ratio=args.dataset_ratio,
+        override_gen_map=False, apply_wchannel=args.wchannel, transform=chan2sequence)
 
-    if not os.path.isdir(args.cp_path):
-        os.makedirs(args.cp_path)
+if not os.path.isdir(args.cp_path):
+    os.makedirs(args.cp_path)
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    ds_info = ds_train.info()
-    Nclass = ds_info['nclasses']
-    
-    train_config = {
-        "lr": exp_config["Learning rate"], 
-        "batch_size": exp_config["Batch size"], 
-        "epochs": exp_config["Epochs"],
-        "pytorch_model": TransformerModel if not args.cls_token else TransformerModel_v2,
-        "transformer_layers": exp_config["Layers"],
-        "Nclass": Nclass,
-        "useRay": args.useRay, # TODO: fix this, currently it's not working with Ray because the dataset gets replicated among workers 
-        "seq_len": ds_info["seq_len"],
-        "slice_len": ds_info["slice_len"],
-        "num_chans": ds_info['nchans'],
-        "device": device,
-        "cp_path": args.cp_path,
-        "use_positional_enc": exp_config["Positional encoder"],
-        "protocols": protocols,
-        "wchannel": args.wchannel,
-        "snr": args.snr_db[0]
-        }
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+ds_info = ds_train.info()
+Nclass = ds_info['nclasses']
 
-    #wandb.init(project="RF_Transformer", config=exp_config)
-    #wandb.run.name = f'{args.snr_db[0]} dBs {args.wchannel} sl:{ds_info["slice_len"]} sq:{ds_info["seq_len"]} {postfix}'
+train_config = {
+    "lr": exp_config["Learning rate"], 
+    "batch_size": exp_config["Batch size"], 
+    "epochs": exp_config["Epochs"],
+    "pytorch_model": TransformerModel if not args.cls_token else TransformerModel_v2,
+    "transformer_layers": exp_config["Layers"],
+    "Nclass": Nclass,
+    "useRay": args.useRay, # TODO: fix this, currently it's not working with Ray because the dataset gets replicated among workers 
+    "seq_len": ds_info["seq_len"],
+    "slice_len": ds_info["slice_len"],
+    "num_chans": ds_info['nchans'],
+    "device": device,
+    "cp_path": args.cp_path,
+    "use_positional_enc": exp_config["Positional encoder"],
+    "protocols": protocols,
+    "wchannel": args.wchannel,
+    "snr": args.snr_db[0]
+    }
 
-    _, conf_matrix = train_func(train_config)
-    #wandb.log({"Confusion Matrix": conf_matrix})
-    #wandb.finish()
+#wandb.init(project="RF_Transformer", config=exp_config)
+#wandb.run.name = f'{args.snr_db[0]} dBs {args.wchannel} sl:{ds_info["slice_len"]} sq:{ds_info["seq_len"]} {postfix}'
+
+_, conf_matrix = train_func(train_config)
+#wandb.log({"Confusion Matrix": conf_matrix})
+#wandb.finish()

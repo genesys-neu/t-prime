@@ -1,7 +1,13 @@
 import argparse
 import sys
 import os
-sys.path.insert(0, '../')
+
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+_REPO_ROOT = os.path.abspath(os.path.join(_THIS_DIR, os.pardir))
+_RESULTS_DIR = os.path.join(_THIS_DIR, "training")
+os.makedirs(_RESULTS_DIR, exist_ok=True)
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
@@ -26,6 +32,23 @@ def chan2sequence(obs):
 def get_model_name(name):
     name = name.split("/")[-1]
     return '.'.join(name.split(".")[0:-1])
+
+
+def _pretty_label(name: str) -> str:
+    if name.startswith('802_11'):
+        label = name.replace('802_11', '').replace('_upsampled', '').replace('_', '')
+        return label
+    return name
+
+
+def _autodetect_protocols(root_dir):
+    """Return sorted list of class folders contained in root_dir."""
+    if root_dir is None or not os.path.isdir(root_dir):
+        raise ValueError(f"Dataset path '{root_dir}' is not a valid directory")
+    return sorted([
+        d for d in os.listdir(root_dir)
+        if os.path.isdir(os.path.join(root_dir, d)) and not d.startswith('.')
+    ])
 
 # === NEW: checkpoint helpers ===
 def _save_checkpoint(path_dir, model_name_prefix, tag, model, optimizer, epoch, acc, loss, extra=None):
@@ -156,14 +179,13 @@ def finetune(model, config):
         best_cm[r, :] = best_cm[r, :] / sum_row  * 100.0 # compute in percentage
     print('------------------- Best confusion matrix (%) -------------------')
     print(np.around(best_cm, decimals=2))
-    prot_display = ['ax', 'b', 'n', 'g'] # PROTOCOLS
-    if len(PROTOCOLS) > 4: # We need to add noise class
-        prot_display.append('noise')
+    prot_display = [_pretty_label(p) for p in PROTOCOLS]
     disp = ConfusionMatrixDisplay(confusion_matrix=best_cm, display_labels=prot_display)
     disp.plot(cmap="Blues", values_format='.2f')
     disp.ax_.get_images()[0].set_clim(0, 100)
     plt.title(f'Conf. Matrix (%): Total Acc. {(best_acc):>0.1f}%')
-    plt.savefig(f"./training/Results_finetune_{MODEL_NAME}_ft.{OTA_DATASET}.{TEST_FLAG}.{RMS_FLAG}{NOISE_FLAG}.pdf")
+    plot_path = os.path.join(_RESULTS_DIR, f"Results_finetune_{MODEL_NAME}_ft.{OTA_DATASET}.{TEST_FLAG}.{RMS_FLAG}{NOISE_FLAG}.pdf")
+    plt.savefig(plot_path)
     plt.clf()
     print('-----------------------------------------------------------------')
     return
@@ -172,9 +194,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_path", default='../TPrime_transformer/model_cp', help='Path to the trained model or to where to save the trained model from scratch with model name included')
     parser.add_argument("--ds_path", default='../data', help='Path to the over the air datasets')
-    parser.add_argument("--datasets", nargs='+', required=True, help="Dataset name to be used for training or test")
+    parser.add_argument("--raw_path", default=None, help='Path to baseband datasets generated offline (non-OTA)')
+    parser.add_argument("--datasets", nargs='+', required=False, help="Dataset name to be used for training or test (when using OTA data)")
+    parser.add_argument('--protocols', nargs='+', default=None, help='Protocol/class folder names to use with --raw_path. Autodetected if omitted.')
     parser.add_argument("--dataset_ratio", default=1.0, type=float, help="Portion of the dataset used for training and validation")
     parser.add_argument("--use_gpu", action='store_true', default=False, help="Use gpu for fine-tuning and inference")
+    parser.add_argument("--gpu_device", type=int, default=0, help="GPU index to use when --use_gpu is provided")
     parser.add_argument("--transformer_version", default=None, required=False, choices=["v1", "v2"], help='Architecture of the model that will be \
                         finetuned. Options are v1 and v2. These refer to the two Transformer-based architectures available, without or with [CLS] token')
     parser.add_argument("--transformer", default="CNN", choices=["sm", "lg"], help="Size of transformer to use, options available are small and \
@@ -190,16 +215,27 @@ if __name__ == "__main__":
     args, _ = parser.parse_known_args()
 
     # Config
-    MODEL_NAME = get_model_name(args.model_path)
+    INPUT_MODEL_NAME = get_model_name(args.model_path)
+    MODEL_NAME = INPUT_MODEL_NAME + ('_finetuned' if args.retrain else '')
     PATH = '/'.join(args.model_path.split('/')[0:-1])
-    PROTOCOLS = args.datasets
+
+    using_raw_dataset = args.raw_path is not None
+    if using_raw_dataset:
+        raw_root = os.path.abspath(args.raw_path)
+        PROTOCOLS = args.protocols if args.protocols else _autodetect_protocols(raw_root)
+        DATASET_LABELS = [os.path.basename(os.path.normpath(raw_root))]
+    else:
+        if not args.datasets:
+            raise ValueError("--datasets must be provided when --raw_path is not used")
+        PROTOCOLS = args.datasets
+        DATASET_LABELS = PROTOCOLS
     CHANNELS = ['None', 'TGn', 'TGax', 'Rayleigh']
     TEST_FLAG = 'rsg' if args.test_mode == 'random_sampling' else 'fut'
     RMS_FLAG = 'RMSn' if args.RMSNorm else ''
     NOISE_FLAG = '_bckg' if args.back_class else ''
     if args.back_class:
         PROTOCOLS.append('noise')
-    OTA_DATASET = args.ota_dataset
+    OTA_DATASET = args.ota_dataset if args.ota_dataset else (DATASET_LABELS[0] if DATASET_LABELS else '')
     train_config = {
         'batchSize': 122,
         'lr': 0.00002,
@@ -210,7 +246,7 @@ if __name__ == "__main__":
     font = {'size': 15}
     plt.rc('font', **font)
 
-    datasets = args.datasets
+    datasets = DATASET_LABELS
     ds_train = []
     ds_test = []
     # Load model
@@ -229,33 +265,66 @@ if __name__ == "__main__":
             global_model = TransformerModel_v2
         # choose correct size
         if args.transformer == "sm":
-            model = global_model(classes=len(PROTOCOLS), d_model=64*2, seq_len=24, nlayers=2, use_pos=False)
-            # Load over the air dataset
-            for ds in datasets:
-                ds_train.append(TPrimeDataset_Transformer(protocols=PROTOCOLS, ds_path=args.ds_path, ds_type='train', seq_len=24, slice_len=64, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
-                                               raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence))
-                ds_test.append(TPrimeDataset_Transformer(protocols=PROTOCOLS, ds_path=args.ds_path, ds_type='test', seq_len=24, slice_len=64, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
-                                              raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence))
+            seq_len = 24
+            slice_len = 64
+            model = global_model(classes=len(PROTOCOLS), d_model=64*2, seq_len=seq_len, nlayers=2, use_pos=False)
         else: # lg
-            model = global_model(classes=len(PROTOCOLS), d_model=128*2, seq_len=64, nlayers=2, use_pos=False)
-            for ds in datasets:
-                ds_train.append(TPrimeDataset_Transformer(protocols=PROTOCOLS, ds_path=args.ds_path, ds_type='train', seq_len=64, slice_len=128, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
-                                               raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence))
-                ds_test.append(TPrimeDataset_Transformer(protocols=PROTOCOLS, ds_path=args.ds_path, ds_type='test', seq_len=64, slice_len=128, slice_overlap_ratio=0, test_ratio=0.2, testing_mode=args.test_mode,
-                                              raw_data_ratio=args.dataset_ratio, override_gen_map=False, ota=True, apply_wchannel=None, apply_noise=False, transform=chan2sequence))
+            seq_len = 64
+            slice_len = 128
+            model = global_model(classes=len(PROTOCOLS), d_model=128*2, seq_len=seq_len, nlayers=2, use_pos=False)
+
+        dataset_kwargs_base = dict(
+            protocols=PROTOCOLS,
+            seq_len=seq_len,
+            slice_len=slice_len,
+            slice_overlap_ratio=0,
+            test_ratio=0.2,
+            testing_mode=args.test_mode,
+            raw_data_ratio=args.dataset_ratio,
+            override_gen_map=False,
+            ota=not using_raw_dataset,
+            apply_wchannel=None,
+            apply_noise=False,
+            transform=chan2sequence
+        )
+
+        if using_raw_dataset:
+            dataset_kwargs_base['ds_path'] = raw_root
+        else:
+            dataset_kwargs_base['ds_path'] = args.ds_path
+
+        for _ in datasets:
+            train_kwargs = dict(dataset_kwargs_base)
+            train_kwargs['ds_type'] = 'train'
+            ds_train.append(TPrimeDataset_Transformer(**train_kwargs))
+
+            test_kwargs = dict(dataset_kwargs_base)
+            test_kwargs['ds_type'] = 'test'
+            ds_test.append(TPrimeDataset_Transformer(**test_kwargs))
+            if using_raw_dataset:
+                break  # raw datasets are instantiated once regardless of number of labels provided
     # concat all loaded datasets
     ds_train = torch.utils.data.ConcatDataset(ds_train)
     if not args.test:
         ds_test = torch.utils.data.ConcatDataset(ds_test)
 
-    device = torch.device("cuda" if torch.cuda.is_available() and args.use_gpu else "cpu")
+    if args.use_gpu:
+        if not torch.cuda.is_available():
+            raise RuntimeError("--use_gpu was set but CUDA is not available on this system")
+        gpu_idx = args.gpu_device
+        total_gpus = torch.cuda.device_count()
+        if gpu_idx < 0 or gpu_idx >= total_gpus:
+            raise ValueError(f"Requested GPU index {gpu_idx} is invalid. Available GPUs: 0..{total_gpus-1}")
+        device = torch.device(f"cuda:{gpu_idx}")
+        print(f"[info] Using GPU device {device}")
+    else:
+        device = torch.device("cpu")
     if args.retrain: # Load pretrained model
         try:
             model.load_state_dict(torch.load(args.model_path, map_location=device)['model_state_dict'])
         except:
             raise Exception("The model you provided does not correspond with the selected architecture. Please revise and try again.")
-    if args.use_gpu:
-        model.cuda()
+    model.to(device)
 
     if args.test and not args.retrain:
         # Use the loaded model to do inference over the OTA dataset
@@ -295,7 +364,7 @@ if __name__ == "__main__":
             correct /= size
             # report accuracy and save confusion matrix
             print(
-                f"\n\nTest Error for dataset {args.datasets[ds_ix]}: \n "
+                f"\n\nTest Error for dataset {DATASET_LABELS[ds_ix]}: \n "
                 f"Accuracy: {(100 * correct):>0.1f}%, "
                 f"Avg loss: {test_loss:>8f} \n"
             )
@@ -304,22 +373,21 @@ if __name__ == "__main__":
                 sum_row = np.sum(conf_matrix[r, :])
                 conf_matrix[r, :] = conf_matrix[r, :] / sum_row  * 100.0 # compute in percentage
             conf_matrix[np.isnan(conf_matrix)] = 0
-            prot_display = ['ax', 'b', 'n', 'g'] # PROTOCOLS
-            if len(PROTOCOLS) > 4: # We need to add noise class
-                prot_display.append('noise')
+            prot_display = [_pretty_label(p) for p in PROTOCOLS]
             disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=prot_display)
             disp.plot(cmap="Blues", values_format='.2f')
             disp.ax_.get_images()[0].set_clim(0, 100)
             plt.title(f'Conf. Matrix (%): Total Acc. {(100 * correct):>0.1f}%')
-            plt.savefig(f"./Results_finetune_{MODEL_NAME}.{args.datasets[ds_ix]}.{TEST_FLAG}.{RMS_FLAG}{NOISE_FLAG}.pdf")
+            plot_path = os.path.join(_RESULTS_DIR, f"Results_finetune_{MODEL_NAME}.{DATASET_LABELS[ds_ix]}.{TEST_FLAG}.{RMS_FLAG}{NOISE_FLAG}.pdf")
+            plt.savefig(plot_path)
             plt.clf()
-            print(f'Confusion matrix (%) for {args.datasets[ds_ix]}')
+            print(f'Confusion matrix (%) for {DATASET_LABELS[ds_ix]}')
             print(np.around(conf_matrix, decimals=2))
             print('-------------------------------------------')
             print('-------------------------------------------')
         
         # Global confusion matrix for all test datasets if more than one provided
-        if len(args.datasets) > 1:
+        if len(DATASET_LABELS) > 1:
             global_conf_matrix = global_conf_matrix.astype('float')
             global_correct /= global_size
             print(
@@ -334,7 +402,8 @@ if __name__ == "__main__":
             disp.plot(cmap="Blues", values_format='.2f')
             disp.ax_.get_images()[0].set_clim(0, 100)
             plt.title(f'Global Conf. Matrix (%): Total Acc. {(100 * global_correct):>0.1f}%')
-            plt.savefig(f"./Results_finetune_{MODEL_NAME}.{OTA_DATASET}.{TEST_FLAG}.{RMS_FLAG}{NOISE_FLAG}.pdf")
+            plot_path = os.path.join(_RESULTS_DIR, f"Results_finetune_{MODEL_NAME}.{OTA_DATASET}.{TEST_FLAG}.{RMS_FLAG}{NOISE_FLAG}.pdf")
+            plt.savefig(plot_path)
             plt.clf()
             print(f'Global Confusion Matrix (%) for {OTA_DATASET}')
             print(np.around(global_conf_matrix, decimals=2))
