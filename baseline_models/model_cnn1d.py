@@ -5,7 +5,7 @@ from torch import nn
 
 # Define model
 class Baseline_CNN1D(nn.Module):
-    def __init__(self, numChannels=1, slice_len=4, classes=3, normalize=False):
+    def __init__(self, numChannels=1, slice_len=512, classes=8, normalize=False):
         super(Baseline_CNN1D, self).__init__()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 

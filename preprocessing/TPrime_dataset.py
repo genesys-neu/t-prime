@@ -10,6 +10,10 @@ from tqdm import tqdm
 proj_root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.join(os.pardir, os.pardir)))
 import sys
 sys.path.append(proj_root_dir)
+from scipy.io import loadmat
+import random
+from scipy.interpolate import interp1d
+from scipy.signal import fftconvolve
 
 class FileCache:
     def __init__(self, max_size):
@@ -49,18 +53,27 @@ class TPrimeDataset(Dataset):
                  test_ratio=0.2,
                  calib_ratio=0.1,
                  testing_mode='random_sampling',
-                 ds_path='../data/DATASET1_1',
+                 ds_path='../data/DATASET1_2',
                  file_postfix='',
                  noise_model='AWGN', snr_dbs=[30], seed=4389,
+                 
                  apply_noise=True, apply_wchannel=None,
                  override_gen_map=False,
                  normalize=False,
                  ota=False, # OVER THE AIR
                  transform=None, target_transform=None,
                  double_class_label=False,
-                 out_mode='real'):
+                 out_mode='real',
+                 channel_path=None,
+                 use_channel_aug=False,
+                 use_sota = False,
+                 sota_type = 'awgn',
+                 use_cfo = False,
+                 max_cfo = 2000,
+                 awgn_snr_range = (5.0, 30.0)   # uniform SNR range (dB) for sota_type='awgn'
+                ):
 
-        self.protocols = protocols
+        self.protocols =  protocols
         self.slice_len = slice_len
         self.slice_overlap_ratio = slice_overlap_ratio
         self.overlap = self.slice_len - int(self.slice_len * self.slice_overlap_ratio)
@@ -75,6 +88,16 @@ class TPrimeDataset(Dataset):
         self.test_ratio = test_ratio
         self.double_class_label = double_class_label    # this is used for overlapping case (it outputs two labels)
         self.out_mode = out_mode
+        self.channel_path = channel_path
+        self.use_channel_aug = use_channel_aug
+        self.use_sota = use_sota
+        self.sota_type = sota_type
+        self.use_cfo = use_cfo
+        self.max_cfo = float(max_cfo)
+        self.awgn_snr_range = awgn_snr_range
+        # self.slice_len = 64
+        # self.seq_len = 4
+        # self.overlap = 1
 
         if not (self.seed is None):
             np.random.seed(self.seed)
@@ -82,18 +105,22 @@ class TPrimeDataset(Dataset):
         if ota:
             assert(apply_wchannel is None)
 
+
         assert(ds_type in ['train', 'test'])
         self.ds_type = ds_type
         if file_postfix != '' and file_postfix[-1] != '_':
             file_postfix += '__'
         if not ota:
-            info_filename = 'ds_info__'+file_postfix+'slice'+str(slice_len)+'_'+str(len(protocols))+testing_mode+'class.pkl'
+
+            info_filename = 'ds_info_'+file_postfix+'slice'+str(slice_len)+'_classes_'+str(len(protocols))+'_'+testing_mode+'_class.pkl'
+
         else: # over the air
             if calib_ratio == 0.0:
                 info_filename = 'ds_info__'+file_postfix+'slice'+str(slice_len)+'_'+str(len(protocols))+testing_mode+'class_ota.pkl'
             else: # Calibration included in dataset
                 info_filename = 'ds_info__'+file_postfix+'slice'+str(slice_len)+'_'+str(len(protocols))+'_calib_'+testing_mode+'class_ota.pkl'
         ds_info_path = os.path.join(self.ds_path, info_filename)
+     
         do_gen_info = True
         if os.path.exists(ds_info_path) and (not override_gen_map):
             #ans = input('File '+info_filename+' already exists. Do you wanna create a new one? [y/n]')
@@ -102,7 +129,11 @@ class TPrimeDataset(Dataset):
 
         if do_gen_info:
             self.ds_info = self.generate_ds_map(ds_path, info_filename, test_ratio, calib_ratio)
+        
+
+
         else:
+            print("Loading pickle from:", ds_info_path)
             self.ds_info = pickle.load(open(ds_info_path, 'rb'))
 
         if normalize:
@@ -116,48 +147,68 @@ class TPrimeDataset(Dataset):
         self.apply_noise = apply_noise
 
         self.signal_cache = FileCache(max_size=20e3)
-
-        # let's initialize Matlab engine
-        if not (self.apply_wchannel is None):
-            self.possible_channels = ['TGn', 'TGax', 'Rayleigh', 'relative', 'random']
-            assert(self.apply_wchannel in self.possible_channels)
-            self.channel_map = {}
-            from preprocessing.matutils import matutils
-            self.mateng = matutils.MatlabEngine()  # todo check if we need any custom paths
-            # initialize each channel object for each protocol used
-            self.chan_models = {}
-            for ix, p in enumerate(protocols[0:4]):
-                if p == '802_11n':
-                    tgn = self.mateng.eng.wlanTGnChannel('SampleRate', float(20e6), 'DelayProfile', 'Model-B', 'LargeScaleFadingEffect', 'Pathloss', 'PathGainsOutputPort', True)
-                    self.chan_models[ix] = tgn
-                    self.channel_map['TGn'] = ix
-                elif p == '802_11ax':
-                    tgax = self.mateng.eng.wlanTGaxChannel('SampleRate', float(20e6), 'ChannelBandwidth', 'CBW20', 'DelayProfile', 'Model-B', 'LargeScaleFadingEffect', 'Pathloss', 'PathGainsOutputPort', True)
-                    self.chan_models[ix] = tgax
-                    self.channel_map['TGax'] = ix
-                elif p == '802_11b':
-                    rayleighB = self.mateng.eng.comm.RayleighChannel('SampleRate', float(11e6), 'PathDelays', float(1.5e-9), 'AveragePathGains', float(-3), 'PathGainsOutputPort', True)
-                    self.chan_models[ix] = rayleighB
-                    self.channel_map['RayleighB'] = ix
-                elif (p == '802_11b_upsampled') or (p == '802_11g'):
-                    rayleigh = self.mateng.eng.comm.RayleighChannel('SampleRate', float(20e6), 'PathDelays', float(1.5e-9), 'AveragePathGains', float(-3), 'PathGainsOutputPort', True)
-                    self.chan_models[ix] = rayleigh
-                    self.channel_map['Rayleigh'] = ix
+        
+        # # let's initialize Matlab engine
+        # if not (self.apply_wchannel is None):
+        #     self.possible_channels = ['TGn', 'TGax', 'Rayleigh', 'relative', 'random']
+        #     assert(self.apply_wchannel in self.possible_channels)
+        #     self.channel_map = {}
+        #     from preprocessing.matutils import matutils
+        #     self.mateng = matutils.MatlabEngine()  # todo check if we need any custom paths
+        #     # initialize each channel object for each protocol used
+        #     self.chan_models = {}
+        #     for ix, p in enumerate(protocols[0:4]):
+        #         if p == '802_11n':
+        #             tgn = self.mateng.eng.wlanTGnChannel('SampleRate', float(20e6), 'DelayProfile', 'Model-B', 'LargeScaleFadingEffect', 'Pathloss', 'PathGainsOutputPort', True)
+        #             self.chan_models[ix] = tgn
+        #             self.channel_map['TGn'] = ix
+        #         elif p == '802_11ax':
+        #             tgax = self.mateng.eng.wlanTGaxChannel('SampleRate', float(20e6), 'ChannelBandwidth', 'CBW20', 'DelayProfile', 'Model-B', 'LargeScaleFadingEffect', 'Pathloss', 'PathGainsOutputPort', True)
+        #             self.chan_models[ix] = tgax
+        #             self.channel_map['TGax'] = ix
+        #         elif p == '802_11b':
+        #             rayleighB = self.mateng.eng.comm.RayleighChannel('SampleRate', float(11e6), 'PathDelays', float(1.5e-9), 'AveragePathGains', float(-3), 'PathGainsOutputPort', True)
+        #             self.chan_models[ix] = rayleighB
+        #             self.channel_map['RayleighB'] = ix
+        #         elif (p == '802_11b_upsampled') or (p == '802_11g'):
+        #             rayleigh = self.mateng.eng.comm.RayleighChannel('SampleRate', float(20e6), 'PathDelays', float(1.5e-9), 'AveragePathGains', float(-3), 'PathGainsOutputPort', True)
+        #             self.chan_models[ix] = rayleigh
+        #             self.channel_map['Rayleigh'] = ix
     
+    # def generate_windows(self, len_sig):
+    #     # print("first generate_windiows")
+    #     #1024 - 64 , self.overlap
+    #     print(self.overlap)
+    #     print(list(range(0, len_sig-self.slice_len, self.overlap)))
+    #     return list(range(0, len_sig-self.slice_len, self.overlap))
+
     def generate_windows(self, len_sig):
-        return list(range(0, len_sig-self.slice_len, self.overlap))
+        #print(self.overlap)
+        starts = list(range(0, len_sig - self.slice_len + 1, self.overlap))
+        
+        # Check if we missed the last window and it's still valid
+        if starts[-1] + self.slice_len < len_sig:
+            starts.append(len_sig - self.slice_len)
+
+        #print(f"Window starts (using all): {starts}")
+        return starts
+
 
     def generate_ds_map(self, ds_path, filename, test_ratio=0.2, calib_ratio=0.1):
         examples_map = {}
+        #self.protocols = ['802.11ax', '802.11b', '802.11n', '802.11g']
+        #self.protocols =  ['16QAM', '64QAM', '8PSK', 'BPSK', 'CPFSK', 'GFSK', 'PAM4', 'QPSK', '802_11ax']
         class_map = dict(zip(self.protocols, range(len(self.protocols))))
         # check if folders are names with _ or .
         if os.path.isdir(os.path.join(ds_path, self.protocols[0])):
             protocols = self.protocols
+
         elif (os.path.isdir(os.path.join(ds_path, '802.11ax')) or os.path.isdir(os.path.join(ds_path, '802.11ax_0'))): #ds_path[-3:] == 'dBs'): 
-            protocols = ['802.11ax', '802.11b', '802.11n', '802.11g']
+            #protocols =  ['16QAM', '64QAM', '8PSK', 'BPSK', 'CPFSK', 'GFSK', 'PAM4', 'QPSK', '802_11ax']
             if len(self.protocols) == 5:
                 protocols.append('noise') 
         else:
+            
             sys.exit('[TPrimeDataset] protocols folder names  not found at ' + ds_path + '. Aborting...')
         # retrieve the list of signals (.mat) from every folder/protocol specified
         for i, p in enumerate(protocols):
@@ -219,21 +270,44 @@ class TPrimeDataset(Dataset):
                     # read binary files and get length
                     sig = np.fromfile(path, dtype=np.complex128)
                     len_sig = sig.shape[0]
+                # print("Signal length", len_sig)
                 window_ixs = self.generate_windows(len_sig)
+
+                #print(f"len_sig = {len_sig} - slice_len*seq_len = {self.slice_len}*{self.seq_len}, last_ind_list = {len_sig-(self.slice_len*self.seq_len)} overlap{self.overlap}*seq_len-1={self.seq_len-1} + slice_len-{self.slice_len} step_size = {self.overlap*(self.seq_len-1) + self.slice_len}, {window_ixs}")#  list(range(0, len_sig-(64*8), \
+                    # 32*(7) + 64)) )
+
+                # print("len_sig", len_sig)
+                # print("WINDOW IXS 1", window_ixs)
+
+
+
+                # example_window  = list(range(0, len_sig-self.slice_len, self.overlap))
+                # print("EXAMPLE WINDOW", example_window)
+                # print("overlap", self.overlap, "slice len" ,self.slice_len, "overlap ratio" ,self.slice_overlap_ratio)
+                # print("OVERLAP", self.overlap, "SLICE LEN", self.slice_len, "SLICE OVERLAP RATIO", self.slice_overlap_ratio)
                 n_windows = len(window_ixs)
+
+                # example_2 = list(range(0, len_sig-(self.slice_len*self.seq_len), \
+                #     self.overlap*(self.seq_len-1) + self.slice_len))
+                # print(example_2)
+
                 examples_map[c][ix] = {'sample': window_ixs, # sample is slice for CNN or sequence for Transformer
                                        'path': examples_map[c][ix]}  # here we modify the original content
+                # print("ix<threshold", ix, test_threshold)
                 if ix <= test_threshold:
+                    
                     for w in window_ixs:
                         data_ixs[ixs_count] = {'path': path, 'sample_ix': w}
                         labels_ixs[ixs_count] = class_map[c]
                         ixs_count += 1
                 elif ix <= calib_threshold:
+                    
                     for w in window_ixs:
                         calib_data_ixs[calib_ixs_count] = {'path': path, 'sample_ix': w}
                         calib_labels_ixs[calib_ixs_count] = class_map[c]
                         calib_ixs_count += 1
                 else:
+                    
                     for w in window_ixs:
                         test_data_ixs[test_ixs_count] = {'path': path, 'sample_ix': w}
                         test_labels_ixs[test_ixs_count] = class_map[c]
@@ -242,7 +316,9 @@ class TPrimeDataset(Dataset):
 
         # lastly, we separate the training, testing, and calibration datasets by randomly sampling a certain % of data sample indices
         if self.testing_mode == 'random_sampling':
+            # print('Random Sampleing == TRUE')
             total_count = ixs_count
+
             # First, randomly sample indices for the calibration set
             calib_ixs = np.random.choice(total_count, size=int(total_count * calib_ratio), replace=False)
             remaining_ixs = list(set(range(total_count)) - set(calib_ixs))
@@ -268,6 +344,7 @@ class TPrimeDataset(Dataset):
                 i_label = labels_ixs.pop(i)
                 test_labels_ixs[i] = i_label
 
+
         # Remaining data_ixs and labels_ixs now represent the training set
         train_data_ixs = data_ixs
         train_labels_ixs = labels_ixs
@@ -291,7 +368,9 @@ class TPrimeDataset(Dataset):
                 },
             'ixs_maps': {'train': train_ixs, 'test': test_ixs, 'calib': calib_ixs}  # linear indexes maps (used by ray/torch)
             }
+        # print(ds_info)
         pickle.dump(ds_info, open(ds_info_path, 'wb'))
+        # print("Class map", class_map)
 
         return ds_info
 
@@ -304,6 +383,7 @@ class TPrimeDataset(Dataset):
             'nclasses': len(self.protocols),
             'nchans': 2,    # real and imag components are separated on different channels
         }
+
         return ds_info
 
     def __len__(self):
@@ -311,6 +391,7 @@ class TPrimeDataset(Dataset):
     
     def retrieve_obs(self, noisy_sig, obs_info):
         obs = noisy_sig[obs_info['sample_ix']:obs_info['sample_ix']+self.slice_len, 0]
+        # print("obs", obs)
         if self.out_mode == 'complex':
             obs = obs   # return complex version
         elif self.out_mode == 'real_invdim':
@@ -328,13 +409,225 @@ class TPrimeDataset(Dataset):
         if self.transform:
             obs = self.transform(obs)
         return obs
+    
+    FS = 30.72e6
+
+    def augment_random_fir(self, x: np.ndarray, num_taps: int = 128) -> np.ndarray:
+        """
+        Convolve with a random normalized complex FIR filter of length num_taps.
+        """
+        # random complex taps
+        taps = (np.random.randn(num_taps) + 1j*np.random.randn(num_taps))
+        # taps /= np.linalg.norm(taps)  # normalize energy
+        # use FFT convolution for speed
+        y = fftconvolve(x, taps, mode='same')
+        y = y.reshape((1024, 1))
+        return y
+
+
+    def augment_ricean(self, x: np.ndarray,
+                    K_dB: float = 5.0,
+                    num_taps: int = 128) -> np.ndarray:
+        """
+        Apply a Ricean fading channel:
+        K_dB: Rice factor in dB (LOS vs. NLOS power ratio)
+        num_taps: length of the channel impulse response
+        """
+        K = 10**(K_dB/10)
+        # LOS component on tap-0
+        los = np.sqrt(K/(K+1))
+        # NLOS taps: circular complex Gaussian
+        nlos = (np.random.randn(num_taps) + 1j*np.random.randn(num_taps))\
+            / np.sqrt(2*(K+1))
+        h = nlos
+        h[0] += los
+        # h /= np.linalg.norm(h)  # normalize channel power
+        y = fftconvolve(x, h, mode='same')
+        y = y.reshape((1024, 1))
+        return y
+
+    def augment_rayleigh(self, x: np.ndarray, num_taps: int = 128) -> np.ndarray:
+        """
+        Apply a Rayleigh fading channel with num_taps taps.
+        """
+        # all NLOS, zero-mean complex Gaussian
+        h = (np.random.randn(num_taps) + 1j*np.random.randn(num_taps))\
+            / np.sqrt(2)
+        # h /= np.linalg.norm(h)
+        y = fftconvolve(x, h, mode='same')
+        y = y.reshape((1024, 1))
+        return y
+
+    def augment_awgn(self, x: np.ndarray,
+                    snr_dB: float = None,
+                    # snr_dB_min: float = -30.0,
+                    snr_dB_min: float =  5.0,
+                    snr_dB_max: float =  30.0) -> np.ndarray:
+        """
+        Add complex AWGN to achieve a random SNR between snr_dB_min and snr_dB_max.
+        If snr_dB is given, use that exact SNR.
+        """
+        if snr_dB is None:
+            snr_dB = np.random.uniform(snr_dB_min, snr_dB_max)
+            # snr_dB = np.random.normal(snr_dB_min, snr_dB_max)
+        sig_power = np.mean(np.abs(x)**2)
+        noise_power = sig_power / (10**(snr_dB/10))
+        noise = np.sqrt(noise_power/2) * (
+            np.random.randn(*x.shape) + 1j*np.random.randn(*x.shape)
+        )
+        output = x+noise
+        output = output.reshape((1024, 1))
+        return output
+
+    def augment_impairments(self, x: np.ndarray,
+                            fs: float = FS,
+                            freq_offset_range: tuple = (-10e4, 10e4),
+                            phase_offset_range: tuple = (-np.pi, np.pi),
+                            gain_imbalance_range: tuple = (8.0, 12.0),
+                            phase_imbalance_deg_range: tuple = (-45, 45)
+                            # freq_offset_range: tuple = (-1e4, 1e4),
+                            # phase_offset_range: tuple = (-np.pi, np.pi),
+                            # gain_imbalance_range: tuple = (0.8, 1.2),
+                            # phase_imbalance_deg_range: tuple = (-5, 5)
+                            ) -> np.ndarray:
+        N = len(x)
+        t = np.arange(N) / fs
+
+        # 1) Frequency offset
+        df = np.random.uniform(*freq_offset_range)
+        x = x * np.exp(1j*2*np.pi*df*t)
+
+        # 2) Phase offset
+        phi0 = np.random.uniform(*phase_offset_range)
+        x = x * np.exp(1j*phi0)
+
+        # 3) IQ gain & phase imbalance
+        g = np.random.uniform(*gain_imbalance_range)
+        phi_iq = np.deg2rad(np.random.uniform(*phase_imbalance_deg_range))
+
+        xi = np.real(x)
+        xq = np.imag(x)
+        # apply gain to I, and rotate Q by phi_iq
+        x_iq = ( g*xi ) + 1j*( xq*np.cos(phi_iq) + xi*np.sin(phi_iq) )
+        x_iq = x_iq.reshape((1024, 1))
+        return x_iq
+    
+    def rms_normalize(self, x):
+        rms = np.sqrt(np.mean(np.abs(x)**2))
+        if rms == 0:
+            return x  
+        return x / rms
+    
+    def apply_channel_via_fft(self, channel_fd, tx_td):
+        channel_fd = channel_fd.flatten()
+        tx_td = tx_td.flatten()
+        channel_fd = np.asarray(channel_fd)
+        tx_td = np.asarray(tx_td)
+
+        if channel_fd.ndim != 1 or channel_fd.size != 1200:
+            raise ValueError(f"channel_fd must be 1D of length 1200, but got shape {channel_fd.shape}")
+        if tx_td.ndim != 1 or tx_td.size != 1024:
+            raise ValueError(f"tx_td must be 1D of length 1024, but got shape {tx_td.shape}")
+
+        N_orig = 1024
+        N_up = 2048
+        orig_idx = np.arange(N_orig)
+        new_idx = np.linspace(0, N_orig - 1, N_up)
+
+        tx_real = np.real(tx_td)
+        tx_imag = np.imag(tx_td)
+
+        interp_real = interp1d(orig_idx, tx_real, kind="linear")
+        interp_imag = interp1d(orig_idx, tx_imag, kind="linear")
+
+        tx_up_real = interp_real(new_idx)
+        tx_up_imag = interp_imag(new_idx)
+        tx_up = tx_up_real + 1j * tx_up_imag
+
+        X_full = np.fft.fft(tx_up)
+        X_full = np.fft.fftshift(X_full)
+
+        channel_start = channel_fd[599]
+        channel_end = channel_fd[600]
+        midpoint = (channel_start + channel_end) / 2
+        ch_1201 = np.concatenate([channel_fd[:600], np.array([midpoint]), channel_fd[600:]])
+
+        start1201 = (2048 - 1201) // 2 + 1
+        end1201 = start1201 + 1201
+        X_mid1201 = X_full[start1201:end1201]
+
+        H = ch_1201
+        HH = np.conjugate(H)
+        csi = np.real(H * HH)
+        K = HH / csi
+
+        Y_mid1201 = X_mid1201 / K
+
+        # DC sits at index 600 of the 1201-bin slice; starting at 88 puts it at index 512 so ifftshift maps it back
+        # to bin 0 (the original "+ 1" shifted every augmented signal by -1 bin = -30 kHz)
+        start1024 = (1201 - 1024) // 2
+        end1024 = start1024 + 1024
+        Y_mid1024 = Y_mid1201[start1024:end1024]
+
+        Y_ifft_input = np.fft.ifftshift(Y_mid1024)
+        y_out = np.fft.ifft(Y_ifft_input)
+        y_out = y_out.reshape((1024, 1))
+        # print(">>> Inside apply_channel_via_fft")
+        # print(f"tx_td dtype: {tx_td.dtype}, shape: {tx_td.shape}, type: {type(tx_td)}")
+        # print(f"channel_fd dtype: {channel_fd.dtype}, shape: {channel_fd.shape}, type: {type(channel_fd)}")
+        # print(f"Output signal dtype: {y_out.dtype}, shape: {y_out.shape}, type: {type(y_out)}")
+        # print(f"First 3 output samples: {y_out[:3].flatten()}")
+        # print("<<< End apply_channel_via_fft")
+
+        return y_out.astype(np.complex128)
+
+
+    def apply_cfo_single(self, signal: np.ndarray, max_offset: float = 2000, fs: float = 30.72e6) -> np.ndarray:
+        N = signal.shape[0]
+        t = np.arange(N).reshape(-1, 1) / fs  #(1024, 1)
+
+        # delta_f = np.random.normal(-max_offset, max_offset)
+        delta_f = np.random.uniform(-max_offset, max_offset)
+        rotation = np.exp(1j * 2 * np.pi * delta_f * t)        
+
+        return signal * rotation  
+    # def apply_channel_augmentation(self, sig, label=None):
+    #     sig = sig.flatten()  # shape: (1024,)
+    #     h_fd = self.load_random_channel_fd(self.channel_path)  # shape: (1200,)
+    #     y = apply_channel_via_fft(h_fd, sig)  # shape: (1024,)
+    #     return y.astype(np.complex64)  # Already (1024, 1)
+
+
+    def load_random_channel_fd(self, channel_path):
+        mat_files = [f for f in os.listdir(channel_path) if f.endswith('.mat')]
+        if not mat_files:
+            raise FileNotFoundError(f"No .mat files found in {channel_path}")
+
+        chosen_file = random.choice(mat_files)
+        path = os.path.join(channel_path, chosen_file)
+        # print("CHOSEN FILE", chosen_file)
+        mat = loadmat(path)
+        if 'chanEstCurrent' not in mat:
+            raise KeyError(f"'chanEstCurrent' not found in {chosen_file}")
+
+        h_fd = mat['chanEstCurrent'].flatten()  # shape: (1200,) or similar
+
+        if h_fd.shape[0] != 1200:
+            raise ValueError(f"{chosen_file} has unexpected shape: {h_fd.shape}")
+
+        return h_fd.astype(np.complex)
 
     def __getitem__(self, idx):
+        # print(self.apply_wchannel)
         dataset = self.ds_info['ds_indexes'][self.ds_type]
-        # first retrieve the internal sample index relative to the linear index idx
+
+        # first retrieve
+        #  the internal sample index relative to the linear index idx
         s_idx = self.ds_info['ixs_maps'][self.ds_type][idx]
         # retrieve the info relative to this input sample
         obs_info = dataset['data'][s_idx]
+        # print("OBS INFO", obs_info)
+
         # let's first retrieve the signal from the cache (or load it in if not present)
         sig_dict = self.signal_cache.get(obs_info['path'])
         self.last_file_loaded = obs_info['path']
@@ -358,13 +651,65 @@ class TPrimeDataset(Dataset):
 
             sig_dict = self.signal_cache.get(obs_info['path'])
 
+
         label = dataset['labels'][s_idx]
-        # apply wireless channel and noise if required
         chan_sig = self.apply_wchan(sig_dict['mat'], label) if not (self.apply_wchannel is None) else sig_dict['np']
+
+        # chan_sig = self.rms_normalize(chan_sig)
+        # print(self.apply_noise)
+        # print("chan_sig dtype 1 :", chan_sig.dtype)
+        # print(len(chan_sig))
+        if self.use_cfo:
+            chan_sig = self.apply_cfo_single(chan_sig, self.max_cfo, 30.72e6)
+
+        # print("chan_sig dtype 2 :", chan_sig.dtype)
+        # print(len(chan_sig))
+        
+        if self.use_channel_aug:
+            # print("using aug")
+            h_fd = self.load_random_channel_fd(self.channel_path)
+            chan_sig = self.apply_channel_via_fft(h_fd, chan_sig)
+        # else:
+        #     chan_sig = self.rms_normalize(chan_sig)
+
+
+        # print("chan_sig dtype 3 :", chan_sig.dtype)
+        # print(len(chan_sig))
+        if self.use_sota:
+            if self.sota_type == 'awgn':
+                chan_sig = self.augment_awgn(chan_sig.flatten(), snr_dB_min=self.awgn_snr_range[0],
+                                             snr_dB_max=self.awgn_snr_range[1])
+                self.apply_noise = False
+
+            if self.sota_type == 'random_fir':
+                chan_sig = self.augment_random_fir(chan_sig.flatten())
+
+            if self.sota_type == 'rayleigh':
+                chan_sig = self.augment_rayleigh(chan_sig.flatten())
+
+            if self.sota_type == 'ricean':
+                chan_sig = self.augment_ricean(chan_sig.flatten())
+
+            if self.sota_type == 'impairments':
+                chan_sig = self.augment_impairments(chan_sig.flatten())
+
+        # print("chan_sig dtype 4 :", chan_sig.dtype)
+        # print(len(chan_sig))  
+
+
+        # print("cfo, channel aug", self.use_cfo, self.use_channel_aug)
+
+        
         noisy_sig = self.apply_AWGN(chan_sig) if self.apply_noise else chan_sig
+
+        noisy_sig = self.rms_normalize(noisy_sig)
+                
+        # print("chan_sig dtype 5 :", noisy_sig.dtype)
+        # print(len(noisy_sig))
 
         # then, retrieve the relative slice of the requested dataset sample
         obs = self.retrieve_obs(noisy_sig, obs_info)
+        # print("OBS", len(obs[0]), "OBS SHAPE", obs.shape)   
         if self.target_transform:
             label = self.target_transform(label)
         if self.double_class_label and (type(label) is not list):
@@ -380,6 +725,10 @@ class TPrimeDataset(Dataset):
         return seq
 
     def apply_AWGN(self, sig):
+        # print('applying AWGN')
+        # print('haha')
+        # print(self.snr_dbs)
+        # print('lol')
         # apply AWGN noise based on the levels specified when instantiating the dataset object
         # if more than one is specified, a random level is picked among the one specified
         # first, let's compute signal power (in Watts) as rms(sig)**2
@@ -438,11 +787,32 @@ class TPrimeDataset_Transformer(TPrimeDataset):
         super().__init__(**kwargs)
         
 
+    # def generate_windows(self, len_sig):
+    #     # print("second generate_windiows")
+    #     # print("self.slice_len", self.slice_len, "self.seq_len", self.seq_len, "self.overlap", self.overlap)
+    #     print(range(0, len_sig-(self.slice_len*self.seq_len), \
+    #                  self.overlap*(self.seq_len-1) + self.slice_len))
+    #     return list(range(0, len_sig-(self.slice_len*self.seq_len), \
+    #                 self.overlap*(self.seq_len-1) + self.slice_len)) # window is now seq_len*slice_len
+
+
+
     def generate_windows(self, len_sig):
-        return list(range(0, len_sig-(self.slice_len*self.seq_len), \
-                    self.overlap*(self.seq_len-1) + self.slice_len)) # window is now seq_len*slice_len
-    
+        stride = self.overlap * (self.seq_len - 1) + self.slice_len
+        starts = list(range(0, len_sig - stride + 1, stride))
+
+        # If there are leftover samples at the end, add one more window
+        if (starts and starts[-1] + stride < len_sig):
+            starts.append(len_sig - stride)
+        elif not starts:
+            starts.append(0)
+
+        #print(f"Using all: {starts}")
+        return starts
+
+
     def info(self):
+
         ds_info = {
             'seq_len': self.seq_len,
             'slice_len': self.slice_len,
@@ -452,10 +822,12 @@ class TPrimeDataset_Transformer(TPrimeDataset):
             'nclasses': len(self.protocols),
             'nchans': 2,    # real and imag components are separated on different channels
         }
+        #print("THIS IS DS INFO", ds_info)
         return ds_info
 
     def retrieve_obs(self, noisy_sig, obs_info):
         obs = noisy_sig[obs_info['sample_ix']:obs_info['sample_ix'] + self.overlap*(self.seq_len-1) + self.slice_len, 0]
+        #print("obs_info[sample]: ", obs_info['sample_ix'], "obs", obs)
         obs = np.stack((obs.real, obs.imag))
 
         if self.transform:
@@ -548,7 +920,9 @@ class TPrimeDataset_Transformer_overlap(TPrimeDataset_Transformer):
                 sig = np.fromfile(path, dtype=np.complex128)
                 len_sig = sig.shape[0]
                 window_ixs = self.generate_windows(len_sig)
+
                 n_windows = len(window_ixs)
+
                 examples_map[c][ix] = {'sample': window_ixs, # sample is slice for CNN or sequence for Transformer
                                        'path': examples_map[c][ix]}  # here we modify the original content
                 if ix <= test_threshold:
@@ -619,6 +993,7 @@ class TPrimeDataset_Transformer_overlap(TPrimeDataset_Transformer):
                 },
             'ixs_maps': {'train': train_ixs, 'test': test_ixs, 'calib': calib_ixs}  # linear indexes maps (used by ray/torch)
             }
+        print("DS_INFO_PATH", ds_info_path)
         pickle.dump(ds_info, open(ds_info_path, 'wb'))
 
 
@@ -629,23 +1004,24 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument("--protocols", nargs='+', default=['802_11ax', '802_11b_upsampled', '802_11n', '802_11g'],
-                        choices=['802_11ax', '802_11b', '802_11b_upsampled', '802_11n', '802_11g'],
+    parser.add_argument("--protocols", nargs='+', default= ['16QAM', '64QAM', '8PSK', 'BPSK', 'CPFSK', 'GFSK', 'PAM4', 'QPSK'],
+                        choices= ['16QAM', '64QAM', '8PSK', 'BPSK', 'CPFSK', 'GFSK', 'PAM4', 'QPSK', '802.11ax', '802.11b', '802.11g', '802.11n'],
                         help="Specify the protocols/classes to be included in the dataset")
     parser.add_argument('--raw_path', default='../data/DSTL_DATASET_1_0', help='Path where raw signals are stored.')
     parser.add_argument('--postfix', default='', help='Postfix to append to dataset file.')
     parser.add_argument('--slicelen', default=128, type=int, help='Signal slice size')
     parser.add_argument('--overlap_ratio', default=0.5, help='Overlap ratio for slices generation')
     parser.add_argument('--raw_data_ratio', default=1.0, type=float, help='Specify the ratio of examples per class to consider while training/testing')
+
     args, _ = parser.parse_known_args()
 
     myds = TPrimeDataset(protocols=args.protocols, ds_path=args.raw_path, slice_len=args.slicelen, slice_overlap_ratio=args.overlap_ratio, raw_data_ratio=args.raw_data_ratio,
-                       apply_wchannel='TGn', file_postfix=args.postfix)    # this case has consistent sampling rates (20 MHz) and applies a specific channel to all signals
+                       apply_wchannel=None, file_postfix=args.postfix)    # this case has consistent sampling rates (20 MHz) and applies a specific channel to all signals
 
     import matplotlib.pyplot as plt
     classes_slice_count = {}
     # compute an histogram that shows the distribution of labels in the dataset
-    for k in ['802_11ax', '802_11b_upsampled', '802_11n', '802_11g']:
+    for k in args.protocols:
         classes_slice_count[k] = 0
         for key_idx, content in myds.ds_info['examples_map'][k].items():
              classes_slice_count[k] += len(content['slices'])

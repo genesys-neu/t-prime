@@ -66,7 +66,7 @@ class MCformer(nn.Module):
         self.flatten = nn.Flatten()
         # Fully connected layers
         self.fc1 = nn.Linear(128, 128)
-        self.fc2 = nn.Linear(128, 4)
+        self.fc2 = nn.Linear(128, 11)
 
     def forward(self, x):
         x = x.unsqueeze(-1) # unsqueeze the last dimension

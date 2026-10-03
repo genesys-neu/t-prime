@@ -77,6 +77,7 @@ def validate_epoch(dataloader, model, loss_fn, Nclasses, use_ray=False):
             y_cpu = y.to('cpu')
             pred_cpu = pred.to('cpu')
             conf_matrix += conf_mat(y_cpu, pred_cpu.argmax(1), labels=list(range(Nclasses)))
+            #here
     test_loss /= num_batches
     correct /= size
     print(
@@ -117,19 +118,23 @@ def train_func(config: Dict):
 
     # Create model.
     if config['pytorch_model'] == 'baseline_cnn1d':
+        print("NUMBER OF CLASSES", Nclass)
         model = Baseline_CNN1D(classes=Nclass, numChannels=num_channels, slice_len=slice_len, normalize=config['normalize'])
         loss_fn = nn.NLLLoss()
     elif config['pytorch_model'] == 'AMCNet':
         model = AMC_Net(num_classes=Nclass)
         loss_fn = nn.CrossEntropyLoss()
     elif config['pytorch_model'] == 'ResNet':
+        print("NUMBER OF CLASSES FO RNN", Nclass, "SLICE LEn", slice_len)
         model = ResNet(num_classes=Nclass, num_samples=slice_len, iq_dim=2, kernel_size=3, pool_size=2)
         loss_fn = nn.CrossEntropyLoss()
     elif config['pytorch_model'] == 'LSTM':
         model = LSTM_ap(input_shape=[slice_len, 2], hidden_size=128, output_size=Nclass, num_layers=2)
         loss_fn = nn.CrossEntropyLoss()
     elif config['pytorch_model'] == 'MCformer':
-        model = MCformer()
+        
+        model = MCformer(Nclass)
+        print("Nclass", Nclass)
         loss_fn = nn.CrossEntropyLoss()
 
     print("Model:", config['pytorch_model'], "Num. Parameters:", count_parameters(model) )
@@ -182,7 +187,7 @@ def train_func(config: Dict):
                     'optimizer_state_dict': optimizer.state_dict(),
                     'loss': loss,
                 }, os.path.join(logdir,f'model.{config["pytorch_model"]}.{config["wchannel"]}.{normalize_flag}{config["snr_dB"]}.pt'))
-                df_confmat = plot_confmatrix(logdir, pkl_file, train_config['class_labels'], 'conf_mat_epoch'+str(e)+'.png')
+                #df_confmat = plot_confmatrix(logdir, pkl_file, train_config['class_labels'], 'conf_mat_epoch'+str(e)+'.png')
                 if is_wandb:
                     wandb.log({'Confusion_Matrix': df_confmat.to_numpy()}, step=e)
     # return required for backwards compatibility with the old API
@@ -207,24 +212,34 @@ if __name__ == "__main__":
     parser.add_argument("--address", required=False, type=str, help="the address to use for Ray")
     parser.add_argument("--test", action="store_true", default=False, help="Testing the model")
     parser.add_argument("--cp_path", default='./', help='Path to the checkpoint to save/load the model.')
-    parser.add_argument("--protocols", nargs='+', default=['802_11ax', '802_11b_upsampled', '802_11n', '802_11g'],
-                        choices=['802_11ax', '802_11b', '802_11b_upsampled', '802_11n', '802_11g'], help="Specify the protocols/classes to be included in the training")
-    parser.add_argument("--channel", default=None, choices=['TGn', 'TGax', 'Rayleigh', 'relative', 'random', 'None', None], help="Specify the channel models to apply during data generation. ")
+    parser.add_argument("--protocols", nargs='+', default=['16QAM', '64QAM', '8PSK', 'BPSK', 'CPFSK', 'GFSK', 'PAM4', 'QPSK'],
+                        choices=['16QAM', '64QAM', '8PSK', 'BPSK', 'CPFSK', 'GFSK', 'PAM4', 'QPSK', '802_11ax'], help="Specify the protocols/classes to be included in the training")
+    parser.add_argument("--channel", default=None, choices=['TGn', 'TGax', 'Rayleigh', 'relative', 'random', '802_11ax', 'None', None], help="Specify the channel models to apply during data generation. ")
     parser.add_argument('--raw_path', default='../data/DATASET1_1', help='Path where raw signals are stored.')
     parser.add_argument('--slicelen', default=128, type=int, help='Signal slice size')
-    parser.add_argument('--overlap_ratio', default=0.5, help='Overlap ratio for slices generation')
+    parser.add_argument('--overlap_ratio', default=0, help='Overlap ratio for slices generation')
     parser.add_argument('--postfix', default='', help='Postfix to append to dataset file.')
     parser.add_argument('--raw_data_ratio', default=1.0, type=float, help='Specify the ratio of examples per class to consider while training/testing')
     parser.add_argument("--normalize", action='store_true', default=False, help="Use a layer norm as a first layer.")
     parser.add_argument('--model', choices=supported_models, default='baseline_cnn1d', help='Model to be used for training')
     parser.add_argument('--out_mode', choices=supported_outmode, default='real', help='Specify data generator output format')
     parser.add_argument('--debug', default=False, action='store_true', help='It will force run on cpu and disable Wandb.')
-
+    parser.add_argument('--channel_path', default='..folder_of_chans/wired', help='folder of channels to apply')
+    parser.add_argument('--use_channel_aug', action='store_true', default=False, help='Apply channel augmentation using .mat files in channel_path')
+    parser.add_argument("--use_sota", action='store_true', default=False, help="does it use sota")
+    parser.add_argument('--sota_type', default='awgn', help='what sota to use')
+    parser.add_argument("--use_cfo", action='store_true', default=False, help="does it use cfo offset")
+    parser.add_argument('--max_cfo', default='2000', help='what mac cfo to use in hz')
+    
     args, _ = parser.parse_known_args()
 
     print('Apply noise:', args.noise)
     args.channel = args.channel if args.channel != 'None' else None
     protocols = args.protocols
+    print('channel path', 'use channel aug','use sota', 'sota type', 'use cfo', 'max cfo')
+    print(args.channel_path, args.use_channel_aug, args.use_sota, args.sota_type)
+    print(args.use_cfo, args.max_cfo)
+
     ds_train = TPrimeDataset(protocols,
                            ds_path=args.raw_path,
                            ds_type='train',
@@ -236,7 +251,13 @@ if __name__ == "__main__":
                            override_gen_map=False,
                            apply_wchannel=args.channel,
                            apply_noise=args.noise,
-                           out_mode=args.out_mode)
+                           out_mode=args.out_mode,
+                           channel_path=args.channel_path,
+                           use_channel_aug=args.use_channel_aug,
+                           use_sota = args.use_sota,
+                           sota_type = args.sota_type,
+                           use_cfo = args.use_cfo,
+                           max_cfo = args.max_cfo)
     ds_test = TPrimeDataset(protocols,
                           ds_path=args.raw_path,
                           ds_type='test',
@@ -248,7 +269,14 @@ if __name__ == "__main__":
                           override_gen_map=False,    # it will use the same as above call
                           apply_wchannel=args.channel,
                           apply_noise=args.noise,
-                          out_mode=args.out_mode)
+                          out_mode=args.out_mode,
+                          channel_path=args.channel_path,
+                          use_channel_aug=args.use_channel_aug,
+                          use_sota = args.use_sota,
+                          sota_type = args.sota_type,
+                          use_cfo = args.use_cfo,
+                          max_cfo = args.max_cfo
+                          )
 
     if not os.path.isdir(args.cp_path):
         os.makedirs(args.cp_path)
@@ -258,7 +286,7 @@ if __name__ == "__main__":
         is_wandb = False
     else:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        is_wandb = True
+        is_wandb = False
 
 
     ds_info = ds_train.info()
@@ -272,7 +300,7 @@ if __name__ == "__main__":
 
         "lr": 1e-3,
         "batch_size": 512,
-        "epochs": 5,
+        "epochs": 20,
         'pytorch_model': args.model,
         'Nclass': Nclass,
         'useRay': args.useRay,
@@ -321,6 +349,8 @@ if __name__ == "__main__":
         wandb.run.name = f'{args.snr_db[0]} dBs {args.channel} sl:{ds_info["slice_len"]}'
 
     epochs_loss = train_func(train_config)
+    if not os.path.exists(args.cp_path):
+        os.makedirs(args.cp_path)
     pickle.dump(epochs_loss, open(os.path.join(args.cp_path, 'epochs_loss.pkl'), 'wb'))
     print(epochs_loss)
     if is_wandb:

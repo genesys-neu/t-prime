@@ -7,7 +7,7 @@ from torch.nn import TransformerEncoder, TransformerEncoderLayer
 class TransformerModel(nn.Module):
 
     def __init__(self, d_model: int = 512, seq_len: int = 64, nhead: int = 8, nlayers: int = 2,
-                 dropout: float = 0.1, classes: int = 4, use_pos: bool = False):
+                 dropout: float = 0.1, classes: int = 11, use_pos: bool = False):
         super(TransformerModel, self).__init__()
         self.model_type = 'Transformer'
 
@@ -77,7 +77,7 @@ class PositionalEncoding(nn.Module):
 
 class TransformerModel_multiclass_transfer(nn.Module):
 
-    def __init__(self, d_model: int = 512, seq_len: int = 64, nhead: int = 8, nlayers: int = 2, classes: int = 4):
+    def __init__(self, d_model: int = 512, seq_len: int = 64, nhead: int = 8, nlayers: int = 2, classes: int = 11):
         super(TransformerModel_multiclass_transfer, self).__init__()
         self.model_type = 'Transformer'
 
@@ -161,7 +161,7 @@ class TransformerModel_multiclass(nn.Module):
 class TransformerModel_v2(nn.Module):
 
     def __init__(self, d_model: int = 512, seq_len: int = 64, nhead: int = 8, nlayers: int = 2,
-                 dropout: float = 0.1, classes: int = 4, use_pos: bool = False):
+                 dropout: float = 0.1, classes: int = 11, use_pos: bool = False):
         super(TransformerModel_v2, self).__init__()
         self.model_type = 'Transformer'
 
